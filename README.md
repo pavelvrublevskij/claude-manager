@@ -4,6 +4,8 @@ A local web UI for managing Claude Code configuration — settings, memory, MCP 
 
 Runs entirely on your machine. No cloud, no accounts, no external dependencies beyond Node.js.
 
+![Dashboard](pics/dashboard0.1.0.png)
+
 ## Quick Start
 
 ```bash
