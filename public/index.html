@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Manager</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1><span class="logo">C</span> Claude Manager</h1>
+        <div class="version-badge" id="app-version"></div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">General</div>
+          <div class="nav-item active" data-view="dashboard">
+            <span class="icon">&#9673;</span> Dashboard
+          </div>
+          <div class="nav-item" data-view="settings">
+            <span class="icon">&#9881;</span> Settings
+          </div>
+          <div class="nav-item" data-view="global-claude-md">
+            <span class="icon">&#9997;</span> Global CLAUDE.md
+          </div>
+          <div class="nav-item" data-view="mcp-servers">
+            <span class="icon">&#9889;</span> MCP Servers
+          </div>
+          <div class="nav-item" data-view="keybindings">
+            <span class="icon">&#9000;</span> Keybindings
+          </div>
+          <div class="nav-item" data-view="skills">
+            <span class="icon">&#9733;</span> Skills
+          </div>
+          <div class="nav-item" data-view="output-styles">
+            <span class="icon">&#9998;</span> Output Styles
+          </div>
+          <div class="nav-item" data-view="plugins">
+            <span class="icon">&#9670;</span> Plugins
+          </div>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">Projects</div>
+          <div class="nav-item" data-view="projects">
+            <span class="icon">&#9776;</span> All Projects
+          </div>
+          <div class="project-list" id="project-nav-list"></div>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="theme-toggle" id="theme-toggle" onclick="Theme.toggle()" title="Toggle light/dark mode">
+          <span id="theme-icon">&#9790;</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+      <div class="update-banner" id="update-banner" style="display:none"></div>
+      <!-- Dashboard View -->
+      <div class="view active" id="view-dashboard">
+        <div class="view-header">
+          <h2>Dashboard</h2>
+          <div class="subtitle">Overview of your Claude Code environment</div>
+        </div>
+        <div class="view-body">
+          <div class="dashboard-stats" id="dashboard-stats"></div>
+          <h3 style="margin:24px 0 12px">Recent Sessions</h3>
+          <div id="dashboard-recent-sessions"></div>
+        </div>
+      </div>
+
+      <!-- Settings View -->
+      <div class="view" id="view-settings">
+        <div class="view-header">
+          <h2>Settings</h2>
+          <div class="subtitle">~/.claude/settings.json</div>
+        </div>
+        <div class="view-body">
+          <div class="settings-toolbar">
+            <div class="btn-group">
+              <button class="btn" onclick="Settings.reload()">Reload</button>
+              <button class="btn btn-primary" onclick="Settings.save()">Save</button>
+              <button class="btn" onclick="Settings.toggleRaw()">Toggle Raw JSON</button>
+            </div>
+            <button class="btn btn-sm" onclick="Settings.addRootProperty()">+ Add Property</button>
+          </div>
+          <div class="info-note">
+            Global settings for Claude Code. Controls permissions, auto-updates, hooks, MCP, sandbox, and more.
+            Precedence: managed &gt; CLI args &gt; local project &gt; shared project &gt; user (this file).
+            Changes auto-reload in Claude Code.
+          </div>
+          <div id="settings-visual" class="settings-tree"></div>
+          <div id="settings-raw" style="display:none">
+            <div class="form-group">
+              <label>Raw JSON</label>
+              <textarea id="settings-editor" class="json-editor" rows="20"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Global CLAUDE.md View -->
+      <div class="view" id="view-global-claude-md">
+        <div class="view-header">
+          <h2>Global CLAUDE.md</h2>
+          <div class="subtitle">~/.claude/CLAUDE.md</div>
+        </div>
+        <div class="view-body">
+          <div class="btn-group" style="margin-bottom: 12px">
+            <button class="btn" onclick="ClaudeMd.reloadGlobal()">Reload</button>
+            <button class="btn btn-primary" onclick="ClaudeMd.saveGlobal()">Save</button>
+          </div>
+          <div class="info-note">
+            Personal instructions loaded into every Claude Code session across all projects.
+            Use for your preferences, role context, and default behaviors. Project-level <code>CLAUDE.md</code> files override these.
+          </div>
+          <div class="editor-container">
+            <div class="editor-pane">
+              <label>Editor</label>
+              <textarea id="global-claude-md-editor"></textarea>
+            </div>
+            <div class="editor-pane">
+              <label>Preview</label>
+              <div class="preview-pane" id="global-claude-md-preview"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MCP Servers View -->
+      <div class="view" id="view-mcp-servers">
+        <div class="view-header">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <h2>MCP Servers</h2>
+              <div class="subtitle">~/.claude/.mcp.json</div>
+            </div>
+            <div class="btn-group">
+              <button class="btn" onclick="McpServers.load()">Reload</button>
+              <button class="btn btn-primary" onclick="McpServers.save()">Save</button>
+              <button class="btn" onclick="McpServers.addServer()">+ Add Server</button>
+            </div>
+          </div>
+        </div>
+        <div class="view-body">
+          <div id="mcp-servers-list"></div>
+        </div>
+      </div>
+
+      <!-- Keybindings View -->
+      <div class="view" id="view-keybindings">
+        <div class="view-header">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <h2>Keybindings</h2>
+              <div class="subtitle">~/.claude/keybindings.json</div>
+            </div>
+            <div class="btn-group">
+              <button class="btn" onclick="Keybindings.load()">Reload</button>
+              <button class="btn btn-primary" onclick="Keybindings.save()">Save</button>
+            </div>
+          </div>
+        </div>
+        <div class="view-body">
+          <div id="keybindings-editor"></div>
+        </div>
+      </div>
+
+      <!-- Skills View -->
+      <div class="view" id="view-skills">
+        <div class="view-header">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <h2>Skills</h2>
+              <div class="subtitle">~/.claude/skills/ — Custom slash commands</div>
+            </div>
+            <div class="btn-group">
+              <button class="btn" onclick="Skills.load()">Reload</button>
+              <button class="btn" onclick="Skills.showCreate()">+ New Skill</button>
+            </div>
+          </div>
+        </div>
+        <div class="view-body">
+          <div id="skills-content"></div>
+        </div>
+      </div>
+
+      <!-- Output Styles View -->
+      <div class="view" id="view-output-styles">
+        <div class="view-header">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <h2>Output Styles</h2>
+              <div class="subtitle">~/.claude/output-styles/ — Response style presets</div>
+            </div>
+            <div class="btn-group">
+              <button class="btn" onclick="OutputStyles.load()">Reload</button>
+              <button class="btn" onclick="OutputStyles.showCreate()">+ New Style</button>
+            </div>
+          </div>
+        </div>
+        <div class="view-body">
+          <div id="output-styles-content"></div>
+        </div>
+      </div>
+
+      <!-- Plugins View -->
+      <div class="view" id="view-plugins">
+        <div class="view-header">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <h2>Plugins</h2>
+              <div class="subtitle">~/.claude/plugins/ — Installed plugins and blocklist</div>
+            </div>
+            <button class="btn" onclick="Plugins.load()">Reload</button>
+          </div>
+        </div>
+        <div class="view-body">
+          <div id="plugins-content"></div>
+        </div>
+      </div>
+
+      <!-- Projects List View -->
+      <div class="view" id="view-projects">
+        <div class="view-header">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <h2>Projects</h2>
+              <div class="subtitle">Auto-discovered from ~/.claude/projects/</div>
+            </div>
+            <button class="btn btn-sm" onclick="Projects.load(); toast('Projects refreshed')">Refresh</button>
+          </div>
+        </div>
+        <div class="view-body">
+          <div class="card-grid" id="projects-grid"></div>
+        </div>
+      </div>
+
+      <!-- Project Detail View -->
+      <div class="view" id="view-project-detail">
+        <div class="view-header">
+          <h2 id="project-detail-title">Project</h2>
+          <div class="subtitle" id="project-detail-path"></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
+            <div class="tab-bar">
+              <button class="tab-btn active" onclick="ProjectTabs.switch('memory', this)">Memory</button>
+              <button class="tab-btn" id="sessions-tab-btn" onclick="ProjectTabs.switch('sessions', this)">Sessions</button>
+              <button class="tab-btn" onclick="ProjectTabs.switch('proj-settings', this)">Settings</button>
+              <button class="tab-btn" onclick="ProjectTabs.switch('proj-mcp', this)">MCP</button>
+              <button class="tab-btn" onclick="ProjectTabs.switch('proj-agents', this)">Agents</button>
+            </div>
+            <button class="btn btn-sm" onclick="ProjectTabs.refresh()">Refresh</button>
+          </div>
+        </div>
+        <div class="view-body">
+          <div class="project-tab active" id="tab-memory">
+            <div class="memory-layout">
+              <div class="memory-list">
+                <div class="memory-list-header">
+                  <label style="margin:0">Memory Files</label>
+                  <button class="btn btn-sm" onclick="Memory.showCreate()">+ New</button>
+                </div>
+                <div id="memory-file-list"></div>
+              </div>
+              <div class="memory-editor" id="memory-editor-pane">
+                <div class="empty-state"><div class="icon">&#128196;</div><p>Select a memory file to edit</p></div>
+              </div>
+            </div>
+          </div>
+          <div class="project-tab" id="tab-sessions">
+            <div id="sessions-list"></div>
+          </div>
+          <div class="project-tab" id="tab-proj-settings">
+            <div id="proj-settings-content"></div>
+          </div>
+          <div class="project-tab" id="tab-proj-mcp">
+            <div id="proj-mcp-content"></div>
+          </div>
+          <div class="project-tab" id="tab-proj-agents">
+            <div id="proj-agents-content"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Session Detail View -->
+      <div class="view" id="view-session-detail">
+        <div class="view-header">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <button class="btn btn-sm" onclick="App.navigate('project-detail', { slug: App.currentProject })">&#8592; Back</button>
+              <h2 id="session-detail-title">Session</h2>
+            </div>
+            <button class="btn btn-sm" onclick="Sessions.loadDetail(Sessions.detailState.slug, Sessions.detailState.sessionId, null)">Refresh</button>
+          </div>
+          <div class="subtitle" id="session-detail-meta"></div>
+          <div class="subtitle" id="session-count" style="margin-top:4px;color:var(--text-muted)"></div>
+        </div>
+        <div class="view-body">
+          <div id="session-messages" class="chat-container"></div>
+        </div>
+      </div>
+
+      <!-- Project CLAUDE.md View -->
+      <div class="view" id="view-project-claude-md">
+        <div class="view-header">
+          <h2 id="project-claude-md-title">Project CLAUDE.md</h2>
+          <div class="subtitle" id="project-claude-md-path"></div>
+        </div>
+        <div class="view-body">
+          <div class="btn-group" style="margin-bottom: 12px">
+            <button class="btn" onclick="ClaudeMd.reloadProject()">Reload</button>
+            <button class="btn btn-primary" onclick="ClaudeMd.saveProject()">Save</button>
+          </div>
+          <div class="editor-container">
+            <div class="editor-pane">
+              <label>Editor</label>
+              <textarea id="project-claude-md-editor"></textarea>
+            </div>
+            <div class="editor-pane">
+              <label>Preview</label>
+              <div class="preview-pane" id="project-claude-md-preview"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="/js/utils.js"></script>
+  <script src="/js/modal.js"></script>
+  <script src="/js/dashboard.js"></script>
+  <script src="/js/settings.js"></script>
+  <script src="/js/projects.js"></script>
+  <script src="/js/memory.js"></script>
+  <script src="/js/claude-md.js"></script>
+  <script src="/js/sessions.js"></script>
+  <script src="/js/project-tabs.js"></script>
+  <script src="/js/mcp-servers.js"></script>
+  <script src="/js/keybindings.js"></script>
+  <script src="/js/skills.js"></script>
+  <script src="/js/output-styles.js"></script>
+  <script src="/js/plugins.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
