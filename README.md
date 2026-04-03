@@ -4,8 +4,6 @@ A local web UI for managing Claude Code configuration — settings, memory, MCP 
 
 Runs entirely on your machine. No cloud, no accounts, no external dependencies beyond Node.js.
 
-![Dashboard](pics/dashboard0.1.0.png)
-
 ## Quick Start
 
 ```bash
@@ -24,6 +22,7 @@ Open [http://127.0.0.1:3000](http://127.0.0.1:3000)
 
 | Feature | Config File | Actions |
 |---------|-------------|---------|
+| **Token Usage** | `data/usage-index.json` | Aggregated stats, cost estimates, period/project breakdowns |
 | **Settings** | `~/.claude/settings.json` | Visual tree editor + raw JSON |
 | **CLAUDE.md** | `~/.claude/CLAUDE.md` | Markdown editor with live preview |
 | **MCP Servers** | `~/.claude/.mcp.json` | Add, edit, enable/disable, delete |
@@ -33,24 +32,31 @@ Open [http://127.0.0.1:3000](http://127.0.0.1:3000)
 | **Output Styles** | `~/.claude/output-styles/*.md` | Create, edit, delete response presets |
 | **Plugins** | `~/.claude/plugins/` | View marketplaces and blocklist (read-only) |
 | **Project Memory** | `~/.claude/projects/*/memory/` | CRUD memory files with frontmatter editor |
-| **Sessions** | `~/.claude/projects/*/` | Browse session history, view conversations |
+| **Sessions** | `~/.claude/projects/*/` | Browse session history with token/cost badges |
 | **Project Settings** | `.claude/settings.local.json` | Edit local and shared project permissions |
 | **Project MCP** | `.claude/.mcp.json` | Project-level MCP server config |
 | **Project Agents** | `.claude/agents/*.md` | Create, edit, delete custom subagents |
+| **Project Skills** | `.claude/skills/*/SKILL.md` | Project-scoped custom slash commands |
+
+## Custom Skills
+
+This project includes a `/p-run` skill to start the development server.
 
 ## Architecture
 
 ```
-server.js          # Express entry point (~30 lines)
+server.js          # Express entry point
 lib/               # Shared server helpers
   paths.js         # Path constants
   file-helpers.js  # File I/O: backup, readJson, validation
   slug.js          # Project slug <-> filesystem path decoder
   frontmatter.js   # YAML frontmatter read/write helpers
-routes/            # Express route modules (12 files)
+  usage-index.js   # Token usage indexer and aggregation
+routes/            # Express route modules (13 files)
+data/              # App-local storage (gitignored, never in ~/.claude/)
 public/
   index.html       # SPA shell
-  css/style.css    # Dark theme
+  css/style.css    # Dark/light theme
   js/
     utils.js       # Shared client utilities + constants
     modal.js       # Modal dialog factory
@@ -70,3 +76,15 @@ Works on Windows, macOS, and Linux. Path resolution handles all OS conventions a
 - All file writes create a backup first
 - Path traversal is prevented on all endpoints
 - No credentials or secrets are ever written — only read for display
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
+## Screenshots
+
+### Dashboard
+![Dashboard](pics/dashboard.png)
+
+### Token Usage
+![Token Usage](pics/token_usage.png)

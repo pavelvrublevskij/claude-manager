@@ -41,10 +41,6 @@ const ClaudeMd = {
 
   async loadProject(slug) {
     ClaudeMd.currentProjectSlug = slug;
-    const project = Projects.data.find(p => p.slug === slug);
-
-    document.getElementById('project-claude-md-title').textContent =
-      project ? decodeName(slug) + ' — CLAUDE.md' : 'Project CLAUDE.md';
 
     try {
       const data = await api(`/api/claude-md/project/${slug}`);

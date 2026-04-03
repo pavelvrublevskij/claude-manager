@@ -36,9 +36,19 @@ function checkLatestVersion() {
   });
 }
 
+function isNewer(remote, local) {
+  const r = remote.split('.').map(Number);
+  const l = local.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((r[i] || 0) > (l[i] || 0)) return true;
+    if ((r[i] || 0) < (l[i] || 0)) return false;
+  }
+  return false;
+}
+
 app.get('/api/version', async (req, res) => {
   const latest = await checkLatestVersion();
-  const updateAvailable = latest && latest !== version;
+  const updateAvailable = latest && latest !== version && isNewer(latest, version);
   res.json({ version, latest, updateAvailable });
 });
 
@@ -56,6 +66,7 @@ app.use('/api/agents', require('./routes/agents'));
 app.use('/api/output-styles', require('./routes/output-styles'));
 app.use('/api/plugins', require('./routes/plugins'));
 app.use('/api/project-settings', require('./routes/project-settings'));
+app.use('/api/usage', require('./routes/usage'));
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

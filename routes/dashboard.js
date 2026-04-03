@@ -4,6 +4,7 @@ const path = require('path');
 const { PROJECTS_DIR, SKILLS_DIR, OUTPUT_STYLES_DIR, MCP_FILE, KEYBINDINGS_FILE } = require('../lib/paths');
 const { readJson, wrapRoute } = require('../lib/file-helpers');
 const { decodeSlug } = require('../lib/slug');
+const { buildIndex, calcCostMultiModel } = require('../lib/usage-index');
 
 /** Gather dashboard stats and recent sessions across all projects. */
 router.get('/', wrapRoute(async (req, res) => {
@@ -86,6 +87,16 @@ router.get('/', wrapRoute(async (req, res) => {
           } catch (_) { /* unreadable file */ }
         }
       } catch (_) {}
+    }
+  }
+
+  // Enrich with token usage
+  const usageIndex = buildIndex();
+  for (const s of recentSessions) {
+    const entry = usageIndex.sessions[s.slug + '/' + s.sessionId];
+    if (entry) {
+      s.tokens = entry.totals;
+      s.cost = calcCostMultiModel(entry.byModel || {}).total;
     }
   }
 

@@ -25,6 +25,8 @@ const Sessions = {
               <div class="meta-item">Created <span class="meta-value">${created}</span></div>
               <div class="meta-item">Modified <span class="meta-value">${modified}</span></div>
               <div class="meta-item">Messages <span class="meta-value">${s.messageCount}</span></div>
+              ${s.tokens ? `<span class="token-badge badge-tokens">${Sessions.fmtTokens((s.tokens.input_tokens || 0) + (s.tokens.output_tokens || 0))} tokens</span>` : ''}
+              ${s.cost ? `<span class="token-badge badge-cost">$${s.cost.toFixed(2)}</span>` : ''}
               ${s.gitBranch ? `<span class="session-branch">${escapeHtml(s.gitBranch)}</span>` : ''}
               ${s.lastGitBranch && s.lastGitBranch !== s.gitBranch ? `<span class="session-branch" style="opacity:0.7">&#8594; ${escapeHtml(s.lastGitBranch)}</span>` : ''}
               ${s.isSidechain ? '<span class="session-sidechain">sidechain</span>' : ''}
@@ -175,5 +177,12 @@ const Sessions = {
         ${bodyHtml}
       </div>
     `;
+  },
+
+  fmtTokens(n) {
+    if (!n) return '0';
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+    return String(n);
   }
 };

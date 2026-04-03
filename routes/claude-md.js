@@ -22,9 +22,20 @@ router.put('/global', wrapRoute((req, res) => {
   res.json({ ok: true });
 }));
 
+function findProjectClaudeMd(projectPath) {
+  const candidates = [
+    path.join(projectPath, '.claude', 'CLAUDE.md'),
+    path.join(projectPath, 'CLAUDE.md')
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return candidates[0];
+}
+
 router.get('/project/:slug', wrapRoute((req, res) => {
   const decodedPath = decodeSlug(req.params.slug);
-  const filePath = path.join(decodedPath, 'CLAUDE.md');
+  const filePath = findProjectClaudeMd(decodedPath);
 
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
@@ -36,7 +47,7 @@ router.get('/project/:slug', wrapRoute((req, res) => {
 
 router.put('/project/:slug', wrapRoute((req, res) => {
   const decodedPath = decodeSlug(req.params.slug);
-  const filePath = path.join(decodedPath, 'CLAUDE.md');
+  const filePath = findProjectClaudeMd(decodedPath);
 
   backup(filePath);
   fs.writeFileSync(filePath, req.body.content, 'utf-8');

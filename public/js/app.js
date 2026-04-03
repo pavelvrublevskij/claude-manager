@@ -47,7 +47,7 @@ const App = {
       const sessions = Sessions.cache[slug] || [];
       const info = sessions.find(s => s.sessionId === sessionId);
       App.navigate('session-detail', { slug, sessionId, sessionInfo: info }, true);
-    } else if ((view === 'project-detail' || view === 'project-claude-md') && slug) {
+    } else if (view === 'project-detail' && slug) {
       App.navigate(view, { slug }, true);
     } else {
       App.navigate(view, {}, true);
@@ -70,6 +70,7 @@ const App = {
     // Simple views with direct ID mapping
     const simpleViews = {
       'dashboard': () => Dashboard.load(),
+      'usage': () => Usage.load(),
       'settings': () => Settings.load(),
       'global-claude-md': () => ClaudeMd.loadGlobal(),
       'projects': () => Projects.load(),
@@ -86,6 +87,7 @@ const App = {
     } else if (view === 'project-detail') {
       document.getElementById('view-project-detail').classList.add('active');
       App.currentProject = opts.slug;
+      ProjectNav.expand();
       // Reset to memory tab
       document.querySelectorAll('.project-tab').forEach(t => t.classList.remove('active'));
       document.getElementById('tab-memory').classList.add('active');
@@ -96,7 +98,9 @@ const App = {
       const project = Projects.data.find(p => p.slug === opts.slug);
       const sessionsTabBtn = document.getElementById('sessions-tab-btn');
       if (sessionsTabBtn) {
-        sessionsTabBtn.style.display = (project && project.sessionCount > 0) ? '' : 'none';
+        const count = project ? project.sessionCount : 0;
+        sessionsTabBtn.style.display = count > 0 ? '' : 'none';
+        sessionsTabBtn.textContent = count > 0 ? `Sessions (${count})` : 'Sessions';
       }
       // Highlight in sidebar
       document.querySelectorAll('.project-list .nav-item').forEach(el => {
@@ -106,10 +110,6 @@ const App = {
       document.getElementById('view-session-detail').classList.add('active');
       App.currentProject = opts.slug;
       Sessions.loadDetail(opts.slug, opts.sessionId, opts.sessionInfo);
-    } else if (view === 'project-claude-md') {
-      document.getElementById('view-project-claude-md').classList.add('active');
-      App.currentProject = opts.slug;
-      ClaudeMd.loadProject(opts.slug);
     }
 
     // Update URL hash

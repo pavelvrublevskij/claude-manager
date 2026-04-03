@@ -60,4 +60,32 @@ router.get('/project/:slug', (req, res) => {
   res.json(listSkills(path.join(decodedPath, '.claude', 'skills')));
 });
 
+router.get('/project/:slug/:name', wrapRoute((req, res) => {
+  const decodedPath = decodeSlug(req.params.slug);
+  const skillFile = path.join(decodedPath, '.claude', 'skills', req.params.name, 'SKILL.md');
+  if (!fs.existsSync(skillFile)) return res.status(404).json({ error: 'Not found' });
+  const { frontmatter, content, raw } = readFrontmatterFile(skillFile);
+  res.json({ name: req.params.name, frontmatter, content, raw });
+}));
+
+router.put('/project/:slug/:name', wrapRoute((req, res) => {
+  const decodedPath = decodeSlug(req.params.slug);
+  const dir = path.join(decodedPath, '.claude', 'skills', req.params.name);
+  const skillFile = path.join(dir, 'SKILL.md');
+  fs.mkdirSync(dir, { recursive: true });
+  backup(skillFile);
+  writeFrontmatter(skillFile, req.body.frontmatter || {}, req.body.content || '');
+  res.json({ ok: true });
+}));
+
+router.delete('/project/:slug/:name', wrapRoute((req, res) => {
+  const decodedPath = decodeSlug(req.params.slug);
+  const dir = path.join(decodedPath, '.claude', 'skills', req.params.name);
+  if (!fs.existsSync(dir)) return res.status(404).json({ error: 'Not found' });
+  const skillFile = path.join(dir, 'SKILL.md');
+  backup(skillFile);
+  fs.rmSync(dir, { recursive: true });
+  res.json({ ok: true });
+}));
+
 module.exports = router;
