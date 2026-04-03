@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { safeSlug, wrapRoute } = require('../lib/file-helpers');
+const { getProjectUsageMap } = require('../lib/usage-index');
 
 const router = express.Router({ mergeParams: true });
 
@@ -23,6 +24,11 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
         gitBranch: e.gitBranch || '',
         isSidechain: e.isSidechain || false
       }));
+      const usageMap = getProjectUsageMap(req.params.slug);
+      sessions.forEach(s => {
+        const u = usageMap[s.sessionId];
+        if (u) { s.tokens = u.totals; s.cost = u.cost; }
+      });
       sessions.sort((a, b) => new Date(b.modified || 0) - new Date(a.modified || 0));
       return res.json(sessions);
     } catch (_) { /* malformed index, fall through to JSONL parsing */ }
@@ -77,7 +83,12 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
     return session;
   });
 
+  const usageMap = getProjectUsageMap(req.params.slug);
   const filtered = sessions.filter(s => s.messageCount > 0);
+  filtered.forEach(s => {
+    const u = usageMap[s.sessionId];
+    if (u) { s.tokens = u.totals; s.cost = u.cost; }
+  });
   filtered.sort((a, b) => new Date(b.modified) - new Date(a.modified));
   res.json(filtered);
 }));

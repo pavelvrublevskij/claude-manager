@@ -1,10 +1,11 @@
 {
   "name": "claude-manager",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local web UI for managing Claude Code settings and memory",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
   "dependencies": {
     "express": "^4.21.0",

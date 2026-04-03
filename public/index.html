@@ -20,6 +20,9 @@
           <div class="nav-item active" data-view="dashboard">
             <span class="icon">&#9673;</span> Dashboard
           </div>
+          <div class="nav-item" data-view="usage">
+            <span class="icon">&#128200;</span> Token Usage
+          </div>
           <div class="nav-item" data-view="settings">
             <span class="icon">&#9881;</span> Settings
           </div>
@@ -43,11 +46,16 @@
           </div>
         </div>
         <div class="nav-section">
-          <div class="nav-section-title">Projects</div>
-          <div class="nav-item" data-view="projects">
-            <span class="icon">&#9776;</span> All Projects
+          <div class="nav-section-title" onclick="ProjectNav.toggle()" style="cursor:pointer;user-select:none">
+            <span id="project-nav-arrow" class="nav-arrow">&#9654;</span> Projects
+            <span class="badge" id="project-nav-count"></span>
           </div>
-          <div class="project-list" id="project-nav-list"></div>
+          <div id="project-nav-body" class="collapsed">
+            <div class="nav-item" data-view="projects">
+              <span class="icon">&#9776;</span> All Projects
+            </div>
+            <div class="project-list" id="project-nav-list"></div>
+          </div>
         </div>
       </nav>
       <div class="sidebar-footer">
@@ -70,6 +78,30 @@
           <div class="dashboard-stats" id="dashboard-stats"></div>
           <h3 style="margin:24px 0 12px">Recent Sessions</h3>
           <div id="dashboard-recent-sessions"></div>
+        </div>
+      </div>
+
+      <!-- Usage View -->
+      <div class="view" id="view-usage">
+        <div class="view-header">
+          <h2>Token Usage</h2>
+          <div class="subtitle">Aggregated token consumption and estimated costs</div>
+        </div>
+        <div class="view-body">
+          <div id="usage-model-filter"></div>
+          <div class="dashboard-stats" id="usage-summary"></div>
+          <h3 style="margin:24px 0 12px">Model Pricing</h3>
+          <div id="usage-pricing"></div>
+          <h3 style="margin:24px 0 12px">Usage by Period</h3>
+          <div class="tab-bar" id="usage-period-tabs">
+            <button class="tab-btn" data-group="day" onclick="Usage.setGroup('day', this)">Day</button>
+            <button class="tab-btn" data-group="week" onclick="Usage.setGroup('week', this)">Week</button>
+            <button class="tab-btn active" data-group="month" onclick="Usage.setGroup('month', this)">Month</button>
+            <button class="tab-btn" data-group="year" onclick="Usage.setGroup('year', this)">Year</button>
+          </div>
+          <div id="usage-periods" style="margin-top:12px"></div>
+          <h3 style="margin:24px 0 12px">Usage by Project</h3>
+          <div id="usage-projects"></div>
         </div>
       </div>
 
@@ -252,6 +284,8 @@
               <button class="tab-btn" onclick="ProjectTabs.switch('proj-settings', this)">Settings</button>
               <button class="tab-btn" onclick="ProjectTabs.switch('proj-mcp', this)">MCP</button>
               <button class="tab-btn" onclick="ProjectTabs.switch('proj-agents', this)">Agents</button>
+              <button class="tab-btn" onclick="ProjectTabs.switch('proj-skills', this)">Skills</button>
+              <button class="tab-btn" onclick="ProjectTabs.switch('claude-md', this)">CLAUDE.md</button>
             </div>
             <button class="btn btn-sm" onclick="ProjectTabs.refresh()">Refresh</button>
           </div>
@@ -283,6 +317,26 @@
           <div class="project-tab" id="tab-proj-agents">
             <div id="proj-agents-content"></div>
           </div>
+          <div class="project-tab" id="tab-proj-skills">
+            <div id="proj-skills-content"></div>
+          </div>
+          <div class="project-tab" id="tab-claude-md">
+            <div id="project-claude-md-path" style="font-size:12px;color:var(--text-muted);margin-bottom:12px"></div>
+            <div class="btn-group" style="margin-bottom: 12px">
+              <button class="btn" onclick="ClaudeMd.reloadProject()">Reload</button>
+              <button class="btn btn-primary" onclick="ClaudeMd.saveProject()">Save</button>
+            </div>
+            <div class="editor-container">
+              <div class="editor-pane">
+                <label>Editor</label>
+                <textarea id="project-claude-md-editor"></textarea>
+              </div>
+              <div class="editor-pane">
+                <label>Preview</label>
+                <div class="preview-pane" id="project-claude-md-preview"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -304,29 +358,6 @@
         </div>
       </div>
 
-      <!-- Project CLAUDE.md View -->
-      <div class="view" id="view-project-claude-md">
-        <div class="view-header">
-          <h2 id="project-claude-md-title">Project CLAUDE.md</h2>
-          <div class="subtitle" id="project-claude-md-path"></div>
-        </div>
-        <div class="view-body">
-          <div class="btn-group" style="margin-bottom: 12px">
-            <button class="btn" onclick="ClaudeMd.reloadProject()">Reload</button>
-            <button class="btn btn-primary" onclick="ClaudeMd.saveProject()">Save</button>
-          </div>
-          <div class="editor-container">
-            <div class="editor-pane">
-              <label>Editor</label>
-              <textarea id="project-claude-md-editor"></textarea>
-            </div>
-            <div class="editor-pane">
-              <label>Preview</label>
-              <div class="preview-pane" id="project-claude-md-preview"></div>
-            </div>
-          </div>
-        </div>
-      </div>
     </main>
   </div>
 
@@ -347,6 +378,7 @@
   <script src="/js/skills.js"></script>
   <script src="/js/output-styles.js"></script>
   <script src="/js/plugins.js"></script>
+  <script src="/js/usage.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

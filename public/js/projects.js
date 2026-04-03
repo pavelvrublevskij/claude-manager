@@ -1,3 +1,18 @@
+const ProjectNav = {
+  toggle() {
+    const body = document.getElementById('project-nav-body');
+    const arrow = document.getElementById('project-nav-arrow');
+    const open = body.classList.toggle('collapsed');
+    arrow.innerHTML = open ? '&#9654;' : '&#9660;';
+  },
+  expand() {
+    const body = document.getElementById('project-nav-body');
+    const arrow = document.getElementById('project-nav-arrow');
+    body.classList.remove('collapsed');
+    arrow.innerHTML = '&#9660;';
+  }
+};
+
 const Projects = {
   data: [],
 
@@ -41,5 +56,7 @@ const Projects = {
         ${p.memoryCount > 0 ? `<span class="badge">${p.memoryCount}</span>` : ''}
       </div>
     `).join('');
+    const countEl = document.getElementById('project-nav-count');
+    if (countEl) countEl.textContent = Projects.data.length;
   }
 };
