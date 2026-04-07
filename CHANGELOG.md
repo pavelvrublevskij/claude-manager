@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.1
+
+### Pricing Fixes
+- Updated model pricing to current Anthropic rates (Opus 4.6: $5/$25, Haiku 4.5: $1/$5)
+- Fixed cost mismatch between summary and period breakdown (period aggregation now uses per-model rates)
+- Added pricing verification date and source link to Anthropic docs
+
 ## v0.2.0
 
 ### Token Usage Statistics

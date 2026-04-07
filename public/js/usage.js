@@ -26,7 +26,7 @@ const Usage = {
       ]);
       Usage.renderSummary(summary);
       Usage.initTooltips();
-      Usage.renderPricing(summary.modelPricing, summary.byModel);
+      Usage.renderPricing(summary.modelPricing, summary.byModel, summary.pricingUpdated, summary.pricingSource);
       Usage.renderModelFilter();
       Usage.renderPeriods(periods.periods);
       Usage.renderProjects(projects.projects);
@@ -92,7 +92,7 @@ const Usage = {
     `).join('');
   },
 
-  renderPricing(modelPricing, byModel) {
+  renderPricing(modelPricing, byModel, pricingUpdated, pricingSource) {
     const el = document.getElementById('usage-pricing');
     const cols = [
       { key: 'input', label: 'Input', cls: 'col-input' },
@@ -148,10 +148,14 @@ const Usage = {
         </table>`;
     }
 
+    const updatedStr = pricingUpdated ? `Last verified: <strong>${escapeHtml(pricingUpdated)}</strong>.` : '';
+    const sourceStr = pricingSource ? ` <a href="${escapeHtml(pricingSource)}" target="_blank" class="usage-project-link">Verify on Anthropic</a>` : '';
+
     el.innerHTML = pricingHtml + breakdownHtml + `
     <div class="info-note" style="margin-top:8px">
-      Rates per 1M tokens. Costs are calculated per message using the actual model. Subscription plans may differ from API pricing.
-      Click a model to filter all statistics.
+      Rates per 1M tokens (5-minute cache writes). Costs are calculated per message using the actual model.
+      Subscription plans may differ from API pricing. Click a model to filter all statistics.<br>
+      ${updatedStr}${sourceStr}
     </div>`;
   },
 

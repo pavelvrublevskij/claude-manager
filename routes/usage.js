@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const { wrapRoute } = require('../lib/file-helpers');
 const { decodeSlug } = require('../lib/slug');
-const { MODEL_PRICING, calcCost, calcCostMultiModel, addTokens, emptyTokens, buildIndex } = require('../lib/usage-index');
+const { MODEL_PRICING, PRICING_UPDATED, PRICING_SOURCE, calcCost, calcCostMultiModel, addTokens, emptyTokens, buildIndex } = require('../lib/usage-index');
 
 function getISOWeek(dateStr) {
   const d = new Date(dateStr + 'T00:00:00Z');
@@ -32,27 +32,31 @@ function aggregateByPeriod(index, group, model) {
       else if (group === 'month') label = day.slice(0, 7);
       else label = day.slice(0, 4);
 
-      if (!buckets[label]) buckets[label] = emptyTokens();
+      if (!buckets[label]) buckets[label] = { totals: emptyTokens(), byModel: {} };
 
       if (typeof modelTokens === 'object' && !('input_tokens' in modelTokens)) {
         if (model) {
-          if (modelTokens[model]) addTokens(buckets[label], modelTokens[model]);
+          if (modelTokens[model]) addTokens(buckets[label].totals, modelTokens[model]);
         } else {
-          for (const tokens of Object.values(modelTokens)) addTokens(buckets[label], tokens);
+          for (const [m, tokens] of Object.entries(modelTokens)) {
+            if (!buckets[label].byModel[m]) buckets[label].byModel[m] = emptyTokens();
+            addTokens(buckets[label].byModel[m], tokens);
+            addTokens(buckets[label].totals, tokens);
+          }
         }
       } else if (!model) {
-        addTokens(buckets[label], modelTokens);
+        addTokens(buckets[label].totals, modelTokens);
       }
     }
   }
 
   return Object.entries(buckets)
-    .filter(([, t]) => t.input_tokens || t.output_tokens || t.cache_creation_input_tokens || t.cache_read_input_tokens)
+    .filter(([, b]) => b.totals.input_tokens || b.totals.output_tokens || b.totals.cache_creation_input_tokens || b.totals.cache_read_input_tokens)
     .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([label, tokens]) => ({
+    .map(([label, b]) => ({
       label,
-      ...tokens,
-      cost: model ? calcCost(tokens, model).total : calcCost(tokens).total
+      ...b.totals,
+      cost: model ? calcCost(b.totals, model).total : calcCostMultiModel(b.byModel).total
     }));
 }
 
@@ -89,6 +93,8 @@ router.get('/summary', wrapRoute((req, res) => {
     sessionCount,
     projectCount: slugs.size,
     modelPricing: MODEL_PRICING,
+    pricingUpdated: PRICING_UPDATED,
+    pricingSource: PRICING_SOURCE,
     activeModel: model || null
   });
 }));
