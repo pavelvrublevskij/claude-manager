@@ -2,41 +2,119 @@
 
 const Sessions = {
   cache: {},
+  _searchSlug: null,
+  _searchTimer: null,
 
   async load(slug) {
+    Sessions._searchSlug = slug;
     const container = document.getElementById('sessions-list');
     showLoading(container, 'Loading sessions...');
 
     try {
       const sessions = await api(`/api/projects/${slug}/sessions`);
       Sessions.cache[slug] = sessions;
-      if (sessions.length === 0) {
-        container.innerHTML = '<div class="empty-state"><p>No sessions found</p></div>';
-        return;
-      }
-      container.innerHTML = sessions.map((s, i) => {
-        const created = s.created ? new Date(s.created).toLocaleString() : '—';
-        const modified = s.modified ? new Date(s.modified).toLocaleString() : '—';
-        return `
-          <div class="session-card" style="cursor:pointer" onclick="Sessions.open('${slug}', '${s.sessionId}', ${i})">
-            <div class="session-summary">${escapeHtml(s.summary || s.firstPrompt || 'Untitled session')}</div>
-            ${s.firstPrompt && s.summary ? `<div class="session-prompt">${escapeHtml(s.firstPrompt)}</div>` : ''}
-            <div class="session-meta">
-              <div class="meta-item">Created <span class="meta-value">${created}</span></div>
-              <div class="meta-item">Modified <span class="meta-value">${modified}</span></div>
-              <div class="meta-item">Messages <span class="meta-value">${s.messageCount}</span></div>
-              ${s.tokens ? `<span class="token-badge badge-tokens">${Sessions.fmtTokens((s.tokens.input_tokens || 0) + (s.tokens.output_tokens || 0))} tokens</span>` : ''}
-              ${s.cost ? `<span class="token-badge badge-cost">$${s.cost.toFixed(2)}</span>` : ''}
-              ${s.gitBranch ? `<span class="session-branch">${escapeHtml(s.gitBranch)}</span>` : ''}
-              ${s.lastGitBranch && s.lastGitBranch !== s.gitBranch ? `<span class="session-branch" style="opacity:0.7">&#8594; ${escapeHtml(s.lastGitBranch)}</span>` : ''}
-              ${s.isSidechain ? '<span class="session-sidechain">sidechain</span>' : ''}
-            </div>
-          </div>
-        `;
-      }).join('');
+      Sessions.renderList(slug, sessions);
     } catch (e) {
       container.innerHTML = `<div class="empty-state"><p>Could not load sessions</p></div>`;
     }
+  },
+
+  renderSearchBar(slug) {
+    return `<div class="session-search-wrap">
+      <input type="text" class="session-search" id="session-search-input"
+        placeholder="Search sessions..." oninput="Sessions.onSearch('${slug}', this.value)">
+    </div>`;
+  },
+
+  renderList(slug, sessions) {
+    const container = document.getElementById('sessions-list');
+    if (sessions.length === 0) {
+      container.innerHTML = Sessions.renderSearchBar(slug) +
+        '<div class="empty-state"><p>No sessions found</p></div>';
+      return;
+    }
+    container.innerHTML = Sessions.renderSearchBar(slug) +
+      sessions.map((s, i) => Sessions.renderCard(slug, s, i)).join('');
+  },
+
+  renderCard(slug, s, i) {
+    const created = s.created ? new Date(s.created).toLocaleString() : '—';
+    const modified = s.modified ? new Date(s.modified).toLocaleString() : '—';
+    const snippetsHtml = (s.snippets || []).map(sn => {
+      const label = sn.label ? `<span class="snippet-label">${escapeHtml(sn.label)}</span> ` : '';
+      const roleTag = sn.role === 'user' ? 'You' : sn.role === 'assistant' ? 'Claude' : '';
+      const roleHtml = roleTag ? `<span class="snippet-role">${roleTag}</span> ` : '';
+      return `<div class="session-snippet">${roleHtml}${label}${Sessions.highlightMatch(sn.text, Sessions._lastQuery)}</div>`;
+    }).join('');
+    return `
+      <div class="session-card" style="cursor:pointer" onclick="Sessions.open('${slug}', '${s.sessionId}', ${i})">
+        <div class="session-summary">${escapeHtml(s.summary || s.firstPrompt || 'Untitled session')}</div>
+        ${s.firstPrompt && s.summary ? `<div class="session-prompt">${escapeHtml(s.firstPrompt)}</div>` : ''}
+        ${snippetsHtml}
+        <div class="session-meta">
+          <div class="meta-item">Created <span class="meta-value">${created}</span></div>
+          <div class="meta-item">Modified <span class="meta-value">${modified}</span></div>
+          <div class="meta-item">Messages <span class="meta-value">${s.messageCount}</span></div>
+          ${s.tokens ? `<span class="token-badge badge-tokens">${fmtTokens((s.tokens.input_tokens || 0) + (s.tokens.output_tokens || 0))} tokens</span>` : ''}
+          ${s.cost ? `<span class="token-badge badge-cost">$${s.cost.toFixed(2)}</span>` : ''}
+          ${s.gitBranch ? `<span class="session-branch">${escapeHtml(s.gitBranch)}</span>` : ''}
+          ${s.lastGitBranch && s.lastGitBranch !== s.gitBranch ? `<span class="session-branch" style="opacity:0.7">&#8594; ${escapeHtml(s.lastGitBranch)}</span>` : ''}
+          ${s.isSidechain ? '<span class="session-sidechain">sidechain</span>' : ''}
+          <button class="btn btn-sm btn-primary session-resume-btn" onclick="event.stopPropagation(); Sessions.resume('${slug}', '${s.sessionId}')">Resume</button>
+        </div>
+      </div>
+    `;
+  },
+
+  _lastQuery: '',
+
+  highlightMatch(text, query) {
+    if (!query) return escapeHtml(text);
+    const escaped = escapeHtml(text);
+    const qEscaped = escapeHtml(query);
+    const re = new RegExp('(' + qEscaped.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    return escaped.replace(re, '<mark>$1</mark>');
+  },
+
+  onSearch(slug, value) {
+    clearTimeout(Sessions._searchTimer);
+    const q = value.trim();
+    Sessions._lastQuery = q;
+
+    if (q.length < 2) {
+      const cached = Sessions.cache[slug];
+      if (cached) {
+        const container = document.getElementById('sessions-list');
+        const searchInput = document.getElementById('session-search-input');
+        const cursorPos = searchInput?.selectionStart;
+        container.innerHTML = Sessions.renderSearchBar(slug) +
+          cached.map((s, i) => Sessions.renderCard(slug, s, i)).join('');
+        const newInput = document.getElementById('session-search-input');
+        if (newInput) { newInput.value = value; newInput.focus(); newInput.selectionStart = newInput.selectionEnd = cursorPos; }
+      }
+      return;
+    }
+
+    Sessions._searchTimer = setTimeout(async () => {
+      try {
+        const results = await api(`/api/projects/${slug}/sessions/search?q=${encodeURIComponent(q)}`);
+        if (Sessions._lastQuery !== q) return;
+        const container = document.getElementById('sessions-list');
+        const searchInput = document.getElementById('session-search-input');
+        const cursorPos = searchInput?.selectionStart;
+        if (results.length === 0) {
+          container.innerHTML = Sessions.renderSearchBar(slug) +
+            '<div class="empty-state"><p>No sessions match your search</p></div>';
+        } else {
+          container.innerHTML = Sessions.renderSearchBar(slug) +
+            results.map((s, i) => Sessions.renderCard(slug, s, i)).join('');
+        }
+        const newInput = document.getElementById('session-search-input');
+        if (newInput) { newInput.value = value; newInput.focus(); newInput.selectionStart = newInput.selectionEnd = cursorPos; }
+      } catch (e) {
+        toast('Search failed', 'error');
+      }
+    }, 300);
   },
 
   open(slug, sessionId, index) {
@@ -179,10 +257,13 @@ const Sessions = {
     `;
   },
 
-  fmtTokens(n) {
-    if (!n) return '0';
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
-    return String(n);
-  }
+  async resume(slug, sessionId) {
+    try {
+      await api(`/api/projects/${slug}/sessions/${sessionId}/resume`, { method: 'POST' });
+      toast('Terminal opened with session');
+    } catch (e) {
+      toast('Failed to open terminal: ' + e.message, 'error');
+    }
+  },
+
 };

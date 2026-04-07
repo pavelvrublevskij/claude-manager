@@ -17,6 +17,7 @@ const ProjectTabs = {
       'proj-mcp': () => ProjectMcp.load(App.currentProject),
       'proj-agents': () => ProjectAgents.load(App.currentProject),
       'proj-skills': () => ProjectSkills.load(App.currentProject),
+      'proj-output-styles': () => ProjectOutputStyles.load(App.currentProject),
       'claude-md': () => ClaudeMd.loadProject(App.currentProject)
     };
     if (loaders[tab]) loaders[tab]();
@@ -346,6 +347,93 @@ const ProjectSkills = {
       await api(`/api/skills/project/${ProjectSkills.slug}/${name}`, { method: 'DELETE' });
       toast('Skill deleted');
       ProjectSkills.load(ProjectSkills.slug);
+    } catch (e) { toast('Delete failed: ' + e.message, 'error'); }
+  }
+};
+
+// --- Project Output Styles Tab ---
+
+const ProjectOutputStyles = {
+  slug: null,
+
+  async load(slug) {
+    ProjectOutputStyles.slug = slug;
+    const container = document.getElementById('proj-output-styles-content');
+    showLoading(container);
+    try {
+      const styles = await api(`/api/output-styles/project/${slug}`);
+      if (styles.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No project-level output styles</p><p style="color:var(--text-secondary);margin-top:8px">Output styles are response presets in .claude/output-styles/</p></div><div style="text-align:center;margin-top:12px"><button class="btn" onclick="ProjectOutputStyles.showCreate()">+ New Style</button></div>';
+        return;
+      }
+      container.innerHTML = '<div class="card-grid">' + styles.map(s => `
+        <div class="card" style="cursor:pointer" onclick="ProjectOutputStyles.edit('${escapeHtml(s.filename)}')">
+          <div style="display:flex;justify-content:space-between;align-items:start">
+            <div>
+              <div style="font-weight:600;margin-bottom:4px">${escapeHtml(s.name)}</div>
+              <div style="font-size:13px;color:var(--text-secondary)">${escapeHtml(s.description)}</div>
+            </div>
+            <button class="prop-action-btn danger" onclick="event.stopPropagation(); ProjectOutputStyles.remove('${escapeHtml(s.filename)}')">&#10005;</button>
+          </div>
+        </div>
+      `).join('') + '</div><div style="margin-top:12px"><button class="btn" onclick="ProjectOutputStyles.showCreate()">+ New Style</button></div>';
+    } catch (e) {
+      container.innerHTML = `<div class="empty-state"><p>${escapeHtml(e.message)}</p></div>`;
+    }
+  },
+
+  async edit(filename) {
+    try {
+      const style = await api(`/api/output-styles/project/${ProjectOutputStyles.slug}/${filename}`);
+      openModal({
+        title: 'Edit Output Style: ' + (style.frontmatter.name || filename),
+        width: 700,
+        body: formRow(
+            formGroup('Name', `<input type="text" id="pos-edit-name" value="${escapeHtml(style.frontmatter.name || '')}">`),
+            formGroup('Description', `<input type="text" id="pos-edit-desc" value="${escapeHtml(style.frontmatter.description || '')}">`)
+          )
+          + formGroup('Content', `<textarea id="pos-edit-content" rows="12">${escapeHtml(style.content)}</textarea>`),
+        buttons: [{
+          label: 'Save', primary: true, onClick: async () => {
+            const fm = { ...style.frontmatter, name: document.getElementById('pos-edit-name').value, description: document.getElementById('pos-edit-desc').value };
+            try {
+              await api(`/api/output-styles/project/${ProjectOutputStyles.slug}/${filename}`, { method: 'PUT', body: { frontmatter: fm, content: document.getElementById('pos-edit-content').value } });
+              toast('Style saved');
+              ProjectOutputStyles.load(ProjectOutputStyles.slug);
+            } catch (e) { toast('Save failed: ' + e.message, 'error'); return false; }
+          }
+        }]
+      });
+    } catch (e) { toast('Could not load style: ' + e.message, 'error'); }
+  },
+
+  showCreate() {
+    openModal({
+      title: 'Create Output Style',
+      body: formGroup('Filename', '<input type="text" id="pos-new-file" placeholder="my-style.md">')
+        + formGroup('Name', '<input type="text" id="pos-new-name" placeholder="My Style">'),
+      buttons: [{
+        label: 'Create', primary: true, onClick: async () => {
+          let filename = document.getElementById('pos-new-file').value.trim();
+          const name = document.getElementById('pos-new-name').value.trim();
+          if (!filename) { toast('Filename required', 'error'); return false; }
+          if (!filename.endsWith('.md')) filename += '.md';
+          try {
+            await api(`/api/output-styles/project/${ProjectOutputStyles.slug}/${filename}`, { method: 'PUT', body: { frontmatter: { name, description: '' }, content: '' } });
+            toast('Style created');
+            ProjectOutputStyles.load(ProjectOutputStyles.slug);
+          } catch (e) { toast('Create failed: ' + e.message, 'error'); return false; }
+        }
+      }]
+    });
+  },
+
+  async remove(filename) {
+    if (!confirm(`Delete output style "${filename}"?`)) return;
+    try {
+      await api(`/api/output-styles/project/${ProjectOutputStyles.slug}/${filename}`, { method: 'DELETE' });
+      toast('Deleted');
+      ProjectOutputStyles.load(ProjectOutputStyles.slug);
     } catch (e) { toast('Delete failed: ' + e.message, 'error'); }
   }
 };

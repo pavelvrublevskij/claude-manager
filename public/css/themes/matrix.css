@@ -1,0 +1,29 @@
+[data-theme="matrix"] {
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-tertiary: #111111;
+  --bg-hover: #1a1a1a;
+  --border: #0f3d0f;
+  --border-light: #1a5c1a;
+  --text-primary: #00ff41;
+  --text-secondary: #00cc33;
+  --text-muted: #008f11;
+  --accent: #00ff41;
+  --accent-hover: #33ff6b;
+  --accent-bg: rgba(0, 255, 65, 0.08);
+  --danger: #ff3333;
+  --danger-hover: #cc0000;
+  --success: #00ff41;
+  --warning: #ccff00;
+  --scrollbar-thumb: #0f3d0f;
+  --scrollbar-hover: #1a5c1a;
+  --info-bg: rgba(0, 255, 65, 0.04);
+  --info-border: rgba(0, 255, 65, 0.15);
+  --project-badge-bg: rgba(0, 255, 65, 0.1);
+  --project-badge-color: #00ff41;
+  --token-input: #00ff41;
+  --token-output: #39ff14;
+  --token-cache-write: #7fff00;
+  --token-cache-read: #00ff41;
+  --token-cost: #ff3333;
+}

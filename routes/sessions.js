@@ -1,8 +1,10 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const { execFile, spawn } = require('child_process');
 const { safeSlug, wrapRoute } = require('../lib/file-helpers');
 const { getProjectUsageMap } = require('../lib/usage-index');
+const { decodeSlug } = require('../lib/slug');
 
 const router = express.Router({ mergeParams: true });
 
@@ -93,6 +95,149 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
   res.json(filtered);
 }));
 
+router.get('/:slug/sessions/search', wrapRoute((req, res) => {
+  const dir = safeSlug(req.params.slug);
+  if (!dir) return res.status(400).json({ error: 'Invalid slug' });
+
+  const q = (req.query.q || '').trim();
+  if (q.length < 2) return res.json([]);
+
+  const qLower = q.toLowerCase();
+  const MAX_SNIPPETS = 3;
+  const SNIPPET_RADIUS = 75;
+
+  // Load index metadata if available
+  const indexMeta = {};
+  const indexFile = path.join(dir, 'sessions-index.json');
+  if (fs.existsSync(indexFile)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(indexFile, 'utf-8'));
+      for (const e of (data.entries || [])) {
+        indexMeta[e.sessionId] = e;
+      }
+    } catch (_) {}
+  }
+
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl'));
+  const results = [];
+
+  for (const f of files) {
+    const sessionId = f.replace('.jsonl', '');
+    const filePath = path.join(dir, f);
+    const snippets = [];
+    let messageCount = 0;
+    let firstPrompt = '';
+    let created = null;
+    let modified = null;
+    let gitBranch = '';
+    let lastGitBranch = '';
+
+    try {
+      const lines = fs.readFileSync(filePath, 'utf-8').split('\n').filter(Boolean);
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line);
+          if (entry.type !== 'user' && entry.type !== 'assistant') continue;
+
+          if (entry.type === 'user') {
+            messageCount++;
+            if (messageCount === 1) {
+              firstPrompt = typeof entry.message?.content === 'string'
+                ? entry.message.content.slice(0, 200) : '';
+              created = entry.timestamp;
+              gitBranch = entry.gitBranch || '';
+            }
+            if (entry.gitBranch) lastGitBranch = entry.gitBranch;
+            modified = entry.timestamp;
+          }
+
+          if (snippets.length >= MAX_SNIPPETS) continue;
+
+          const content = entry.message?.content;
+          const role = entry.type;
+          const searchBlocks = [];
+
+          if (typeof content === 'string') {
+            searchBlocks.push({ text: content, label: '' });
+          } else if (Array.isArray(content)) {
+            for (const block of content) {
+              if (block.type === 'text') {
+                searchBlocks.push({ text: block.text, label: '' });
+              } else if (block.type === 'tool_use') {
+                const inputStr = typeof block.input === 'string'
+                  ? block.input
+                  : JSON.stringify(block.input);
+                searchBlocks.push({ text: inputStr, label: block.name || 'tool' });
+              } else if (block.type === 'tool_result') {
+                let resultText = '';
+                if (typeof block.content === 'string') {
+                  resultText = block.content;
+                } else if (Array.isArray(block.content)) {
+                  resultText = block.content
+                    .filter(c => c.type === 'text')
+                    .map(c => c.text)
+                    .join('\n');
+                }
+                if (resultText) searchBlocks.push({ text: resultText, label: 'result' });
+              }
+            }
+          }
+
+          for (const sb of searchBlocks) {
+            if (snippets.length >= MAX_SNIPPETS) break;
+            const idx = sb.text.toLowerCase().indexOf(qLower);
+            if (idx === -1) continue;
+            const start = Math.max(0, idx - SNIPPET_RADIUS);
+            const end = Math.min(sb.text.length, idx + q.length + SNIPPET_RADIUS);
+            let snippet = (start > 0 ? '...' : '') + sb.text.slice(start, end) + (end < sb.text.length ? '...' : '');
+            snippet = snippet.replace(/\n/g, ' ');
+            snippets.push({ text: snippet, role, label: sb.label });
+          }
+        } catch (_) {}
+      }
+    } catch (_) { continue; }
+
+    // Also check index metadata (summary/firstPrompt)
+    const meta = indexMeta[sessionId];
+    if (snippets.length === 0 && meta) {
+      const checkFields = [meta.summary, meta.firstPrompt].filter(Boolean);
+      for (const field of checkFields) {
+        if (field.toLowerCase().includes(qLower)) {
+          const idx = field.toLowerCase().indexOf(qLower);
+          const start = Math.max(0, idx - SNIPPET_RADIUS);
+          const end = Math.min(field.length, idx + q.length + SNIPPET_RADIUS);
+          snippets.push({ text: field.slice(start, end), role: 'meta', label: '' });
+          break;
+        }
+      }
+    }
+
+    if (snippets.length === 0) continue;
+
+    const session = {
+      sessionId,
+      summary: meta?.summary || '',
+      firstPrompt: meta?.firstPrompt || firstPrompt,
+      messageCount: meta?.messageCount || messageCount,
+      created: meta?.created || created,
+      modified: meta?.modified || modified,
+      gitBranch: meta?.gitBranch || gitBranch,
+      lastGitBranch: meta?.lastGitBranch || lastGitBranch,
+      isSidechain: meta?.isSidechain || false,
+      snippets
+    };
+    results.push(session);
+  }
+
+  const usageMap = getProjectUsageMap(req.params.slug);
+  results.forEach(s => {
+    const u = usageMap[s.sessionId];
+    if (u) { s.tokens = u.totals; s.cost = u.cost; }
+  });
+  results.sort((a, b) => new Date(b.modified || 0) - new Date(a.modified || 0));
+  res.json(results);
+}));
+
 router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
   const dir = safeSlug(req.params.slug);
   if (!dir) return res.status(400).json({ error: 'Invalid slug' });
@@ -162,6 +307,58 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
   const limit = parseInt(req.query.limit) || 20;
   const page = messages.slice(offset, offset + limit);
   res.json({ messages: page, total: messages.length, hasMore: offset + limit < messages.length });
+}));
+
+router.post('/:slug/sessions/:sessionId/resume', wrapRoute((req, res) => {
+  const dir = safeSlug(req.params.slug);
+  if (!dir) return res.status(400).json({ error: 'Invalid slug' });
+
+  const sessionId = req.params.sessionId;
+  if (sessionId.includes('..') || sessionId.includes('/') || sessionId.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid session ID' });
+  }
+
+  const filePath = path.join(dir, sessionId + '.jsonl');
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Session not found' });
+
+  const projectPath = decodeSlug(req.params.slug);
+  const platform = process.platform;
+  const cmd = `claude --resume "${sessionId}"`;
+
+  try {
+    if (platform === 'win32') {
+      // Try Windows Terminal first, fall back to cmd.exe
+      const wtArgs = ['-d', projectPath, 'cmd.exe', '/k', cmd];
+      const proc = spawn('wt.exe', wtArgs, { detached: true, stdio: 'ignore' });
+      proc.on('error', () => {
+        spawn('cmd.exe', ['/c', `start "" cmd.exe /k "cd /d ${projectPath} && ${cmd}"`], { shell: true, detached: true, stdio: 'ignore' }).unref();
+      });
+      proc.unref();
+    } else if (platform === 'darwin') {
+      const script = `tell application "Terminal" to do script "cd '${projectPath}' && ${cmd}"`;
+      execFile('osascript', ['-e', script]);
+    } else {
+      const terminals = ['x-terminal-emulator', 'gnome-terminal', 'konsole', 'xfce4-terminal', 'xterm'];
+      let launched = false;
+      for (const term of terminals) {
+        try {
+          if (term === 'gnome-terminal') {
+            execFile(term, ['--', 'bash', '-c', `cd '${projectPath}' && ${cmd}; exec bash`]);
+          } else if (term === 'konsole' || term === 'xfce4-terminal') {
+            execFile(term, ['-e', `bash -c "cd '${projectPath}' && ${cmd}; exec bash"`]);
+          } else {
+            execFile(term, ['-e', `bash -c "cd '${projectPath}' && ${cmd}; exec bash"`]);
+          }
+          launched = true;
+          break;
+        } catch (_) { continue; }
+      }
+      if (!launched) return res.status(500).json({ error: 'No supported terminal found' });
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to open terminal: ' + e.message });
+  }
 }));
 
 module.exports = router;

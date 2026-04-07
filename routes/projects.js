@@ -37,12 +37,26 @@ router.get('/', wrapRoute((req, res) => {
     const aiMemoryDir = path.join(decodedPath, '.ai_project_memory');
     const hasAiMemory = fs.existsSync(aiMemoryDir);
 
+    const projSkillsDir = path.join(decodedPath, '.claude', 'skills');
+    let skillsCount = 0;
+    if (fs.existsSync(projSkillsDir)) {
+      try { skillsCount = fs.readdirSync(projSkillsDir, { withFileTypes: true }).filter(d => d.isDirectory()).length; } catch (_) {}
+    }
+
+    const projStylesDir = path.join(decodedPath, '.claude', 'output-styles');
+    let outputStylesCount = 0;
+    if (fs.existsSync(projStylesDir)) {
+      try { outputStylesCount = fs.readdirSync(projStylesDir).filter(f => f.endsWith('.md')).length; } catch (_) {}
+    }
+
     return {
       slug,
       path: decodedPath,
       memoryCount,
       hasMemory,
       sessionCount,
+      skillsCount,
+      outputStylesCount,
       hasClaudeMd,
       hasAiMemory
     };

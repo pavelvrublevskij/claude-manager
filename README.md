@@ -6,17 +6,22 @@ Runs entirely on your machine. No cloud, no accounts, no external dependencies b
 
 ## Quick Start
 
+**macOS / Linux / Git Bash on Windows:**
 ```bash
-npm install
-npm start
+./run.sh
 ```
 
-Open [http://127.0.0.1:3000](http://127.0.0.1:3000)
+**Windows (Command Prompt / PowerShell):**
+```cmd
+run.bat
+```
+
+The script will install Node.js if missing, install dependencies, and open the app in your browser automatically.
 
 ## Requirements
 
-- Node.js 18+
 - Claude Code installed (`~/.claude/` directory must exist)
+- Node.js 16+ (auto-installed by the run script if missing)
 
 ## What It Manages
 

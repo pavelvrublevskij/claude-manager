@@ -1,6 +1,6 @@
 {
   "name": "claude-manager",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Local web UI for managing Claude Code settings and memory",
   "main": "server.js",
   "scripts": {

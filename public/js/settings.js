@@ -1,3 +1,5 @@
+const SETTINGS_DEFAULTS = { outputStyle: '' };
+
 const Settings = {
   data: {},
   showRaw: false,
@@ -7,6 +9,9 @@ const Settings = {
     try {
       const res = await api('/api/settings');
       Settings.data = JSON.parse(res.content);
+      for (const [key, val] of Object.entries(SETTINGS_DEFAULTS)) {
+        if (!(key in Settings.data)) Settings.data[key] = val;
+      }
       Settings.render();
       document.getElementById('settings-editor').value = JSON.stringify(Settings.data, null, 2);
     } catch (e) {
@@ -38,6 +43,92 @@ const Settings = {
     } catch (e) {
       toast('Save failed: ' + e.message, 'error');
     }
+  },
+
+  toggleReference() {
+    const el = document.getElementById('settings-reference');
+    if (el.style.display === 'none') {
+      el.style.display = '';
+      if (!el.innerHTML) el.innerHTML = Settings.referenceHtml();
+    } else {
+      el.style.display = 'none';
+    }
+  },
+
+  referenceHtml() {
+    const sections = [
+      { title: 'General', keys: [
+        ['model', 'string', 'Claude model to use: <code>default</code>, <code>best</code>, <code>sonnet</code>, <code>opus</code>, <code>haiku</code>, or specific model ID'],
+        ['effortLevel', 'string', 'Reasoning effort: <code>"low"</code>, <code>"medium"</code>, <code>"high"</code>'],
+        ['availableModels', 'string[]', 'Restrict which models users can select'],
+        ['modelOverrides', 'object', 'Map Anthropic model IDs to Bedrock/Vertex/Foundry deployment names'],
+        ['defaultMode', 'string', 'Permission mode: <code>default</code>, <code>acceptEdits</code>, <code>plan</code>, <code>auto</code>, <code>dontAsk</code>, <code>bypassPermissions</code>'],
+        ['env', 'object', 'Environment variables as key-value pairs'],
+        ['additionalDirectories', 'string[]', 'Extra paths to grant file access beyond working directory'],
+        ['theme', 'string', 'Terminal theme name'],
+        ['notificationCommand', 'string', 'Shell command for desktop notifications'],
+        ['disableAllHooks', 'boolean', 'Disable all hooks from running'],
+      ]},
+      { title: 'Permissions', keys: [
+        ['permissions.defaultMode', 'string', 'Default permission mode for the session'],
+        ['permissions.allow', 'string[]', 'Auto-approve rules, e.g. <code>"Bash(npm run build)"</code>, <code>"Read(.env)"</code>'],
+        ['permissions.ask', 'string[]', 'Rules requiring user confirmation'],
+        ['permissions.deny', 'string[]', 'Rules to block entirely'],
+        ['permissions.disableBypassPermissionsMode', 'string', 'Set <code>"disable"</code> to prevent bypass mode'],
+        ['permissions.disableAutoMode', 'string', 'Set <code>"disable"</code> to prevent auto mode'],
+      ]},
+      { title: 'Sandbox', keys: [
+        ['sandbox.enabled', 'boolean', 'Enable filesystem/network sandboxing'],
+        ['sandbox.filesystem.allowRead', 'string[]', 'Paths Bash can read'],
+        ['sandbox.filesystem.denyRead', 'string[]', 'Paths to block from reading'],
+        ['sandbox.filesystem.allowWrite', 'string[]', 'Paths Bash can write to'],
+        ['sandbox.filesystem.denyWrite', 'string[]', 'Paths to block from writing'],
+        ['sandbox.network.allowedDomains', 'string[]', 'Domains allowed for network access'],
+        ['sandbox.network.deniedDomains', 'string[]', 'Domains to block'],
+      ]},
+      { title: 'Auto Mode', keys: [
+        ['autoMode.environment', 'string[]', 'Descriptions of trusted infrastructure'],
+        ['autoMode.allow', 'string[]', 'Natural-language allow rules (exceptions to soft_deny)'],
+        ['autoMode.soft_deny', 'string[]', 'Natural-language block rules for security checks'],
+      ]},
+      { title: 'Hooks (event keys)', keys: [
+        ['hooks.SessionStart', 'hook[]', 'When session begins or resumes'],
+        ['hooks.UserPromptSubmit', 'hook[]', 'When user submits a prompt'],
+        ['hooks.PreToolUse', 'hook[]', 'Before tool execution (can block)'],
+        ['hooks.PostToolUse', 'hook[]', 'After tool succeeds'],
+        ['hooks.Stop', 'hook[]', 'When Claude finishes responding'],
+        ['hooks.Notification', 'hook[]', 'When Claude needs attention'],
+        ['hooks.SubagentStart', 'hook[]', 'When a subagent spawns'],
+        ['hooks.SubagentStop', 'hook[]', 'When a subagent finishes'],
+      ]},
+      { title: 'Plugins', keys: [
+        ['enabledPlugins', 'string[]', 'List of installed plugin IDs to enable'],
+        ['extraKnownMarketplaces', 'string[]', 'Additional plugin marketplace URLs'],
+        ['strictKnownMarketplaces', 'boolean', 'Restrict to known marketplaces only'],
+      ]},
+    ];
+    let html = '';
+    for (const s of sections) {
+      html += '<div class="ref-section"><h4>' + s.title + '</h4><table class="ref-table"><thead><tr><th>Key</th><th>Type</th><th>Description</th></tr></thead><tbody>';
+      for (const [key, type, desc] of s.keys) {
+        html += '<tr><td><code>' + key + '</code></td><td><code>' + type + '</code></td><td>' + desc + '</td></tr>';
+      }
+      html += '</tbody></table></div>';
+    }
+    html += '<div class="ref-footer">';
+    html += '<div style="margin-bottom:6px"><strong>Hook object format:</strong><br>';
+    html += '<code>matcher</code> — filter pattern<br>';
+    html += '<code>type</code> — <code>command</code> | <code>http</code> | <code>prompt</code><br>';
+    html += '<code>command</code> — shell command to run<br>';
+    html += '<code>url</code> — HTTP endpoint<br>';
+    html += '<code>timeout</code> — seconds</div>';
+    html += '<div style="margin-bottom:6px"><strong>Permission rules:</strong> <code>Tool</code> or <code>Tool(pattern)</code><br>';
+    html += 'e.g. <code>Bash(npm *)</code> · <code>Read(/src/*)</code> · <code>WebFetch(domain:github.com)</code></div>';
+    html += '<div>Docs: <a href="https://docs.anthropic.com/en/docs/claude-code/settings" target="_blank" rel="noopener">Settings</a>';
+    html += ' · <a href="https://docs.anthropic.com/en/docs/claude-code/hooks" target="_blank" rel="noopener">Hooks</a>';
+    html += ' · <a href="https://docs.anthropic.com/en/docs/claude-code/security" target="_blank" rel="noopener">Permissions &amp; Security</a></div>';
+    html += '</div>';
+    return html;
   },
 
   toggleRaw() {

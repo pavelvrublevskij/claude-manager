@@ -6,7 +6,7 @@ const OutputStyles = {
   async load() {
     showLoading('output-styles-content');
     try {
-      OutputStyles.list = await api('/api/output-styles');
+      OutputStyles.list = await api('/api/output-styles/global');
       OutputStyles.render();
     } catch (e) { toast('Could not load output styles: ' + e.message, 'error'); }
   },
@@ -51,7 +51,7 @@ const OutputStyles = {
         label: 'Save', primary: true, onClick: async () => {
           const fm = { ...style.frontmatter, name: document.getElementById('os-edit-name').value, description: document.getElementById('os-edit-desc').value };
           try {
-            await api(`/api/output-styles/${filename}`, { method: 'PUT', body: { frontmatter: fm, content: document.getElementById('os-edit-content').value } });
+            await api(`/api/output-styles/global/${filename}`, { method: 'PUT', body: { frontmatter: fm, content: document.getElementById('os-edit-content').value } });
             toast('Style saved');
             OutputStyles.load();
           } catch (e) { toast('Save failed: ' + e.message, 'error'); return false; }
@@ -72,7 +72,7 @@ const OutputStyles = {
           if (!filename) { toast('Filename required', 'error'); return false; }
           if (!filename.endsWith('.md')) filename += '.md';
           try {
-            await api(`/api/output-styles/${filename}`, { method: 'PUT', body: { frontmatter: { name, description: '' }, content: '' } });
+            await api(`/api/output-styles/global/${filename}`, { method: 'PUT', body: { frontmatter: { name, description: '' }, content: '' } });
             toast('Style created');
             OutputStyles.load();
           } catch (e) { toast('Create failed: ' + e.message, 'error'); return false; }
@@ -83,7 +83,7 @@ const OutputStyles = {
 
   async remove(filename) {
     if (!confirm(`Delete output style "${filename}"?`)) return;
-    try { await api(`/api/output-styles/${filename}`, { method: 'DELETE' }); toast('Deleted'); OutputStyles.load(); }
+    try { await api(`/api/output-styles/global/${filename}`, { method: 'DELETE' }); toast('Deleted'); OutputStyles.load(); }
     catch (e) { toast('Delete failed: ' + e.message, 'error'); }
   }
 };

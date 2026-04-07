@@ -2,23 +2,29 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { backup, wrapRoute } = require('../lib/file-helpers');
+const { decodeSlug } = require('../lib/slug');
 const { readFrontmatterFile, readFrontmatterDir, writeFrontmatter } = require('../lib/frontmatter');
 const { OUTPUT_STYLES_DIR } = require('../lib/paths');
 
 const router = express.Router();
 
-router.get('/', (req, res) => {
-  const styles = readFrontmatterDir(OUTPUT_STYLES_DIR).map(s => ({
+function mapStyles(dir) {
+  return readFrontmatterDir(dir).map(s => ({
     filename: s.filename,
     name: s.name || s.filename.replace('.md', ''),
     description: s.description || '',
     frontmatter: { name: s.name, description: s.description, ...s },
     content: s.content
   }));
-  res.json(styles);
+}
+
+// Global routes
+
+router.get('/global', (req, res) => {
+  res.json(mapStyles(OUTPUT_STYLES_DIR));
 });
 
-router.put('/:filename', wrapRoute((req, res) => {
+router.put('/global/:filename', wrapRoute((req, res) => {
   fs.mkdirSync(OUTPUT_STYLES_DIR, { recursive: true });
   const filePath = path.join(OUTPUT_STYLES_DIR, req.params.filename);
   backup(filePath);
@@ -26,8 +32,42 @@ router.put('/:filename', wrapRoute((req, res) => {
   res.json({ ok: true });
 }));
 
-router.delete('/:filename', wrapRoute((req, res) => {
+router.delete('/global/:filename', wrapRoute((req, res) => {
   const filePath = path.join(OUTPUT_STYLES_DIR, req.params.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
+  backup(filePath);
+  fs.unlinkSync(filePath);
+  res.json({ ok: true });
+}));
+
+// Project routes
+
+router.get('/project/:slug', (req, res) => {
+  const decodedPath = decodeSlug(req.params.slug);
+  res.json(mapStyles(path.join(decodedPath, '.claude', 'output-styles')));
+});
+
+router.get('/project/:slug/:filename', wrapRoute((req, res) => {
+  const decodedPath = decodeSlug(req.params.slug);
+  const filePath = path.join(decodedPath, '.claude', 'output-styles', req.params.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
+  const { frontmatter, content, raw } = readFrontmatterFile(filePath);
+  res.json({ filename: req.params.filename, frontmatter, content, raw });
+}));
+
+router.put('/project/:slug/:filename', wrapRoute((req, res) => {
+  const decodedPath = decodeSlug(req.params.slug);
+  const dir = path.join(decodedPath, '.claude', 'output-styles');
+  const filePath = path.join(dir, req.params.filename);
+  fs.mkdirSync(dir, { recursive: true });
+  backup(filePath);
+  writeFrontmatter(filePath, req.body.frontmatter || {}, req.body.content || '');
+  res.json({ ok: true });
+}));
+
+router.delete('/project/:slug/:filename', wrapRoute((req, res) => {
+  const decodedPath = decodeSlug(req.params.slug);
+  const filePath = path.join(decodedPath, '.claude', 'output-styles', req.params.filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
   backup(filePath);
   fs.unlinkSync(filePath);
