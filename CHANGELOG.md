@@ -1,4 +1,38 @@
-# Changelog
+## v0.3.0
+
+### Themes
+- Theme system with 4 built-in themes: Dark, Light, Matrix, Default (Catppuccin)
+- Theme CSS extracted to individual files (`public/css/themes/`)
+- Cycle through themes via sidebar button
+
+### Session Search
+- Full-text search across all session messages in a project
+- Server-side search endpoint with context snippets and match highlighting
+- Searches user messages, assistant responses, tool calls, and tool results
+
+### Run Scripts
+- One-click startup scripts (`run.sh`, `run.bat`) for all platforms
+- Auto-installs Node.js if missing (via brew, apt, winget, choco, pacman, dnf)
+- Kills previous instance on same port before starting
+- Opens browser automatically after launch
+
+### Project-Level Output Styles
+- Browse, create, edit, and delete output styles scoped to individual projects
+- New Output Styles tab in project detail view with count badge
+
+### Settings Reference
+- Inline reference panel for all Claude Code settings keys
+- Covers general, permissions, sandbox, auto mode, hooks, and plugins
+- Includes hook format documentation and links to official docs
+
+### UI Improvements
+- Version badge and update banner with remote version check
+- Changelog view accessible from sidebar footer
+- Session cards show git branch transitions (initial → latest)
+- Sidechain session indicator badge
+
+### Internal
+- Consolidated duplicate `fmtTokens` helper to shared `utils.js`
 
 ## v0.2.1
 

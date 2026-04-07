@@ -1,0 +1,29 @@
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #eaeef2;
+  --bg-hover: #d8dee4;
+  --border: #d0d7de;
+  --border-light: #afb8c1;
+  --text-primary: #1f2328;
+  --text-secondary: #59636e;
+  --text-muted: #8b949e;
+  --accent: #0969da;
+  --accent-hover: #0550ae;
+  --accent-bg: rgba(9, 105, 218, 0.08);
+  --danger: #d1242f;
+  --danger-hover: #a40e26;
+  --success: #1a7f37;
+  --warning: #9a6700;
+  --scrollbar-thumb: #d0d7de;
+  --scrollbar-hover: #afb8c1;
+  --info-bg: rgba(9, 105, 218, 0.06);
+  --info-border: rgba(9, 105, 218, 0.2);
+  --project-badge-bg: rgba(130, 80, 223, 0.1);
+  --project-badge-color: #7c3aed;
+  --token-input: #0969da;
+  --token-output: #bc4c00;
+  --token-cache-write: #8250df;
+  --token-cache-read: #1a7f37;
+  --token-cost: #d1242f;
+}

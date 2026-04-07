@@ -51,20 +51,14 @@ const Dashboard = {
           <div class="session-meta">
             <span class="project-badge">${escapeHtml(projectShort)}</span>
             <div class="meta-item">Messages <span class="meta-value">${s.messageCount}</span></div>
-            ${s.tokens ? `<span class="token-badge badge-tokens">${Dashboard.fmtTokens((s.tokens.input_tokens || 0) + (s.tokens.output_tokens || 0))} tokens</span>` : ''}
+            ${s.tokens ? `<span class="token-badge badge-tokens">${fmtTokens((s.tokens.input_tokens || 0) + (s.tokens.output_tokens || 0))} tokens</span>` : ''}
             ${s.cost ? `<span class="token-badge badge-cost">$${s.cost.toFixed(2)}</span>` : ''}
             ${s.gitBranch ? `<span class="session-branch">${escapeHtml(s.gitBranch)}</span>` : ''}
+            <button class="btn btn-sm btn-primary session-resume-btn" onclick="event.stopPropagation(); Sessions.resume('${s.slug}', '${s.sessionId}')">Resume</button>
           </div>
         </div>
       `;
     }).join('');
-  },
-
-  fmtTokens(n) {
-    if (!n) return '0';
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
-    return String(n);
   },
 
   timeAgo(date) {

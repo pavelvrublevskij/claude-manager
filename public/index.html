@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Claude Manager</title>
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/themes/dark.css" id="theme-stylesheet">
+  <script>
+    (function() {
+      var t = localStorage.getItem('claude-manager-theme') || 'dark';
+      document.getElementById('theme-stylesheet').href = '/css/themes/' + t + '.css';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
 </head>
 <body>
   <div class="app">
@@ -59,8 +67,11 @@
         </div>
       </nav>
       <div class="sidebar-footer">
-        <button class="theme-toggle" id="theme-toggle" onclick="Theme.toggle()" title="Toggle light/dark mode">
+        <button class="theme-toggle" id="theme-toggle" onclick="Theme.toggle()" title="Dark mode">
           <span id="theme-icon">&#9790;</span>
+        </button>
+        <button class="theme-toggle" onclick="App.navigate('changelog')" title="Changelog">
+          <span>&#9776;</span>
         </button>
       </div>
     </aside>
@@ -84,7 +95,10 @@
       <!-- Usage View -->
       <div class="view" id="view-usage">
         <div class="view-header">
-          <h2>Token Usage</h2>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <h2>Token Usage</h2>
+            <button class="btn btn-sm" onclick="Usage.refresh()">Refresh</button>
+          </div>
           <div class="subtitle">Aggregated token consumption and estimated costs</div>
         </div>
         <div class="view-body">
@@ -124,13 +138,21 @@
             Global settings for Claude Code. Controls permissions, auto-updates, hooks, MCP, sandbox, and more.
             Precedence: managed &gt; CLI args &gt; local project &gt; shared project &gt; user (this file).
             Changes auto-reload in Claude Code.
-          </div>
-          <div id="settings-visual" class="settings-tree"></div>
-          <div id="settings-raw" style="display:none">
-            <div class="form-group">
-              <label>Raw JSON</label>
-              <textarea id="settings-editor" class="json-editor" rows="20"></textarea>
+            <div style="margin-top:8px">
+              <button class="btn btn-sm" onclick="Settings.toggleReference()">Settings Reference</button>
             </div>
+          </div>
+          <div class="settings-layout">
+            <div class="settings-main">
+              <div id="settings-visual" class="settings-tree"></div>
+              <div id="settings-raw" style="display:none">
+                <div class="form-group">
+                  <label>Raw JSON</label>
+                  <textarea id="settings-editor" class="json-editor" rows="20"></textarea>
+                </div>
+              </div>
+            </div>
+            <div id="settings-reference" class="settings-reference" style="display:none"></div>
           </div>
         </div>
       </div>
@@ -284,7 +306,8 @@
               <button class="tab-btn" onclick="ProjectTabs.switch('proj-settings', this)">Settings</button>
               <button class="tab-btn" onclick="ProjectTabs.switch('proj-mcp', this)">MCP</button>
               <button class="tab-btn" onclick="ProjectTabs.switch('proj-agents', this)">Agents</button>
-              <button class="tab-btn" onclick="ProjectTabs.switch('proj-skills', this)">Skills</button>
+              <button class="tab-btn" id="skills-tab-btn" onclick="ProjectTabs.switch('proj-skills', this)">Skills</button>
+              <button class="tab-btn" id="output-styles-tab-btn" onclick="ProjectTabs.switch('proj-output-styles', this)">Output Styles</button>
               <button class="tab-btn" onclick="ProjectTabs.switch('claude-md', this)">CLAUDE.md</button>
             </div>
             <button class="btn btn-sm" onclick="ProjectTabs.refresh()">Refresh</button>
@@ -320,6 +343,9 @@
           <div class="project-tab" id="tab-proj-skills">
             <div id="proj-skills-content"></div>
           </div>
+          <div class="project-tab" id="tab-proj-output-styles">
+            <div id="proj-output-styles-content"></div>
+          </div>
           <div class="project-tab" id="tab-claude-md">
             <div id="project-claude-md-path" style="font-size:12px;color:var(--text-muted);margin-bottom:12px"></div>
             <div class="btn-group" style="margin-bottom: 12px">
@@ -348,13 +374,27 @@
               <button class="btn btn-sm" onclick="App.navigate('project-detail', { slug: App.currentProject })">&#8592; Back</button>
               <h2 id="session-detail-title">Session</h2>
             </div>
-            <button class="btn btn-sm" onclick="Sessions.loadDetail(Sessions.detailState.slug, Sessions.detailState.sessionId, null)">Refresh</button>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-sm btn-primary" onclick="Sessions.resume(Sessions.detailState.slug, Sessions.detailState.sessionId)">Resume in Terminal</button>
+              <button class="btn btn-sm" onclick="Sessions.loadDetail(Sessions.detailState.slug, Sessions.detailState.sessionId, null)">Refresh</button>
+            </div>
           </div>
           <div class="subtitle" id="session-detail-meta"></div>
           <div class="subtitle" id="session-count" style="margin-top:4px;color:var(--text-muted)"></div>
         </div>
         <div class="view-body">
           <div id="session-messages" class="chat-container"></div>
+        </div>
+      </div>
+
+      <!-- Changelog View -->
+      <div class="view" id="view-changelog">
+        <div class="view-header">
+          <h2>Changelog</h2>
+          <div class="subtitle">Release notes and version history</div>
+        </div>
+        <div class="view-body">
+          <div id="changelog-content" class="markdown-body"></div>
         </div>
       </div>
 

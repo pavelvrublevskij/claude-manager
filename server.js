@@ -52,6 +52,13 @@ app.get('/api/version', async (req, res) => {
   res.json({ version, latest, updateAvailable });
 });
 
+const fs = require('fs');
+app.get('/api/changelog', (req, res) => {
+  const file = path.join(__dirname, 'CHANGELOG.md');
+  if (!fs.existsSync(file)) return res.json({ content: 'No changelog found.' });
+  res.json({ content: fs.readFileSync(file, 'utf-8') });
+});
+
 // Mount API routes
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/settings', require('./routes/settings'));
