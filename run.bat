@@ -75,10 +75,21 @@ if exist "node_modules" (
 
 echo.
 echo Starting Claude Manager at %URL%
-echo Press Ctrl+C to stop
 echo.
 
-:: Open browser after short delay
-start "" cmd /c "timeout /t 2 /nobreak >nul && start %URL%"
+:: Start server in a new minimized window (survives this terminal closing)
+start "Claude Manager" /min cmd /c "cd /d %~dp0 && node server.js"
 
-call npm start
+:: Wait for server to be ready
+:wait_ready
+timeout /t 1 /nobreak >nul
+powershell -command "try { $null = Invoke-WebRequest -Uri '%URL%' -UseBasicParsing -TimeoutSec 2; exit 0 } catch { exit 1 }" >nul 2>&1
+if %errorlevel% neq 0 goto :wait_ready
+
+:: Open browser
+start "" %URL%
+
+echo Claude Manager is running at %URL%
+echo Server runs in the minimized window. Close it from Task Manager or re-run this script.
+echo.
+timeout /t 3 /nobreak >nul

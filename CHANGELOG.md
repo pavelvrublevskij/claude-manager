@@ -1,3 +1,12 @@
+## v0.3.1
+
+### Bug Fixes
+- Run scripts now launch server as a background process instead of blocking the terminal
+- Terminal auto-closes after server starts and browser opens
+- Server continues running after the launch terminal is closed
+- Fix Skills view crashing when SKILL.md files have corrupt or unreadable content
+- Wrap skills list routes in error handler for proper JSON error responses
+
 ## v0.3.0
 
 ### Themes

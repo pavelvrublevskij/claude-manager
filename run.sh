@@ -102,23 +102,30 @@ fi
 
 echo ""
 echo "Starting Claude Manager at $URL"
-echo "Press Ctrl+C to stop"
 echo ""
 
-# Open browser after short delay
-(
-  sleep 2
-  if $IS_WINDOWS; then
-    cmd.exe /c "start $URL" &>/dev/null
-  elif [[ "$OSTYPE" == "darwin"* ]]; then
-    open "$URL"
-  elif [[ "$OSTYPE" == "linux"* ]]; then
-    if command -v wslview &>/dev/null; then
-      wslview "$URL"
-    elif command -v xdg-open &>/dev/null; then
-      xdg-open "$URL"
-    fi
-  fi
-) &
+# Start server in background (survives terminal closing)
+nohup node server.js > /dev/null 2>&1 &
+SERVER_PID=$!
 
-npm start
+# Wait for server to be ready
+until curl -s -o /dev/null "$URL" 2>/dev/null; do
+  sleep 1
+done
+
+# Open browser
+if $IS_WINDOWS; then
+  cmd.exe /c "start $URL" &>/dev/null
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+  open "$URL"
+elif [[ "$OSTYPE" == "linux"* ]]; then
+  if command -v wslview &>/dev/null; then
+    wslview "$URL"
+  elif command -v xdg-open &>/dev/null; then
+    xdg-open "$URL"
+  fi
+fi
+
+echo "Claude Manager is running at $URL (PID: $SERVER_PID)"
+echo "To stop: kill $SERVER_PID"
+echo ""

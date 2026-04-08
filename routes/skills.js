@@ -13,22 +13,24 @@ function listSkills(dir) {
   return fs.readdirSync(dir, { withFileTypes: true })
     .filter(d => d.isDirectory())
     .map(d => {
-      const skillFile = path.join(dir, d.name, 'SKILL.md');
-      if (!fs.existsSync(skillFile)) return null;
-      const { frontmatter, content } = readFrontmatterFile(skillFile);
-      return {
-        name: d.name,
-        title: frontmatter.name || d.name,
-        description: frontmatter.description || '',
-        frontmatter,
-        content
-      };
+      try {
+        const skillFile = path.join(dir, d.name, 'SKILL.md');
+        if (!fs.existsSync(skillFile)) return null;
+        const { frontmatter, content } = readFrontmatterFile(skillFile);
+        return {
+          name: d.name,
+          title: frontmatter.name || d.name,
+          description: String(frontmatter.description || ''),
+          frontmatter,
+          content
+        };
+      } catch (_) { return null; }
     }).filter(Boolean);
 }
 
-router.get('/global', (req, res) => {
+router.get('/global', wrapRoute((req, res) => {
   res.json(listSkills(SKILLS_DIR));
-});
+}));
 
 router.get('/global/:name', wrapRoute((req, res) => {
   const skillFile = path.join(SKILLS_DIR, req.params.name, 'SKILL.md');
@@ -55,10 +57,10 @@ router.delete('/global/:name', wrapRoute((req, res) => {
   res.json({ ok: true });
 }));
 
-router.get('/project/:slug', (req, res) => {
+router.get('/project/:slug', wrapRoute((req, res) => {
   const decodedPath = decodeSlug(req.params.slug);
   res.json(listSkills(path.join(decodedPath, '.claude', 'skills')));
-});
+}));
 
 router.get('/project/:slug/:name', wrapRoute((req, res) => {
   const decodedPath = decodeSlug(req.params.slug);
