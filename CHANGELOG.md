@@ -6,6 +6,7 @@
 - Server continues running after the launch terminal is closed
 - Fix Skills view crashing when SKILL.md files have corrupt or unreadable content
 - Wrap skills list routes in error handler for proper JSON error responses
+- Fix run.bat Node.js version check comparing minor version instead of major
 
 ## v0.3.0
 

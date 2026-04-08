@@ -13,7 +13,6 @@ where node >nul 2>&1
 if %errorlevel% neq 0 goto :install_node
 
 for /f "tokens=1 delims=v." %%a in ('node -v') do set NODE_VER=%%a
-for /f "tokens=2 delims=v." %%a in ('node -v') do set NODE_VER=%%a
 if %NODE_VER% lss %MIN_NODE% (
     echo Node.js v%MIN_NODE%+ required. Please update: https://nodejs.org
     pause
