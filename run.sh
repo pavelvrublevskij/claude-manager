@@ -105,7 +105,11 @@ echo "Starting Claude Manager at $URL"
 echo ""
 
 # Start server in background (survives terminal closing)
-nohup node server.js > /dev/null 2>&1 &
+if $IS_WINDOWS; then
+  powershell.exe -command "Start-Process node -ArgumentList 'server.js' -WorkingDirectory '$(pwd -W)' -WindowStyle Hidden"
+else
+  nohup node server.js > /dev/null 2>&1 &
+fi
 SERVER_PID=$!
 
 # Wait for server to be ready

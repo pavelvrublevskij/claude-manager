@@ -76,8 +76,8 @@ echo.
 echo Starting Claude Manager at %URL%
 echo.
 
-:: Start server in a new minimized window (survives this terminal closing)
-start "Claude Manager" /min cmd /c "cd /d %~dp0 && node server.js"
+:: Start server as a hidden background process (no visible window)
+powershell -command "Start-Process node -ArgumentList 'server.js' -WorkingDirectory '%~dp0' -WindowStyle Hidden"
 
 :: Wait for server to be ready
 :wait_ready
@@ -89,6 +89,5 @@ if %errorlevel% neq 0 goto :wait_ready
 start "" %URL%
 
 echo Claude Manager is running at %URL%
-echo Server runs in the minimized window. Close it from Task Manager or re-run this script.
+echo To stop: re-run this script or close port %PORT% from Task Manager.
 echo.
-timeout /t 3 /nobreak >nul
