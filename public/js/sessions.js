@@ -38,32 +38,20 @@ const Sessions = {
   },
 
   renderCard(slug, s, i) {
-    const created = s.created ? new Date(s.created).toLocaleString() : '—';
-    const modified = s.modified ? new Date(s.modified).toLocaleString() : '—';
     const snippetsHtml = (s.snippets || []).map(sn => {
       const label = sn.label ? `<span class="snippet-label">${escapeHtml(sn.label)}</span> ` : '';
       const roleTag = sn.role === 'user' ? 'You' : sn.role === 'assistant' ? 'Claude' : '';
       const roleHtml = roleTag ? `<span class="snippet-role">${roleTag}</span> ` : '';
       return `<div class="session-snippet">${roleHtml}${label}${Sessions.highlightMatch(sn.text, Sessions._lastQuery)}</div>`;
     }).join('');
-    return `
-      <div class="session-card" style="cursor:pointer" onclick="Sessions.open('${slug}', '${s.sessionId}', ${i})">
-        <div class="session-summary">${escapeHtml(s.summary || s.firstPrompt || 'Untitled session')}</div>
-        ${s.firstPrompt && s.summary ? `<div class="session-prompt">${escapeHtml(s.firstPrompt)}</div>` : ''}
-        ${snippetsHtml}
-        <div class="session-meta">
-          <div class="meta-item">Created <span class="meta-value">${created}</span></div>
-          <div class="meta-item">Modified <span class="meta-value">${modified}</span></div>
-          <div class="meta-item">Messages <span class="meta-value">${s.messageCount}</span></div>
-          ${s.tokens ? `<span class="token-badge badge-tokens">${fmtTokens((s.tokens.input_tokens || 0) + (s.tokens.output_tokens || 0))} tokens</span>` : ''}
-          ${s.cost ? `<span class="token-badge badge-cost">$${s.cost.toFixed(2)}</span>` : ''}
-          ${s.gitBranch ? `<span class="session-branch">${escapeHtml(s.gitBranch)}</span>` : ''}
-          ${s.lastGitBranch && s.lastGitBranch !== s.gitBranch ? `<span class="session-branch" style="opacity:0.7">&#8594; ${escapeHtml(s.lastGitBranch)}</span>` : ''}
-          ${s.isSidechain ? '<span class="session-sidechain">sidechain</span>' : ''}
-          <button class="btn btn-sm btn-primary session-resume-btn" onclick="event.stopPropagation(); Sessions.resume('${slug}', '${s.sessionId}')">Resume</button>
-        </div>
-      </div>
-    `;
+    return renderSessionCard(s, {
+      onclick: `Sessions.open('${slug}', '${s.sessionId}', ${i})`,
+      slug,
+      dates: true,
+      sidechain: true,
+      snippets: snippetsHtml,
+      delete: { slug, sessionId: s.sessionId }
+    });
   },
 
   _lastQuery: '',
@@ -122,6 +110,13 @@ const Sessions = {
     App.navigate('session-detail', { slug, sessionId, sessionInfo: sessions[index] });
   },
 
+  goBack() {
+    const slug = App.currentProject;
+    App.navigate('project-detail', { slug });
+    const btn = document.getElementById('sessions-tab-btn');
+    if (btn) btn.click();
+  },
+
   detailState: { slug: null, sessionId: null, offset: 0, loading: false, hasMore: false, total: 0 },
 
   async loadDetail(slug, sessionId, info) {
@@ -132,7 +127,8 @@ const Sessions = {
     title.textContent = info?.summary || info?.firstPrompt?.slice(0, 80) || 'Session';
     const created = info?.created ? new Date(info.created).toLocaleString() : '';
     const branch = info?.gitBranch || '';
-    meta.innerHTML = [created, branch ? `<span class="session-branch">${escapeHtml(branch)}</span>` : ''].filter(Boolean).join(' &middot; ');
+    const models = (info?.models || []).map(m => `<span class="token-badge badge-model">${escapeHtml(shortModel(m))}</span>`).join('');
+    meta.innerHTML = [created, branch ? `<span class="session-branch">${escapeHtml(branch)}</span>` : '', models].filter(Boolean).join(' &middot; ');
 
     Sessions.detailState = { slug, sessionId, offset: 0, loading: false, hasMore: false, total: 0 };
     container.innerHTML = '';
@@ -250,11 +246,39 @@ const Sessions = {
       <div class="chat-msg ${msg.role}">
         <div class="chat-role ${msg.role}">
           ${msg.role === 'user' ? 'You' : 'Claude'}
+          ${msg.model && msg.role === 'assistant' ? `<span class="chat-model">${escapeHtml(shortModel(msg.model))}</span>` : ''}
           <span class="chat-time">${time}</span>
         </div>
         ${bodyHtml}
       </div>
     `;
+  },
+
+  confirmDelete(slug, sessionId) {
+    openModal({
+      title: 'Delete session?',
+      body: `<p>This will delete session <strong>${escapeHtml(sessionId)}</strong>. A backup will be created.</p>`,
+      buttons: [{
+        label: 'Delete', danger: true, onClick: () => {
+          Sessions.doDelete(slug, sessionId);
+        }
+      }]
+    });
+  },
+
+  async doDelete(slug, sessionId) {
+    try {
+      await api(`/api/projects/${slug}/sessions/${sessionId}`, { method: 'DELETE' });
+      toast('Session deleted');
+      delete Sessions.cache[slug];
+      if (Sessions.detailState.sessionId === sessionId) {
+        App.navigate('project-detail', { slug });
+      } else {
+        Sessions.load(slug);
+      }
+    } catch (e) {
+      toast('Delete failed: ' + e.message, 'error');
+    }
   },
 
   async resume(slug, sessionId) {

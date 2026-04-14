@@ -101,12 +101,70 @@ const Changelog = {
   }
 };
 
+/** Map a full model ID to a short display name. */
+function shortModel(model) {
+  if (!model) return '';
+  if (model.includes('opus')) return 'Opus';
+  if (model.includes('sonnet')) return 'Sonnet';
+  if (model.includes('haiku')) return 'Haiku';
+  return model;
+}
+
 /** Format a token count to human-readable (e.g. 1.2M, 3.5K). */
 function fmtTokens(n) {
   if (!n) return '0';
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
   return String(n);
+}
+
+/**
+ * Render a session card.
+ * opts.onclick     - onclick handler string
+ * opts.project     - show project badge (pass decoded project name)
+ * opts.timeAgo     - show relative time in header (pass formatted string)
+ * opts.dates       - show Created/Modified rows
+ * opts.snippets    - HTML string for search snippets
+ * opts.delete      - show delete button (pass {slug, sessionId})
+ * opts.sidechain   - show sidechain/lastGitBranch indicators
+ */
+function renderSessionCard(s, opts = {}) {
+  const tokensHtml = s.tokens ? `<span class="token-badge badge-tokens">${fmtTokens((s.tokens.input_tokens || 0) + (s.tokens.output_tokens || 0))} tokens</span>` : '';
+  const costHtml = s.cost ? `<span class="token-badge badge-cost">$${s.cost.toFixed(2)}</span>` : '';
+  const modelsHtml = (s.models || []).map(m => `<span class="token-badge badge-model">${escapeHtml(shortModel(m))}</span>`).join('');
+  const branchHtml = s.gitBranch ? `<span class="session-branch">${escapeHtml(s.gitBranch)}</span>` : '';
+  const slug = opts.slug || s.slug;
+
+  let headerHtml;
+  if (opts.timeAgo) {
+    headerHtml = `<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">
+      <div class="session-summary">${escapeHtml(s.summary || s.firstPrompt || 'Untitled session')}</div>
+      <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;margin-left:12px">${escapeHtml(opts.timeAgo)}</span>
+    </div>`;
+  } else {
+    headerHtml = `<div class="session-summary">${escapeHtml(s.summary || s.firstPrompt || 'Untitled session')}</div>`;
+    if (s.firstPrompt && s.summary) {
+      headerHtml += `<div class="session-prompt">${escapeHtml(s.firstPrompt)}</div>`;
+    }
+  }
+
+  return `
+    <div class="session-card" style="cursor:pointer" onclick="${opts.onclick || ''}">
+      ${headerHtml}
+      ${opts.snippets || ''}
+      <div class="session-meta">
+        ${opts.project ? `<span class="project-badge">${escapeHtml(opts.project)}</span>` : ''}
+        ${opts.dates ? `<div class="meta-item">Created <span class="meta-value">${s.created ? new Date(s.created).toLocaleString() : '—'}</span></div>
+        <div class="meta-item">Modified <span class="meta-value">${s.modified ? new Date(s.modified).toLocaleString() : '—'}</span></div>` : ''}
+        <div class="meta-item">Messages <span class="meta-value">${s.messageCount}</span></div>
+        ${tokensHtml}${costHtml}${modelsHtml}${branchHtml}
+        ${opts.sidechain && s.lastGitBranch && s.lastGitBranch !== s.gitBranch ? `<span class="session-branch" style="opacity:0.7">&#8594; ${escapeHtml(s.lastGitBranch)}</span>` : ''}
+        ${opts.sidechain && s.isSidechain ? '<span class="session-sidechain">sidechain</span>' : ''}
+        <button class="btn btn-sm btn-primary session-resume-btn" onclick="event.stopPropagation(); Sessions.resume('${slug}', '${s.sessionId}')">Resume</button>
+        ${opts.delete ? `<button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); Sessions.confirmDelete('${opts.delete.slug}', '${opts.delete.sessionId}')">Delete</button>` : ''}
+      </div>
+    </div>
+  `;
 }
 
 // --- Constants ---

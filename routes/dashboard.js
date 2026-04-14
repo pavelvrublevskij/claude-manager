@@ -97,6 +97,7 @@ router.get('/', wrapRoute(async (req, res) => {
     if (entry) {
       s.tokens = entry.totals;
       s.cost = calcCostMultiModel(entry.byModel || {}).total;
+      s.models = Object.keys(entry.byModel || {});
     }
   }
 

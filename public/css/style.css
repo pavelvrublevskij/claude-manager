@@ -949,6 +949,13 @@ label {
 .chat-role.user { color: var(--accent); }
 .chat-role.assistant { color: var(--success); }
 
+.chat-role .chat-model {
+  font-weight: 400;
+  color: #a371f7;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+}
 .chat-role .chat-time {
   font-weight: 400;
   color: var(--text-muted);
@@ -1386,6 +1393,10 @@ label {
 .token-badge.badge-cost {
   background: rgba(248, 81, 73, 0.12);
   color: var(--token-cost);
+}
+.token-badge.badge-model {
+  background: rgba(163, 113, 247, 0.12);
+  color: #a371f7;
 }
 
 .usage-table {

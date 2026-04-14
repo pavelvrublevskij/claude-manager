@@ -2,8 +2,8 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { execFile, spawn } = require('child_process');
-const { safeSlug, wrapRoute } = require('../lib/file-helpers');
-const { getProjectUsageMap } = require('../lib/usage-index');
+const { safeSlug, backup, readJson, wrapRoute } = require('../lib/file-helpers');
+const { getProjectUsageMap, removeSessionFromIndex } = require('../lib/usage-index');
 const { decodeSlug } = require('../lib/slug');
 
 const router = express.Router({ mergeParams: true });
@@ -29,7 +29,7 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
       const usageMap = getProjectUsageMap(req.params.slug);
       sessions.forEach(s => {
         const u = usageMap[s.sessionId];
-        if (u) { s.tokens = u.totals; s.cost = u.cost; }
+        if (u) { s.tokens = u.totals; s.cost = u.cost; s.models = Object.keys(u.byModel || {}); }
       });
       sessions.sort((a, b) => new Date(b.modified || 0) - new Date(a.modified || 0));
       return res.json(sessions);
@@ -89,7 +89,7 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
   const filtered = sessions.filter(s => s.messageCount > 0);
   filtered.forEach(s => {
     const u = usageMap[s.sessionId];
-    if (u) { s.tokens = u.totals; s.cost = u.cost; }
+    if (u) { s.tokens = u.totals; s.cost = u.cost; s.models = Object.keys(u.byModel || {}); }
   });
   filtered.sort((a, b) => new Date(b.modified) - new Date(a.modified));
   res.json(filtered);
@@ -232,7 +232,7 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
   const usageMap = getProjectUsageMap(req.params.slug);
   results.forEach(s => {
     const u = usageMap[s.sessionId];
-    if (u) { s.tokens = u.totals; s.cost = u.cost; }
+    if (u) { s.tokens = u.totals; s.cost = u.cost; s.models = Object.keys(u.byModel || {}); }
   });
   results.sort((a, b) => new Date(b.modified || 0) - new Date(a.modified || 0));
   res.json(results);
@@ -261,6 +261,7 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
           role: entry.type,
           timestamp: entry.timestamp,
           gitBranch: entry.gitBranch || '',
+          model: entry.message?.model || '',
           content: []
         };
 
@@ -307,6 +308,37 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
   const limit = parseInt(req.query.limit) || 20;
   const page = messages.slice(offset, offset + limit);
   res.json({ messages: page, total: messages.length, hasMore: offset + limit < messages.length });
+}));
+
+router.delete('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
+  const dir = safeSlug(req.params.slug);
+  if (!dir) return res.status(400).json({ error: 'Invalid slug' });
+
+  const sessionId = req.params.sessionId;
+  if (sessionId.includes('..') || sessionId.includes('/') || sessionId.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid session ID' });
+  }
+
+  const filePath = path.join(dir, sessionId + '.jsonl');
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Session not found' });
+
+  try { backup(filePath); } catch (_) { /* best-effort: skip backup on read-only FS */ }
+  fs.unlinkSync(filePath);
+
+  // Remove from sessions-index.json if present
+  const indexFile = path.join(dir, 'sessions-index.json');
+  try {
+    if (fs.existsSync(indexFile)) {
+      const data = readJson(indexFile, { entries: [] });
+      data.entries = (data.entries || []).filter(e => e.sessionId !== sessionId);
+      fs.writeFileSync(indexFile, JSON.stringify(data, null, 2));
+    }
+  } catch (_) { /* index update is best-effort */ }
+
+  // Remove from usage index
+  try { removeSessionFromIndex(req.params.slug, sessionId); } catch (_) {}
+
+  res.json({ ok: true });
 }));
 
 router.post('/:slug/sessions/:sessionId/resume', wrapRoute((req, res) => {

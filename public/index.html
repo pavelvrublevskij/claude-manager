@@ -371,12 +371,13 @@
         <div class="view-header">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
             <div style="display:flex;align-items:center;gap:12px">
-              <button class="btn btn-sm" onclick="App.navigate('project-detail', { slug: App.currentProject })">&#8592; Back</button>
+              <button class="btn btn-sm" onclick="Sessions.goBack()">&#8592; Back</button>
               <h2 id="session-detail-title">Session</h2>
             </div>
             <div style="display:flex;gap:8px">
               <button class="btn btn-sm btn-primary" onclick="Sessions.resume(Sessions.detailState.slug, Sessions.detailState.sessionId)">Resume in Terminal</button>
               <button class="btn btn-sm" onclick="Sessions.loadDetail(Sessions.detailState.slug, Sessions.detailState.sessionId, null)">Refresh</button>
+              <button class="btn btn-sm btn-danger" onclick="Sessions.confirmDelete(Sessions.detailState.slug, Sessions.detailState.sessionId)">Delete</button>
             </div>
           </div>
           <div class="subtitle" id="session-detail-meta"></div>
