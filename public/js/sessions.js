@@ -23,6 +23,7 @@ const Sessions = {
     return `<div class="session-search-wrap">
       <input type="text" class="session-search" id="session-search-input"
         placeholder="Search sessions..." oninput="Sessions.onSearch('${slug}', this.value)">
+      <button class="btn btn-sm btn-primary" onclick="Sessions.newSession('${slug}')">New Session</button>
     </div>`;
   },
 
@@ -49,8 +50,7 @@ const Sessions = {
       slug,
       dates: true,
       sidechain: true,
-      snippets: snippetsHtml,
-      delete: { slug, sessionId: s.sessionId }
+      snippets: snippetsHtml
     });
   },
 
@@ -254,35 +254,27 @@ const Sessions = {
     `;
   },
 
-  confirmDelete(slug, sessionId) {
-    openModal({
-      title: 'Delete session?',
-      body: `<p>This will delete session <strong>${escapeHtml(sessionId)}</strong>. A backup will be created.</p>`,
-      buttons: [{
-        label: 'Delete', danger: true, onClick: () => {
-          Sessions.doDelete(slug, sessionId);
-        }
-      }]
-    });
+  async checkPricing() {
+    try {
+      await api('/api/pricing/fetch', { method: 'POST' });
+    } catch (_) {
+      toast('Pricing check failed — using cached data', 'error');
+    }
   },
 
-  async doDelete(slug, sessionId) {
+  async newSession(slug) {
     try {
-      await api(`/api/projects/${slug}/sessions/${sessionId}`, { method: 'DELETE' });
-      toast('Session deleted');
-      delete Sessions.cache[slug];
-      if (Sessions.detailState.sessionId === sessionId) {
-        App.navigate('project-detail', { slug });
-      } else {
-        Sessions.load(slug);
-      }
+      await Sessions.checkPricing();
+      await api(`/api/projects/${slug}/sessions/new`, { method: 'POST' });
+      toast('New session opened');
     } catch (e) {
-      toast('Delete failed: ' + e.message, 'error');
+      toast('Failed to open terminal: ' + e.message, 'error');
     }
   },
 
   async resume(slug, sessionId) {
     try {
+      await Sessions.checkPricing();
       await api(`/api/projects/${slug}/sessions/${sessionId}/resume`, { method: 'POST' });
       toast('Terminal opened with session');
     } catch (e) {

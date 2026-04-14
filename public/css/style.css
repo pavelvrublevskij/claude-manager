@@ -780,6 +780,9 @@ label {
 /* --- Sessions --- */
 
 .session-search-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
   margin-bottom: 12px;
 }
 
@@ -870,6 +873,7 @@ label {
 
 .session-meta {
   display: flex;
+  align-items: center;
   gap: 16px;
   flex-wrap: wrap;
 }
@@ -1398,6 +1402,18 @@ label {
   background: rgba(163, 113, 247, 0.12);
   color: #a371f7;
 }
+
+.pricing-input {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.pricing-input.pricing-id { width: 100%; }
+.pricing-input.pricing-num { width: 80px; text-align: right; }
 
 .usage-table {
   width: 100%;

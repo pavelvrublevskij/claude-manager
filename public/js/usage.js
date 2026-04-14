@@ -108,7 +108,7 @@ const Usage = {
       { key: 'cache_read', label: 'Cache Read', cls: 'col-cache-read' }
     ];
 
-    const models = Object.keys(modelPricing || {});
+    const models = Object.keys(byModel || {}).filter(m => matchPricing(m, modelPricing));
 
     const pricingHtml = `<table class="usage-table">
       <thead><tr>
@@ -116,7 +116,7 @@ const Usage = {
         ${cols.map(c => `<th class="${c.cls}">${c.label}</th>`).join('')}
       </tr></thead>
       <tbody>${models.map(m => {
-        const r = modelPricing[m];
+        const r = matchPricing(m, modelPricing);
         return `<tr>
           <td>${Usage.fmtModel(m)}</td>
           ${cols.map(c => `<td class="${c.cls}">$${r[c.key].toFixed(2)}</td>`).join('')}
@@ -137,7 +137,7 @@ const Usage = {
             <th class="col-cost">Cost</th>
           </tr></thead>
           <tbody>${Object.entries(byModel).map(([model, tokens]) => {
-            const r = (modelPricing || {})[model] || {};
+            const r = matchPricing(model, modelPricing) || {};
             const cost = (tokens.input_tokens || 0) * (r.input || 0) / 1e6
               + (tokens.output_tokens || 0) * (r.output || 0) / 1e6
               + (tokens.cache_creation_input_tokens || 0) * (r.cache_write || 0) / 1e6
@@ -155,7 +155,7 @@ const Usage = {
         </table>`;
     }
 
-    const updatedStr = pricingUpdated ? `Last verified: <strong>${escapeHtml(pricingUpdated)}</strong>.` : '';
+    const updatedStr = pricingUpdated ? `Last fetched: <strong>${new Date(pricingUpdated).toLocaleString()}</strong>.` : 'No pricing data fetched yet.';
     const sourceStr = pricingSource ? ` <a href="${escapeHtml(pricingSource)}" target="_blank" class="usage-project-link">Verify on Anthropic</a>` : '';
 
     el.innerHTML = pricingHtml + breakdownHtml + `
@@ -164,6 +164,16 @@ const Usage = {
       Subscription plans may differ from API pricing. Click a model to filter all statistics.<br>
       ${updatedStr}${sourceStr}
     </div>`;
+  },
+
+  async fetchPricing() {
+    try {
+      const result = await api('/api/pricing/fetch', { method: 'POST' });
+      toast(result.changed ? 'Pricing updated — changes detected' : 'Pricing checked — no changes');
+      if (result.changed) Usage.refresh();
+    } catch (e) {
+      toast('Failed to fetch pricing: ' + e.message, 'error');
+    }
   },
 
   renderPeriods(periods) {
@@ -230,12 +240,7 @@ const Usage = {
   },
 
   fmtModel(model) {
-    const names = {
-      'claude-opus-4-6': 'Opus 4.6',
-      'claude-sonnet-4-6': 'Sonnet 4.6',
-      'claude-haiku-4-5-20251001': 'Haiku 4.5'
-    };
-    return names[model] || model;
+    return shortModel(model) || model;
   },
 
   initTooltips() {

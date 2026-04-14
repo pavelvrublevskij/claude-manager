@@ -31,6 +31,9 @@
           <div class="nav-item" data-view="usage">
             <span class="icon">&#128200;</span> Token Usage
           </div>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">Claude Code</div>
           <div class="nav-item" data-view="settings">
             <span class="icon">&#9881;</span> Settings
           </div>
@@ -65,13 +68,19 @@
             <div class="project-list" id="project-nav-list"></div>
           </div>
         </div>
+        <div class="nav-section">
+          <div class="nav-section-title">Claude Manager</div>
+          <div class="nav-item" data-view="manager-settings">
+            <span class="icon">&#9878;</span> Settings
+          </div>
+          <div class="nav-item" data-view="changelog">
+            <span class="icon">&#9776;</span> Changelog
+          </div>
+        </div>
       </nav>
       <div class="sidebar-footer">
         <button class="theme-toggle" id="theme-toggle" onclick="Theme.toggle()" title="Dark mode">
           <span id="theme-icon">&#9790;</span>
-        </button>
-        <button class="theme-toggle" onclick="App.navigate('changelog')" title="Changelog">
-          <span>&#9776;</span>
         </button>
       </div>
     </aside>
@@ -104,7 +113,12 @@
         <div class="view-body">
           <div id="usage-model-filter"></div>
           <div class="dashboard-stats" id="usage-summary"></div>
-          <h3 style="margin:24px 0 12px">Model Pricing</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin:24px 0 12px">
+            <h3 style="margin:0">Model Pricing</h3>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-sm" onclick="Usage.fetchPricing()">Update Pricing</button>
+            </div>
+          </div>
           <div id="usage-pricing"></div>
           <h3 style="margin:24px 0 12px">Usage by Period</h3>
           <div class="tab-bar" id="usage-period-tabs">
@@ -377,7 +391,6 @@
             <div style="display:flex;gap:8px">
               <button class="btn btn-sm btn-primary" onclick="Sessions.resume(Sessions.detailState.slug, Sessions.detailState.sessionId)">Resume in Terminal</button>
               <button class="btn btn-sm" onclick="Sessions.loadDetail(Sessions.detailState.slug, Sessions.detailState.sessionId, null)">Refresh</button>
-              <button class="btn btn-sm btn-danger" onclick="Sessions.confirmDelete(Sessions.detailState.slug, Sessions.detailState.sessionId)">Delete</button>
             </div>
           </div>
           <div class="subtitle" id="session-detail-meta"></div>
@@ -385,6 +398,35 @@
         </div>
         <div class="view-body">
           <div id="session-messages" class="chat-container"></div>
+        </div>
+      </div>
+
+      <!-- Manager Settings View -->
+      <div class="view" id="view-manager-settings">
+        <div class="view-header">
+          <h2>Manager Settings</h2>
+          <div class="subtitle">Claude Manager configuration</div>
+        </div>
+        <div class="view-body">
+          <h3 style="margin:0 0 12px">Pricing Fetch URL</h3>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:24px">
+            <input type="text" id="pricing-fetch-url" style="flex:1">
+            <button class="btn btn-sm" onclick="ManagerSettings.saveUrl()">Save</button>
+            <button class="btn btn-sm" onclick="ManagerSettings.resetUrl()">Reset Default</button>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <h3 style="margin:0">Pricing History</h3>
+          </div>
+          <div id="manager-pricing-history"></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin:24px 0 12px">
+            <h3 style="margin:0">Model Pricing</h3>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-sm" onclick="ManagerSettings.addModel()">Add Model</button>
+              <button class="btn btn-sm" onclick="ManagerSettings.updateEntry()">Update Entry</button>
+              <button class="btn btn-sm btn-primary" onclick="ManagerSettings.savePricing()">Save as New</button>
+            </div>
+          </div>
+          <div id="manager-pricing-table"></div>
         </div>
       </div>
 
@@ -420,6 +462,7 @@
   <script src="/js/output-styles.js"></script>
   <script src="/js/plugins.js"></script>
   <script src="/js/usage.js"></script>
+  <script src="/js/manager-settings.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

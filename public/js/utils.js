@@ -104,10 +104,28 @@ const Changelog = {
 /** Map a full model ID to a short display name. */
 function shortModel(model) {
   if (!model) return '';
-  if (model.includes('opus')) return 'Opus';
-  if (model.includes('sonnet')) return 'Sonnet';
-  if (model.includes('haiku')) return 'Haiku';
+  // "claude-opus-4-6" -> "Opus 4.6", "claude-haiku-4-5-20251001" -> "Haiku 4.5"
+  const m = model.replace(/-\d{8,}$/, '');
+  const match = m.match(/claude-(opus|sonnet|haiku)-(.+)/i);
+  if (match) {
+    const family = match[1].charAt(0).toUpperCase() + match[1].slice(1);
+    const ver = match[2].replace(/-/g, '.');
+    return family + ' ' + ver;
+  }
   return model;
+}
+
+/** Look up pricing for a model ID with fuzzy matching (strip date suffix, prefix match). */
+function matchPricing(modelId, pricingMap) {
+  if (!modelId || !pricingMap) return null;
+  if (pricingMap[modelId]) return pricingMap[modelId];
+  const noDate = modelId.replace(/-\d{8,}$/, '');
+  if (pricingMap[noDate]) return pricingMap[noDate];
+  let best = null, bestLen = 0;
+  for (const key of Object.keys(pricingMap)) {
+    if (modelId.startsWith(key) && key.length > bestLen) { best = key; bestLen = key.length; }
+  }
+  return best ? pricingMap[best] : null;
 }
 
 /** Format a token count to human-readable (e.g. 1.2M, 3.5K). */
@@ -125,7 +143,6 @@ function fmtTokens(n) {
  * opts.timeAgo     - show relative time in header (pass formatted string)
  * opts.dates       - show Created/Modified rows
  * opts.snippets    - HTML string for search snippets
- * opts.delete      - show delete button (pass {slug, sessionId})
  * opts.sidechain   - show sidechain/lastGitBranch indicators
  */
 function renderSessionCard(s, opts = {}) {
@@ -161,7 +178,6 @@ function renderSessionCard(s, opts = {}) {
         ${opts.sidechain && s.lastGitBranch && s.lastGitBranch !== s.gitBranch ? `<span class="session-branch" style="opacity:0.7">&#8594; ${escapeHtml(s.lastGitBranch)}</span>` : ''}
         ${opts.sidechain && s.isSidechain ? '<span class="session-sidechain">sidechain</span>' : ''}
         <button class="btn btn-sm btn-primary session-resume-btn" onclick="event.stopPropagation(); Sessions.resume('${slug}', '${s.sessionId}')">Resume</button>
-        ${opts.delete ? `<button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); Sessions.confirmDelete('${opts.delete.slug}', '${opts.delete.sessionId}')">Delete</button>` : ''}
       </div>
     </div>
   `;
