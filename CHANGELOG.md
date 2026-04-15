@@ -4,6 +4,8 @@
 - New Session button in project sessions list — opens a new Claude terminal in the project directory
 - Resume and New Session automatically check for pricing updates before launching
 - Session back button now returns to the sessions list instead of the project overview
+- In-session search — filter messages and highlight matches within a single session
+- Auto-loads all messages when searching so the full session is covered
 
 ### AI Model Display
 - Session cards show model badges (Opus, Sonnet, Haiku) with version numbers

@@ -133,6 +133,12 @@ const Sessions = {
     Sessions.detailState = { slug, sessionId, offset: 0, loading: false, hasMore: false, total: 0 };
     container.innerHTML = '';
 
+    // Reset search
+    const searchInput = document.getElementById('session-detail-search-input');
+    if (searchInput) searchInput.value = '';
+    const countEl = document.getElementById('session-detail-search-count');
+    if (countEl) countEl.textContent = '';
+
     await Sessions.loadMore();
     Sessions.setupScroll();
   },
@@ -202,6 +208,11 @@ const Sessions = {
         btn.onclick = () => Sessions.loadMore();
         container.appendChild(btn);
       }
+
+      // Re-apply active search to newly loaded messages
+      if (Sessions._detailSearchQuery) {
+        Sessions.applyDetailFilter(Sessions._detailSearchQuery);
+      }
     } catch (e) {
       loader.textContent = 'Failed to load messages';
     } finally {
@@ -252,6 +263,108 @@ const Sessions = {
         ${bodyHtml}
       </div>
     `;
+  },
+
+  _detailSearchTimer: null,
+  _detailSearchQuery: '',
+
+  onDetailSearch(value) {
+    clearTimeout(Sessions._detailSearchTimer);
+    const q = value.trim();
+    Sessions._detailSearchQuery = q;
+
+    Sessions._detailSearchTimer = setTimeout(async () => {
+      if (Sessions._detailSearchQuery !== q) return;
+
+      // Load all remaining messages so search covers the whole session
+      if (q && Sessions.detailState.hasMore) {
+        await Sessions.loadAllMessages();
+        if (Sessions._detailSearchQuery !== q) return;
+      }
+
+      Sessions.applyDetailFilter(q);
+    }, 250);
+  },
+
+  async loadAllMessages() {
+    while (Sessions.detailState.hasMore && !Sessions.detailState.loading) {
+      await Sessions.loadMore();
+    }
+  },
+
+  applyDetailFilter(query) {
+    const container = document.getElementById('session-messages');
+    const countEl = document.getElementById('session-detail-search-count');
+    const messages = container.querySelectorAll('.chat-msg');
+
+    // Remove any existing highlights
+    container.querySelectorAll('mark.search-highlight').forEach(m => {
+      const parent = m.parentNode;
+      parent.replaceChild(document.createTextNode(m.textContent), m);
+      parent.normalize();
+    });
+
+    if (!query) {
+      messages.forEach(msg => msg.style.display = '');
+      if (countEl) countEl.textContent = '';
+      return;
+    }
+
+    const qLower = query.toLowerCase();
+    let matchedMessages = 0;
+    let totalMatches = 0;
+
+    messages.forEach(msg => {
+      const text = msg.textContent.toLowerCase();
+      if (text.includes(qLower)) {
+        msg.style.display = '';
+        matchedMessages++;
+        totalMatches += Sessions.highlightInNode(msg, query);
+      } else {
+        msg.style.display = 'none';
+      }
+    });
+
+    if (countEl) {
+      countEl.textContent = matchedMessages
+        ? `${totalMatches} matches in ${matchedMessages} messages`
+        : 'No matches';
+    }
+  },
+
+  highlightInNode(root, query) {
+    const qLower = query.toLowerCase();
+    let count = 0;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: n => n.parentNode.tagName === 'SCRIPT' || n.parentNode.tagName === 'STYLE'
+        ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+    });
+    const textNodes = [];
+    let node;
+    while ((node = walker.nextNode())) textNodes.push(node);
+
+    for (const textNode of textNodes) {
+      const text = textNode.nodeValue;
+      const lower = text.toLowerCase();
+      let idx = lower.indexOf(qLower);
+      if (idx === -1) continue;
+
+      const frag = document.createDocumentFragment();
+      let last = 0;
+      while (idx !== -1) {
+        if (idx > last) frag.appendChild(document.createTextNode(text.slice(last, idx)));
+        const mark = document.createElement('mark');
+        mark.className = 'search-highlight';
+        mark.textContent = text.slice(idx, idx + query.length);
+        frag.appendChild(mark);
+        count++;
+        last = idx + query.length;
+        idx = lower.indexOf(qLower, last);
+      }
+      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      textNode.parentNode.replaceChild(frag, textNode);
+    }
+    return count;
   },
 
   async checkPricing() {
