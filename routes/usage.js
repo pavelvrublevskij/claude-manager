@@ -1,7 +1,8 @@
 const router = require('express').Router();
 const { wrapRoute } = require('../lib/file-helpers');
 const { decodeSlug } = require('../lib/slug');
-const { MODEL_PRICING, PRICING_UPDATED, PRICING_SOURCE, calcCost, calcCostMultiModel, addTokens, emptyTokens, buildIndex } = require('../lib/usage-index');
+const { getModelPricingMap, calcCost, calcCostMultiModel, addTokens, emptyTokens, buildIndex } = require('../lib/usage-index');
+const { getLastFetchedAt, PRICING_URL, resolveModelPrice } = require('../lib/pricing');
 
 function getISOWeek(dateStr) {
   const d = new Date(dateStr + 'T00:00:00Z');
@@ -13,7 +14,7 @@ function getISOWeek(dateStr) {
 
 function filterModel(req) {
   const m = req.query.model;
-  return m && MODEL_PRICING[m] ? m : null;
+  return m && resolveModelPrice(m, getModelPricingMap()) ? m : null;
 }
 
 function getSessionTokens(session, model) {
@@ -92,9 +93,9 @@ router.get('/summary', wrapRoute((req, res) => {
     cost,
     sessionCount,
     projectCount: slugs.size,
-    modelPricing: MODEL_PRICING,
-    pricingUpdated: PRICING_UPDATED,
-    pricingSource: PRICING_SOURCE,
+    modelPricing: getModelPricingMap(),
+    pricingUpdated: getLastFetchedAt(),
+    pricingSource: PRICING_URL,
     activeModel: model || null
   });
 }));

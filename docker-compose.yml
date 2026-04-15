@@ -1,0 +1,15 @@
+name: claude-manager
+
+services:
+  app:
+    build: .
+    container_name: claude-manager
+    ports:
+      - "3000:3000"
+    volumes:
+      # rw is required — container will not start without write access to ~/.claude
+      - ${CLAUDE_DIR:-~/.claude}:/root/.claude:rw
+      - app-data:/app/data
+
+volumes:
+  app-data:

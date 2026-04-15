@@ -2,8 +2,8 @@ const express = require('express');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
-const HOST = '127.0.0.1';
+const PORT = parseInt(process.env.PORT, 10) || 3000;
+const HOST = process.env.HOST || '127.0.0.1';
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -59,6 +59,73 @@ app.get('/api/changelog', (req, res) => {
   res.json({ content: fs.readFileSync(file, 'utf-8') });
 });
 
+// Pricing endpoints
+const pricing = require('./lib/pricing');
+
+app.get('/api/pricing', (req, res) => {
+  const history = pricing.readHistory();
+  res.json({
+    current: pricing.getCurrentPricing(),
+    lastFetched: pricing.getLastFetchedAt(),
+    source: pricing.PRICING_URL,
+    historyCount: history.entries.length
+  });
+});
+
+app.get('/api/pricing/history', (req, res) => {
+  const history = pricing.readHistory();
+  res.json(history.entries || []);
+});
+
+app.post('/api/pricing/fetch', async (req, res) => {
+  try {
+    const { models, changed } = await pricing.fetchAndUpdate();
+    res.json({ ok: true, changed, models });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/pricing/manual', (req, res) => {
+  try {
+    const models = req.body.models;
+    if (!models || typeof models !== 'object' || !Object.keys(models).length) {
+      return res.status(400).json({ error: 'No pricing data provided' });
+    }
+    pricing.saveManualEntry(models, req.body.fetchedAt);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/pricing/history/:index', (req, res) => {
+  try {
+    const index = parseInt(req.params.index);
+    const models = req.body.models;
+    if (!models || typeof models !== 'object' || !Object.keys(models).length) {
+      return res.status(400).json({ error: 'No pricing data provided' });
+    }
+    pricing.updateEntry(index, models, req.body.fetchedAt);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/pricing/config', (req, res) => {
+  res.json({ url: pricing.getFetchUrl() });
+});
+
+app.put('/api/pricing/config', (req, res) => {
+  try {
+    pricing.setFetchUrl(req.body.url);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Mount API routes
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/settings', require('./routes/settings'));
@@ -81,4 +148,13 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, HOST, () => {
   console.log(`Claude Manager running at http://${HOST}:${PORT}`);
+
+  // Auto-fetch pricing on startup if stale (>24h) or missing
+  const lastFetch = pricing.getLastFetchedAt();
+  const stale = !lastFetch || (Date.now() - new Date(lastFetch).getTime()) > 24 * 60 * 60 * 1000;
+  if (stale) {
+    pricing.fetchAndUpdate()
+      .then(({ changed }) => console.log(changed ? 'Pricing updated from Anthropic' : 'Pricing checked, no changes'))
+      .catch(e => console.log('Pricing fetch skipped:', e.message));
+  }
 });

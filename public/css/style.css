@@ -780,6 +780,9 @@ label {
 /* --- Sessions --- */
 
 .session-search-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
   margin-bottom: 12px;
 }
 
@@ -818,7 +821,8 @@ label {
   -webkit-box-orient: vertical;
 }
 
-.session-snippet mark {
+.session-snippet mark,
+mark.search-highlight {
   background: rgba(210, 153, 34, 0.3);
   color: var(--warning);
   border-radius: 2px;
@@ -870,6 +874,7 @@ label {
 
 .session-meta {
   display: flex;
+  align-items: center;
   gap: 16px;
   flex-wrap: wrap;
 }
@@ -949,6 +954,13 @@ label {
 .chat-role.user { color: var(--accent); }
 .chat-role.assistant { color: var(--success); }
 
+.chat-role .chat-model {
+  font-weight: 400;
+  color: #a371f7;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+}
 .chat-role .chat-time {
   font-weight: 400;
   color: var(--text-muted);
@@ -1387,6 +1399,22 @@ label {
   background: rgba(248, 81, 73, 0.12);
   color: var(--token-cost);
 }
+.token-badge.badge-model {
+  background: rgba(163, 113, 247, 0.12);
+  color: #a371f7;
+}
+
+.pricing-input {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.pricing-input.pricing-id { width: 100%; }
+.pricing-input.pricing-num { width: 80px; text-align: right; }
 
 .usage-table {
   width: 100%;

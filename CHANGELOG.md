@@ -1,3 +1,52 @@
+## v0.4.0
+
+### New Session Management
+- New Session button in project sessions list — opens a new Claude terminal in the project directory
+- Resume and New Session automatically check for pricing updates before launching
+- Session back button now returns to the sessions list instead of the project overview
+- In-session search — filter messages and highlight matches within a single session
+- Auto-loads all messages when searching so the full session is covered
+
+### AI Model Display
+- Session cards show model badges (Opus, Sonnet, Haiku) with version numbers
+- Session detail view shows model name on each assistant message
+- Dashboard recent sessions include model badges
+- Shared `renderSessionCard()` replaces duplicated card templates in dashboard and sessions
+
+### Dynamic Pricing
+- Auto-fetches model pricing from Anthropic on server startup (daily)
+- Manual "Update Pricing" button in Token Usage view
+- Pricing history with timestamped entries — only records when pricing actually changes
+- Historical pricing used for cost calculations based on session dates
+- Fuzzy model matching resolves session model IDs (e.g. `claude-haiku-4-5-20251001`) to pricing entries
+- Fallback to built-in pricing when fetch is unavailable
+
+### Manager Settings (new view)
+- Pricing Fetch URL — configurable for when Anthropic changes their docs URL
+- Pricing History table — browse all entries, view changes between them
+- Manual pricing editor — add/edit/remove models with editable price fields
+- Update existing history entries in-place to correct historical calculations
+- Save as new entry for actual pricing changes
+- Editable entry date for backdating corrections
+
+### Docker Support
+- Dockerfile and docker-compose.yml for containerized deployment
+- Read-write volume mount for `~/.claude` with user confirmation prompt
+- Run scripts (option 2 and 6) ask for permission before mounting with write access
+- Persistent `app-data` volume for usage index and pricing history
+
+### UI Restructure
+- Sidebar reorganized into four sections: General, Claude Code, Projects, Claude Manager
+- Claude Code section groups settings, CLAUDE.md, MCP, keybindings, skills, output styles, plugins
+- Claude Manager section with Settings and Changelog (moved from footer)
+- Session card meta items vertically centered
+
+### Bug Fixes
+- Fixed pricing page fetch failing on relative redirect URLs (307 with relative path)
+- Fixed Token Usage showing $0.00 for models with date-suffixed IDs (fuzzy matching)
+- Fixed pricing history reversed index loading wrong entry when clicked
+- Removed session delete to preserve token usage calculation integrity
+
 ## v0.3.1
 
 ### Bug Fixes

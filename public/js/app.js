@@ -79,6 +79,7 @@ const App = {
       'skills': () => Skills.load(),
       'output-styles': () => OutputStyles.load(),
       'plugins': () => Plugins.load(),
+      'manager-settings': () => ManagerSettings.load(),
       'changelog': () => Changelog.load()
     };
 

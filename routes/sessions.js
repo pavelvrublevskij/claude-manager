@@ -8,6 +8,33 @@ const { decodeSlug } = require('../lib/slug');
 
 const router = express.Router({ mergeParams: true });
 
+function launchTerminal(projectPath, cmd) {
+  const platform = process.platform;
+  if (platform === 'win32') {
+    const wtArgs = ['-d', projectPath, 'cmd.exe', '/k', cmd];
+    const proc = spawn('wt.exe', wtArgs, { detached: true, stdio: 'ignore' });
+    proc.on('error', () => {
+      spawn('cmd.exe', ['/c', `start "" cmd.exe /k "cd /d ${projectPath} && ${cmd}"`], { shell: true, detached: true, stdio: 'ignore' }).unref();
+    });
+    proc.unref();
+  } else if (platform === 'darwin') {
+    const script = `tell application "Terminal" to do script "cd '${projectPath}' && ${cmd}"`;
+    execFile('osascript', ['-e', script]);
+  } else {
+    const terminals = ['x-terminal-emulator', 'gnome-terminal', 'konsole', 'xfce4-terminal', 'xterm'];
+    for (const term of terminals) {
+      try {
+        const args = term === 'gnome-terminal'
+          ? ['--', 'bash', '-c', `cd '${projectPath}' && ${cmd}; exec bash`]
+          : ['-e', `bash -c "cd '${projectPath}' && ${cmd}; exec bash"`];
+        execFile(term, args);
+        return;
+      } catch (_) { continue; }
+    }
+    throw new Error('No supported terminal found');
+  }
+}
+
 router.get('/:slug/sessions', wrapRoute((req, res) => {
   const dir = safeSlug(req.params.slug);
   if (!dir) return res.status(400).json({ error: 'Invalid slug' });
@@ -29,7 +56,7 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
       const usageMap = getProjectUsageMap(req.params.slug);
       sessions.forEach(s => {
         const u = usageMap[s.sessionId];
-        if (u) { s.tokens = u.totals; s.cost = u.cost; }
+        if (u) { s.tokens = u.totals; s.cost = u.cost; s.models = Object.keys(u.byModel || {}); }
       });
       sessions.sort((a, b) => new Date(b.modified || 0) - new Date(a.modified || 0));
       return res.json(sessions);
@@ -89,7 +116,7 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
   const filtered = sessions.filter(s => s.messageCount > 0);
   filtered.forEach(s => {
     const u = usageMap[s.sessionId];
-    if (u) { s.tokens = u.totals; s.cost = u.cost; }
+    if (u) { s.tokens = u.totals; s.cost = u.cost; s.models = Object.keys(u.byModel || {}); }
   });
   filtered.sort((a, b) => new Date(b.modified) - new Date(a.modified));
   res.json(filtered);
@@ -232,7 +259,7 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
   const usageMap = getProjectUsageMap(req.params.slug);
   results.forEach(s => {
     const u = usageMap[s.sessionId];
-    if (u) { s.tokens = u.totals; s.cost = u.cost; }
+    if (u) { s.tokens = u.totals; s.cost = u.cost; s.models = Object.keys(u.byModel || {}); }
   });
   results.sort((a, b) => new Date(b.modified || 0) - new Date(a.modified || 0));
   res.json(results);
@@ -261,6 +288,7 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
           role: entry.type,
           timestamp: entry.timestamp,
           gitBranch: entry.gitBranch || '',
+          model: entry.message?.model || '',
           content: []
         };
 
@@ -309,6 +337,19 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
   res.json({ messages: page, total: messages.length, hasMore: offset + limit < messages.length });
 }));
 
+router.post('/:slug/sessions/new', wrapRoute((req, res) => {
+  const dir = safeSlug(req.params.slug);
+  if (!dir) return res.status(400).json({ error: 'Invalid slug' });
+
+  const projectPath = decodeSlug(req.params.slug);
+  try {
+    launchTerminal(projectPath, 'claude');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to open terminal: ' + e.message });
+  }
+}));
+
 router.post('/:slug/sessions/:sessionId/resume', wrapRoute((req, res) => {
   const dir = safeSlug(req.params.slug);
   if (!dir) return res.status(400).json({ error: 'Invalid slug' });
@@ -322,39 +363,8 @@ router.post('/:slug/sessions/:sessionId/resume', wrapRoute((req, res) => {
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Session not found' });
 
   const projectPath = decodeSlug(req.params.slug);
-  const platform = process.platform;
-  const cmd = `claude --resume "${sessionId}"`;
-
   try {
-    if (platform === 'win32') {
-      // Try Windows Terminal first, fall back to cmd.exe
-      const wtArgs = ['-d', projectPath, 'cmd.exe', '/k', cmd];
-      const proc = spawn('wt.exe', wtArgs, { detached: true, stdio: 'ignore' });
-      proc.on('error', () => {
-        spawn('cmd.exe', ['/c', `start "" cmd.exe /k "cd /d ${projectPath} && ${cmd}"`], { shell: true, detached: true, stdio: 'ignore' }).unref();
-      });
-      proc.unref();
-    } else if (platform === 'darwin') {
-      const script = `tell application "Terminal" to do script "cd '${projectPath}' && ${cmd}"`;
-      execFile('osascript', ['-e', script]);
-    } else {
-      const terminals = ['x-terminal-emulator', 'gnome-terminal', 'konsole', 'xfce4-terminal', 'xterm'];
-      let launched = false;
-      for (const term of terminals) {
-        try {
-          if (term === 'gnome-terminal') {
-            execFile(term, ['--', 'bash', '-c', `cd '${projectPath}' && ${cmd}; exec bash`]);
-          } else if (term === 'konsole' || term === 'xfce4-terminal') {
-            execFile(term, ['-e', `bash -c "cd '${projectPath}' && ${cmd}; exec bash"`]);
-          } else {
-            execFile(term, ['-e', `bash -c "cd '${projectPath}' && ${cmd}; exec bash"`]);
-          }
-          launched = true;
-          break;
-        } catch (_) { continue; }
-      }
-      if (!launched) return res.status(500).json({ error: 'No supported terminal found' });
-    }
+    launchTerminal(projectPath, `claude --resume "${sessionId}"`);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Failed to open terminal: ' + e.message });

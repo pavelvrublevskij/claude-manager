@@ -39,26 +39,12 @@ const Dashboard = {
       return;
     }
 
-    container.innerHTML = sessions.map(s => {
-      const modified = s.modified ? Dashboard.timeAgo(new Date(s.modified)) : '';
-      const projectShort = decodeName(s.slug);
-      return `
-        <div class="session-card" style="cursor:pointer" onclick="App.navigate('session-detail', { slug: '${s.slug}', sessionId: '${s.sessionId}', sessionInfo: null })">
-          <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">
-            <div class="session-summary">${escapeHtml(s.summary || s.firstPrompt || 'Untitled session')}</div>
-            <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;margin-left:12px">${modified}</span>
-          </div>
-          <div class="session-meta">
-            <span class="project-badge">${escapeHtml(projectShort)}</span>
-            <div class="meta-item">Messages <span class="meta-value">${s.messageCount}</span></div>
-            ${s.tokens ? `<span class="token-badge badge-tokens">${fmtTokens((s.tokens.input_tokens || 0) + (s.tokens.output_tokens || 0))} tokens</span>` : ''}
-            ${s.cost ? `<span class="token-badge badge-cost">$${s.cost.toFixed(2)}</span>` : ''}
-            ${s.gitBranch ? `<span class="session-branch">${escapeHtml(s.gitBranch)}</span>` : ''}
-            <button class="btn btn-sm btn-primary session-resume-btn" onclick="event.stopPropagation(); Sessions.resume('${s.slug}', '${s.sessionId}')">Resume</button>
-          </div>
-        </div>
-      `;
-    }).join('');
+    container.innerHTML = sessions.map(s => renderSessionCard(s, {
+      onclick: `App.navigate('session-detail', { slug: '${s.slug}', sessionId: '${s.sessionId}', sessionInfo: null })`,
+      project: decodeName(s.slug),
+      timeAgo: s.modified ? Dashboard.timeAgo(new Date(s.modified)) : '',
+      slug: s.slug
+    })).join('');
   },
 
   timeAgo(date) {
