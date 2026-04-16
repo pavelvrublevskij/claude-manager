@@ -49,7 +49,7 @@ function isNewer(remote, local) {
 app.get('/api/version', async (req, res) => {
   const latest = await checkLatestVersion();
   const updateAvailable = latest && latest !== version && isNewer(latest, version);
-  res.json({ version, latest, updateAvailable });
+  res.json({ version, latest, updateAvailable, docker: !!process.env.DOCKER });
 });
 
 const fs = require('fs');

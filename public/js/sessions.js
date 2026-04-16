@@ -23,7 +23,7 @@ const Sessions = {
     return `<div class="session-search-wrap">
       <input type="text" class="session-search" id="session-search-input"
         placeholder="Search sessions..." oninput="Sessions.onSearch('${slug}', this.value)">
-      <button class="btn btn-sm btn-primary" onclick="Sessions.newSession('${slug}')">New Session</button>
+      ${window.__docker ? '' : `<button class="btn btn-sm btn-primary" onclick="Sessions.newSession('${slug}')">New Session</button>`}
     </div>`;
   },
 

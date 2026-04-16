@@ -136,6 +136,7 @@ const App = {
 document.addEventListener('DOMContentLoaded', () => {
   App.init();
   api('/api/version').then(data => {
+    window.__docker = !!data.docker;
     document.getElementById('app-version').textContent = 'v' + data.version;
     if (data.updateAvailable) {
       const banner = document.getElementById('update-banner');

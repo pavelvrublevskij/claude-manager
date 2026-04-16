@@ -177,7 +177,7 @@ function renderSessionCard(s, opts = {}) {
         ${tokensHtml}${costHtml}${modelsHtml}${branchHtml}
         ${opts.sidechain && s.lastGitBranch && s.lastGitBranch !== s.gitBranch ? `<span class="session-branch" style="opacity:0.7">&#8594; ${escapeHtml(s.lastGitBranch)}</span>` : ''}
         ${opts.sidechain && s.isSidechain ? '<span class="session-sidechain">sidechain</span>' : ''}
-        <button class="btn btn-sm btn-primary session-resume-btn" onclick="event.stopPropagation(); Sessions.resume('${slug}', '${s.sessionId}')">Resume</button>
+        ${window.__docker ? '' : `<button class="btn btn-sm btn-primary session-resume-btn" onclick="event.stopPropagation(); Sessions.resume('${slug}', '${s.sessionId}')">Resume</button>`}
       </div>
     </div>
   `;
