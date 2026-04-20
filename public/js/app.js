@@ -93,11 +93,16 @@ const App = {
       // Reset to memory tab
       document.querySelectorAll('.project-tab').forEach(t => t.classList.remove('active'));
       document.getElementById('tab-memory').classList.add('active');
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelector('.tab-btn').classList.add('active');
+      document.querySelectorAll('#view-project-detail .tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('memory-tab-btn').classList.add('active');
       Memory.load(opts.slug);
       // Show counts on tabs
       const project = Projects.data.find(p => p.slug === opts.slug);
+      const memoryTabBtn = document.getElementById('memory-tab-btn');
+      if (memoryTabBtn) {
+        const count = project ? project.memoryCount : 0;
+        memoryTabBtn.textContent = count > 0 ? `Memory (${count})` : 'Memory';
+      }
       const sessionsTabBtn = document.getElementById('sessions-tab-btn');
       if (sessionsTabBtn) {
         const count = project ? project.sessionCount : 0;
@@ -114,6 +119,8 @@ const App = {
         const count = project ? project.outputStylesCount : 0;
         stylesTabBtn.textContent = count > 0 ? `Output Styles (${count})` : 'Output Styles';
       }
+      // Load per-project token usage in header
+      ProjectUsage.load(opts.slug);
       // Highlight in sidebar
       document.querySelectorAll('.project-list .nav-item').forEach(el => {
         el.classList.toggle('active', el.dataset.slug === opts.slug);

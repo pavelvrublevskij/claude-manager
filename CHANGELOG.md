@@ -1,3 +1,13 @@
+## v0.4.2
+
+### Memory
+- Memory tab button now shows the file count (e.g. `Memory (5)`)
+- Export all memory files for a project as a `.zip` of the raw `.md` files
+- Import memory files from a `.zip` — on conflict, prompts for confirmation before overwriting (backups are always created)
+
+### Project Usage
+- Project detail header now shows per-project token totals and cost (input, output, cache write/read, total cost)
+
 ## v0.4.0
 
 ### New Session Management

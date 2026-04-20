@@ -313,9 +313,10 @@
         <div class="view-header">
           <h2 id="project-detail-title">Project</h2>
           <div class="subtitle" id="project-detail-path"></div>
+          <div id="project-detail-usage" class="project-usage-bar"></div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
             <div class="tab-bar">
-              <button class="tab-btn active" onclick="ProjectTabs.switch('memory', this)">Memory</button>
+              <button class="tab-btn active" id="memory-tab-btn" onclick="ProjectTabs.switch('memory', this)">Memory</button>
               <button class="tab-btn" id="sessions-tab-btn" onclick="ProjectTabs.switch('sessions', this)">Sessions</button>
               <button class="tab-btn" onclick="ProjectTabs.switch('proj-settings', this)">Settings</button>
               <button class="tab-btn" onclick="ProjectTabs.switch('proj-mcp', this)">MCP</button>
@@ -333,7 +334,12 @@
               <div class="memory-list">
                 <div class="memory-list-header">
                   <label style="margin:0">Memory Files</label>
-                  <button class="btn btn-sm" onclick="Memory.showCreate()">+ New</button>
+                  <div class="btn-group">
+                    <button class="btn btn-sm" onclick="Memory.exportAll()" title="Export all memory files as JSON">Export</button>
+                    <button class="btn btn-sm" onclick="Memory.triggerImport()" title="Import memory files from JSON">Import</button>
+                    <button class="btn btn-sm" onclick="Memory.showCreate()">+ New</button>
+                  </div>
+                  <input type="file" id="memory-import-input" accept=".zip,application/zip" style="display:none" onchange="Memory.handleImportFile(event)">
                 </div>
                 <div id="memory-file-list"></div>
               </div>

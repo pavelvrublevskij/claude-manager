@@ -149,6 +149,78 @@ const Memory = {
     });
   },
 
+  async exportAll() {
+    if (!Memory.currentSlug) return;
+    try {
+      const res = await fetch(`/api/projects/${Memory.currentSlug}/memory-export`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || res.statusText);
+      }
+      const fileCount = parseInt(res.headers.get('X-File-Count') || '0', 10);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `memory-${Memory.currentSlug}-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast(`Exported ${fileCount} file${fileCount === 1 ? '' : 's'}`);
+    } catch (e) {
+      toast('Export failed: ' + e.message, 'error');
+    }
+  },
+
+  triggerImport() {
+    if (!Memory.currentSlug) return;
+    const input = document.getElementById('memory-import-input');
+    input.value = '';
+    input.click();
+  },
+
+  handleImportFile(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    file.arrayBuffer().then(buf => Memory.doImport(buf, false))
+      .catch(e => toast('Could not read file: ' + e.message, 'error'));
+  },
+
+  async doImport(buffer, overwrite) {
+    try {
+      const res = await fetch(`/api/projects/${Memory.currentSlug}/memory-import?overwrite=${overwrite ? '1' : '0'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/zip' },
+        body: buffer
+      });
+      const data = await res.json();
+      if (res.status === 409 && data.conflicts) {
+        Memory.confirmOverwrite(buffer, data.conflicts);
+        return;
+      }
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      toast(`Imported ${data.imported} file${data.imported === 1 ? '' : 's'}`);
+      Memory.load(Memory.currentSlug);
+    } catch (e) {
+      toast('Import failed: ' + e.message, 'error');
+    }
+  },
+
+  confirmOverwrite(buffer, conflicts) {
+    const list = conflicts.map(c => `<li><code>${escapeHtml(c)}</code></li>`).join('');
+    openModal({
+      title: 'Overwrite existing memory files?',
+      body: `<p>The following ${conflicts.length} file${conflicts.length === 1 ? '' : 's'} already exist and will be overwritten (backups are created):</p>
+             <ul style="margin:8px 0 0 16px;max-height:200px;overflow:auto">${list}</ul>`,
+      buttons: [{
+        label: 'Overwrite', danger: true, onClick: () => {
+          Memory.doImport(buffer, true);
+        }
+      }]
+    });
+  },
+
   async doCreate() {
     let filename = document.getElementById('new-mem-filename').value.trim();
     const name = document.getElementById('new-mem-name').value.trim();

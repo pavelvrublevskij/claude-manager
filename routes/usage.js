@@ -100,6 +100,40 @@ router.get('/summary', wrapRoute((req, res) => {
   });
 }));
 
+/** GET /api/usage/project/:slug */
+router.get('/project/:slug', wrapRoute((req, res) => {
+  const model = filterModel(req);
+  const index = buildIndex();
+  const totals = emptyTokens();
+  const byModel = {};
+  let sessionCount = 0;
+
+  for (const s of Object.values(index.sessions)) {
+    if (s.slug !== req.params.slug) continue;
+    const t = getSessionTokens(s, model);
+    if (!t) continue;
+    addTokens(totals, t);
+    sessionCount++;
+    if (!model) {
+      for (const [m, tokens] of Object.entries(s.byModel || {})) {
+        if (!byModel[m]) byModel[m] = emptyTokens();
+        addTokens(byModel[m], tokens);
+      }
+    }
+  }
+
+  const cost = model ? calcCost(totals, model) : calcCostMultiModel(byModel);
+
+  res.json({
+    slug: req.params.slug,
+    totals,
+    byModel: model ? { [model]: totals } : byModel,
+    cost,
+    sessionCount,
+    activeModel: model || null
+  });
+}));
+
 /** GET /api/usage/by-period?group=day|week|month|year */
 router.get('/by-period', wrapRoute((req, res) => {
   const group = ['day', 'week', 'month', 'year'].includes(req.query.group) ? req.query.group : 'month';

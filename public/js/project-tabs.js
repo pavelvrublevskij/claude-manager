@@ -1,3 +1,32 @@
+// --- Project Usage (header strip) ---
+
+const ProjectUsage = {
+  async load(slug) {
+    const el = document.getElementById('project-detail-usage');
+    if (!el) return;
+    el.innerHTML = '';
+    try {
+      const data = await api(`/api/usage/project/${slug}`);
+      if (!data.sessionCount) {
+        el.innerHTML = '<span class="project-usage-empty">No token usage recorded</span>';
+        return;
+      }
+      const t = data.totals;
+      const c = data.cost;
+      el.innerHTML = `
+        <span class="project-usage-item"><span class="lbl">Sessions</span> <strong>${data.sessionCount}</strong></span>
+        <span class="project-usage-item color-input"><span class="lbl">Input</span> <strong>${fmtTokens(t.input_tokens)}</strong></span>
+        <span class="project-usage-item color-output"><span class="lbl">Output</span> <strong>${fmtTokens(t.output_tokens)}</strong></span>
+        <span class="project-usage-item color-cache-write"><span class="lbl">Cache W</span> <strong>${fmtTokens(t.cache_creation_input_tokens)}</strong></span>
+        <span class="project-usage-item color-cache-read"><span class="lbl">Cache R</span> <strong>${fmtTokens(t.cache_read_input_tokens)}</strong></span>
+        <span class="project-usage-item color-cost"><span class="lbl">Cost</span> <strong>$${c.total.toFixed(2)}</strong></span>
+      `;
+    } catch (e) {
+      el.innerHTML = `<span class="project-usage-empty">Could not load usage: ${escapeHtml(e.message)}</span>`;
+    }
+  }
+};
+
 // --- Project Tabs ---
 
 const ProjectTabs = {

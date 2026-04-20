@@ -2,9 +2,12 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const matter = require('gray-matter');
+const AdmZip = require('adm-zip');
 const { backup, safeSlug, safeMemoryFile, wrapRoute } = require('../lib/file-helpers');
 
 const router = express.Router({ mergeParams: true });
+
+const zipBodyParser = express.raw({ type: 'application/zip', limit: '25mb' });
 
 router.get('/:slug/memory', wrapRoute((req, res) => {
   const dir = safeSlug(req.params.slug);
@@ -93,6 +96,82 @@ router.delete('/:slug/memory/:file', wrapRoute((req, res) => {
   backup(filePath);
   fs.unlinkSync(filePath);
   res.json({ ok: true });
+}));
+
+// --- Export / Import ---
+
+router.get('/:slug/memory-export', wrapRoute((req, res) => {
+  const dir = safeSlug(req.params.slug);
+  if (!dir) return res.status(400).json({ error: 'Invalid slug' });
+
+  const memoryDir = path.join(dir, 'memory');
+  const zip = new AdmZip();
+  let fileCount = 0;
+
+  if (fs.existsSync(memoryDir)) {
+    const entries = fs.readdirSync(memoryDir).filter(f => f.endsWith('.md'));
+    for (const f of entries) {
+      zip.addLocalFile(path.join(memoryDir, f));
+      fileCount++;
+    }
+  }
+
+  if (fileCount === 0) return res.status(404).json({ error: 'No memory files to export' });
+
+  const buf = zip.toBuffer();
+  const downloadName = `memory-${req.params.slug}-${new Date().toISOString().slice(0, 10)}.zip`;
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+  res.setHeader('X-File-Count', String(fileCount));
+  res.send(buf);
+}));
+
+router.post('/:slug/memory-import', zipBodyParser, wrapRoute((req, res) => {
+  const dir = safeSlug(req.params.slug);
+  if (!dir) return res.status(400).json({ error: 'Invalid slug' });
+
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+    return res.status(400).json({ error: 'Expected ZIP binary body (Content-Type: application/zip)' });
+  }
+
+  const overwrite = req.query.overwrite === '1' || req.query.overwrite === 'true';
+
+  let zip;
+  try {
+    zip = new AdmZip(req.body);
+  } catch (e) {
+    return res.status(400).json({ error: 'Not a valid ZIP file: ' + e.message });
+  }
+
+  const entries = zip.getEntries().filter(e => !e.isDirectory && e.entryName.endsWith('.md'));
+  if (entries.length === 0) return res.status(400).json({ error: 'ZIP contains no .md files' });
+
+  const validated = [];
+  for (const entry of entries) {
+    const basename = path.basename(entry.entryName);
+    const safe = safeMemoryFile(basename);
+    if (!safe) return res.status(400).json({ error: 'Invalid filename in ZIP: ' + entry.entryName });
+    validated.push({ filename: safe, content: entry.getData().toString('utf-8') });
+  }
+
+  const memoryDir = path.join(dir, 'memory');
+  fs.mkdirSync(memoryDir, { recursive: true });
+
+  const conflicts = validated
+    .filter(f => fs.existsSync(path.join(memoryDir, f.filename)))
+    .map(f => f.filename);
+
+  if (conflicts.length > 0 && !overwrite) {
+    return res.status(409).json({ error: 'conflict', conflicts });
+  }
+
+  for (const f of validated) {
+    const filePath = path.join(memoryDir, f.filename);
+    if (fs.existsSync(filePath)) backup(filePath);
+    fs.writeFileSync(filePath, f.content, 'utf-8');
+  }
+
+  res.json({ ok: true, imported: validated.length });
 }));
 
 // --- MEMORY.md index ---

@@ -1,6 +1,6 @@
 {
   "name": "claude-manager",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Local web UI for managing Claude Code settings and memory",
   "main": "server.js",
   "scripts": {
@@ -8,6 +8,7 @@
     "dev": "node --watch server.js"
   },
   "dependencies": {
+    "adm-zip": "^0.5.17",
     "express": "^4.21.0",
     "gray-matter": "^4.0.3"
   }
