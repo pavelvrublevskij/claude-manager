@@ -32,7 +32,7 @@ const Projects = {
     grid.innerHTML = Projects.data.map(p => `
       <div class="card project-card" onclick="App.navigate('project-detail', { slug: '${p.slug}' })">
         <div class="project-name">${decodeName(p.slug)}</div>
-        <div class="project-path">${escapeHtml(p.path)}</div>
+        <div class="project-path${window.__docker ? '' : ' clickable-path'}" ${window.__docker ? '' : `onclick="event.stopPropagation(); Projects.openFolder('${p.slug}')" title="Open folder in file explorer"`}>${escapeHtml(p.path)}</div>
         <div class="project-stats">
           <div class="stat">
             <span class="stat-value">${p.memoryCount}</span> memories
@@ -58,5 +58,13 @@ const Projects = {
     `).join('');
     const countEl = document.getElementById('project-nav-count');
     if (countEl) countEl.textContent = Projects.data.length;
+  },
+
+  async openFolder(slug) {
+    try {
+      await api(`/api/projects/${slug}/open-folder`, { method: 'POST' });
+    } catch (e) {
+      toast('Could not open folder: ' + e.message, 'error');
+    }
   }
 };

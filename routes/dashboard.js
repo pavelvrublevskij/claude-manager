@@ -5,6 +5,7 @@ const { PROJECTS_DIR, SKILLS_DIR, OUTPUT_STYLES_DIR, MCP_FILE, KEYBINDINGS_FILE 
 const { readJson, wrapRoute } = require('../lib/file-helpers');
 const { decodeSlug } = require('../lib/slug');
 const { buildIndex, calcCostMultiModel } = require('../lib/usage-index');
+const { getCustomTitle } = require('../lib/session-title');
 
 /** Gather dashboard stats and recent sessions across all projects. */
 router.get('/', wrapRoute(async (req, res) => {
@@ -33,11 +34,12 @@ router.get('/', wrapRoute(async (req, res) => {
         const entries = (data.entries || []).filter(e => e.messageCount > 0);
         totalSessions += entries.length;
         for (const e of entries) {
+          const custom = getCustomTitle(path.join(projectDir, e.sessionId + '.jsonl'));
           recentSessions.push({
             slug,
             projectName: decodedPath,
             sessionId: e.sessionId,
-            summary: e.summary || '',
+            summary: custom || e.summary || '',
             firstPrompt: e.firstPrompt || '',
             messageCount: e.messageCount || 0,
             created: e.created || null,
@@ -57,11 +59,13 @@ router.get('/', wrapRoute(async (req, res) => {
           const stat = fs.statSync(filePath);
           try {
             const lines = fs.readFileSync(filePath, 'utf-8').split('\n').filter(Boolean);
-            let firstPrompt = '', created = null, gitBranch = '', msgCount = 0;
+            let firstPrompt = '', created = null, gitBranch = '', msgCount = 0, customTitle = '';
             for (const line of lines) {
               try {
                 const entry = JSON.parse(line);
-                if (entry.type === 'user') {
+                if (entry.type === 'custom-title' && entry.customTitle) {
+                  customTitle = entry.customTitle;
+                } else if (entry.type === 'user') {
                   msgCount++;
                   if (msgCount === 1) {
                     firstPrompt = typeof entry.message?.content === 'string' ? entry.message.content.slice(0, 200) : '';
@@ -76,7 +80,7 @@ router.get('/', wrapRoute(async (req, res) => {
                 slug,
                 projectName: decodedPath,
                 sessionId: f.replace('.jsonl', ''),
-                summary: '',
+                summary: customTitle,
                 firstPrompt,
                 messageCount: msgCount,
                 created,

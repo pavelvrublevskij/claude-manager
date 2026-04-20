@@ -443,6 +443,15 @@ label {
   word-break: break-all;
 }
 
+.clickable-path {
+  cursor: pointer;
+}
+
+.clickable-path:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 .project-card .project-stats {
   display: flex;
   gap: 12px;
@@ -941,9 +950,96 @@ mark.search-highlight {
 }
 
 .session-resume-btn {
-  margin-left: auto;
   font-size: 11px;
   padding: 2px 10px;
+}
+
+.session-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.action-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.action-menu-btn {
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 8px;
+  min-width: 0;
+}
+
+.action-menu-panel {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  min-width: 140px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  padding: 4px;
+}
+
+.action-menu-panel.open {
+  display: block;
+}
+
+.action-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.action-menu-item:hover {
+  background: var(--bg-hover);
+}
+
+#view-session-detail {
+  position: relative;
+}
+
+.scroll-to-top {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 18px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 50;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.scroll-to-top:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.scroll-to-top.visible {
+  display: flex;
 }
 
 .session-sidechain {

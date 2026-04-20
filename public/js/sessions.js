@@ -125,10 +125,14 @@ const Sessions = {
     const container = document.getElementById('session-messages');
 
     title.textContent = info?.summary || info?.firstPrompt?.slice(0, 80) || 'Session';
-    const created = info?.created ? new Date(info.created).toLocaleString() : '';
-    const branch = info?.gitBranch || '';
-    const models = (info?.models || []).map(m => `<span class="token-badge badge-model">${escapeHtml(shortModel(m))}</span>`).join('');
-    meta.innerHTML = [created, branch ? `<span class="session-branch">${escapeHtml(branch)}</span>` : '', models].filter(Boolean).join(' &middot; ');
+    if (info) {
+      const createdHtml = info.created
+        ? `<div class="meta-item">Created <span class="meta-value">${new Date(info.created).toLocaleString()}</span></div>`
+        : '';
+      meta.innerHTML = createdHtml + renderSessionBadges(info, { sidechain: true });
+    } else {
+      meta.innerHTML = '';
+    }
 
     Sessions.detailState = { slug, sessionId, offset: 0, loading: false, hasMore: false, total: 0 };
     container.innerHTML = '';
@@ -149,14 +153,22 @@ const Sessions = {
     if (Sessions._scrollHandler) {
       viewBody.removeEventListener('scroll', Sessions._scrollHandler);
     }
+    const topBtn = document.getElementById('scroll-to-top-btn');
+    if (topBtn) topBtn.classList.remove('visible');
     Sessions._scrollHandler = () => {
-      if (Sessions.detailState.loading || !Sessions.detailState.hasMore) return;
       const { scrollTop, scrollHeight, clientHeight } = viewBody;
+      if (topBtn) topBtn.classList.toggle('visible', scrollTop > 400);
+      if (Sessions.detailState.loading || !Sessions.detailState.hasMore) return;
       if (scrollTop + clientHeight >= scrollHeight - 300) {
         Sessions.loadMore();
       }
     };
     viewBody.addEventListener('scroll', Sessions._scrollHandler);
+  },
+
+  scrollToTop() {
+    const viewBody = document.querySelector('#view-session-detail .view-body');
+    if (viewBody) viewBody.scrollTo({ top: 0, behavior: 'smooth' });
   },
 
   async loadMore() {
@@ -395,4 +407,73 @@ const Sessions = {
     }
   },
 
+  toggleActionMenu(btn) {
+    const panel = btn.nextElementSibling;
+    if (!panel) return;
+    const isOpen = panel.classList.contains('open');
+    document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
+    if (!isOpen) panel.classList.add('open');
+  },
+
+  renameAction(btn) {
+    Sessions.openRenameModal(btn.dataset.slug, btn.dataset.session, btn.dataset.title || '');
+  },
+
+  renameDetail() {
+    const { slug, sessionId } = Sessions.detailState;
+    if (!slug || !sessionId) return;
+    const current = document.getElementById('session-detail-title')?.textContent || '';
+    Sessions.openRenameModal(slug, sessionId, current === 'Session' ? '' : current);
+  },
+
+  openRenameModal(slug, sessionId, currentTitle) {
+    document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
+    openModal({
+      title: 'Rename session',
+      body: formGroup('Title', `<input type="text" id="rename-session-title" maxlength="500" value="${escapeHtml(currentTitle)}" style="width:100%">`),
+      buttons: [{
+        label: 'Save',
+        primary: true,
+        onClick: async () => {
+          const title = document.getElementById('rename-session-title').value.trim();
+          if (!title) { toast('Title is required', 'error'); return false; }
+          try {
+            await api(`/api/projects/${slug}/sessions/${sessionId}/rename`, {
+              method: 'POST',
+              body: { title }
+            });
+            toast('Session renamed');
+            Sessions.applyRename(slug, sessionId, title);
+          } catch (e) {
+            toast('Rename failed: ' + e.message, 'error');
+            return false;
+          }
+        }
+      }]
+    });
+    setTimeout(() => document.getElementById('rename-session-title')?.focus(), 0);
+  },
+
+  applyRename(slug, sessionId, title) {
+    const cached = Sessions.cache[slug];
+    if (cached) {
+      const s = cached.find(x => x.sessionId === sessionId);
+      if (s) s.summary = title;
+    }
+    if (Sessions.detailState.slug === slug && Sessions.detailState.sessionId === sessionId) {
+      const el = document.getElementById('session-detail-title');
+      if (el) el.textContent = title;
+    }
+    document.querySelectorAll(`.session-card[data-session-id="${sessionId}"] .session-summary`).forEach(el => {
+      el.textContent = title;
+    });
+    document.querySelectorAll(`.session-card[data-session-id="${sessionId}"] .action-menu-item[data-session="${sessionId}"]`).forEach(btn => {
+      btn.dataset.title = title;
+    });
+  },
+
 };
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
+});

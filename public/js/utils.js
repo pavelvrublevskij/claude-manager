@@ -145,11 +145,39 @@ function fmtTokens(n) {
  * opts.snippets    - HTML string for search snippets
  * opts.sidechain   - show sidechain/lastGitBranch indicators
  */
+/**
+ * Render session stat badges (messages, tokens, cost, models, branch, sidechain).
+ * Shared between the session list card and the session detail header.
+ * opts.sidechain - show sidechain/lastGitBranch indicators
+ */
+function renderSessionBadges(s, opts = {}) {
+  const parts = [];
+  if (s.messageCount != null) {
+    parts.push(`<div class="meta-item">Messages <span class="meta-value">${s.messageCount}</span></div>`);
+  }
+  if (s.tokens) {
+    const total = (s.tokens.input_tokens || 0) + (s.tokens.output_tokens || 0);
+    parts.push(`<span class="token-badge badge-tokens">${fmtTokens(total)} tokens</span>`);
+  }
+  if (s.cost) {
+    parts.push(`<span class="token-badge badge-cost">$${s.cost.toFixed(2)}</span>`);
+  }
+  (s.models || []).forEach(m => {
+    parts.push(`<span class="token-badge badge-model">${escapeHtml(shortModel(m))}</span>`);
+  });
+  if (s.gitBranch) {
+    parts.push(`<span class="session-branch">${escapeHtml(s.gitBranch)}</span>`);
+  }
+  if (opts.sidechain && s.lastGitBranch && s.lastGitBranch !== s.gitBranch) {
+    parts.push(`<span class="session-branch" style="opacity:0.7">&#8594; ${escapeHtml(s.lastGitBranch)}</span>`);
+  }
+  if (opts.sidechain && s.isSidechain) {
+    parts.push('<span class="session-sidechain">sidechain</span>');
+  }
+  return parts.join('');
+}
+
 function renderSessionCard(s, opts = {}) {
-  const tokensHtml = s.tokens ? `<span class="token-badge badge-tokens">${fmtTokens((s.tokens.input_tokens || 0) + (s.tokens.output_tokens || 0))} tokens</span>` : '';
-  const costHtml = s.cost ? `<span class="token-badge badge-cost">$${s.cost.toFixed(2)}</span>` : '';
-  const modelsHtml = (s.models || []).map(m => `<span class="token-badge badge-model">${escapeHtml(shortModel(m))}</span>`).join('');
-  const branchHtml = s.gitBranch ? `<span class="session-branch">${escapeHtml(s.gitBranch)}</span>` : '';
   const slug = opts.slug || s.slug;
 
   let headerHtml;
@@ -166,18 +194,23 @@ function renderSessionCard(s, opts = {}) {
   }
 
   return `
-    <div class="session-card" style="cursor:pointer" onclick="${opts.onclick || ''}">
+    <div class="session-card" style="cursor:pointer" data-session-id="${s.sessionId}" onclick="${opts.onclick || ''}">
       ${headerHtml}
       ${opts.snippets || ''}
       <div class="session-meta">
         ${opts.project ? `<span class="project-badge">${escapeHtml(opts.project)}</span>` : ''}
         ${opts.dates ? `<div class="meta-item">Created <span class="meta-value">${s.created ? new Date(s.created).toLocaleString() : '—'}</span></div>
         <div class="meta-item">Modified <span class="meta-value">${s.modified ? new Date(s.modified).toLocaleString() : '—'}</span></div>` : ''}
-        <div class="meta-item">Messages <span class="meta-value">${s.messageCount}</span></div>
-        ${tokensHtml}${costHtml}${modelsHtml}${branchHtml}
-        ${opts.sidechain && s.lastGitBranch && s.lastGitBranch !== s.gitBranch ? `<span class="session-branch" style="opacity:0.7">&#8594; ${escapeHtml(s.lastGitBranch)}</span>` : ''}
-        ${opts.sidechain && s.isSidechain ? '<span class="session-sidechain">sidechain</span>' : ''}
-        ${window.__docker ? '' : `<button class="btn btn-sm btn-primary session-resume-btn" onclick="event.stopPropagation(); Sessions.resume('${slug}', '${s.sessionId}')">Resume</button>`}
+        ${renderSessionBadges(s, { sidechain: opts.sidechain })}
+        <div class="session-actions">
+          ${window.__docker ? '' : `<button class="btn btn-sm btn-primary session-resume-btn" onclick="event.stopPropagation(); Sessions.resume('${slug}', '${s.sessionId}')">Resume</button>`}
+          <div class="action-menu">
+            <button class="btn btn-sm action-menu-btn" onclick="event.stopPropagation(); Sessions.toggleActionMenu(this)" aria-label="More actions">&#8942;</button>
+            <div class="action-menu-panel">
+              <button class="action-menu-item" data-slug="${slug}" data-session="${s.sessionId}" data-title="${escapeHtml(s.summary || s.firstPrompt || '')}" onclick="event.stopPropagation(); Sessions.renameAction(this)">Rename</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   `;

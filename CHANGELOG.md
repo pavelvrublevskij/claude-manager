@@ -1,3 +1,16 @@
+## v0.5.0
+
+### Session Rename
+- Display custom titles set via Claude Code's `/rename` command — reads `type: "custom-title"` entries from session JSONL files
+- Rename sessions from Claude Manager via a new `⋮` action menu on session cards and the session detail header
+- Server writes the new title as a `custom-title` line to the session JSONL (matching Claude Code's format) and also patches `sessions-index.json` when present
+- Search now matches against custom titles and the scanned first prompt, not just index metadata — renamed sessions are findable by their new name
+
+### UI
+- Scroll-to-top button in the session detail view — appears after scrolling past ~400px, smoothly returns to the top on click
+- Action menu (`⋮`) replaces the single Resume button with an extensible dropdown (Resume + Rename, ready for future actions)
+- Project path in project cards and the project detail header is now clickable — opens the folder in the OS file explorer (Explorer on Windows, Finder on macOS, `xdg-open` on Linux). Disabled in Docker.
+
 ## v0.4.2
 
 ### Memory

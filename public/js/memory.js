@@ -10,7 +10,18 @@ const Memory = {
     const project = Projects.data.find(p => p.slug === slug);
     if (project) {
       document.getElementById('project-detail-title').textContent = decodeName(slug);
-      document.getElementById('project-detail-path').textContent = project.path;
+      const pathEl = document.getElementById('project-detail-path');
+      if (window.__docker) {
+        pathEl.textContent = project.path;
+        pathEl.onclick = null;
+        pathEl.classList.remove('clickable-path');
+        pathEl.removeAttribute('title');
+      } else {
+        pathEl.textContent = project.path;
+        pathEl.classList.add('clickable-path');
+        pathEl.title = 'Open folder in file explorer';
+        pathEl.onclick = () => Projects.openFolder(slug);
+      }
     }
 
     try {

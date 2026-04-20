@@ -394,12 +394,18 @@
               <button class="btn btn-sm" onclick="Sessions.goBack()">&#8592; Back</button>
               <h2 id="session-detail-title">Session</h2>
             </div>
-            <div style="display:flex;gap:8px">
+            <div style="display:flex;gap:8px;align-items:center">
               <button class="btn btn-sm btn-primary" onclick="Sessions.resume(Sessions.detailState.slug, Sessions.detailState.sessionId)">Resume in Terminal</button>
               <button class="btn btn-sm" onclick="Sessions.loadDetail(Sessions.detailState.slug, Sessions.detailState.sessionId, null)">Refresh</button>
+              <div class="action-menu">
+                <button class="btn btn-sm action-menu-btn" onclick="event.stopPropagation(); Sessions.toggleActionMenu(this)" aria-label="More actions">&#8942;</button>
+                <div class="action-menu-panel">
+                  <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.renameDetail()">Rename</button>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="subtitle" id="session-detail-meta"></div>
+          <div class="session-meta" id="session-detail-meta"></div>
           <div class="subtitle" id="session-count" style="margin-top:4px;color:var(--text-muted)"></div>
           <div class="session-search-wrap" style="margin-top:12px">
             <input type="text" class="session-search" id="session-detail-search-input"
@@ -410,6 +416,7 @@
         <div class="view-body">
           <div id="session-messages" class="chat-container"></div>
         </div>
+        <button class="scroll-to-top" id="scroll-to-top-btn" onclick="Sessions.scrollToTop()" aria-label="Scroll to top" title="Scroll to top">&#8593;</button>
       </div>
 
       <!-- Manager Settings View -->

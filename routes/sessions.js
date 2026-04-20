@@ -2,9 +2,10 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { execFile, spawn } = require('child_process');
-const { safeSlug, wrapRoute } = require('../lib/file-helpers');
+const { safeSlug, wrapRoute, backup } = require('../lib/file-helpers');
 const { getProjectUsageMap } = require('../lib/usage-index');
 const { decodeSlug } = require('../lib/slug');
+const { getCustomTitle } = require('../lib/session-title');
 
 const router = express.Router({ mergeParams: true });
 
@@ -53,6 +54,10 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
         gitBranch: e.gitBranch || '',
         isSidechain: e.isSidechain || false
       }));
+      sessions.forEach(s => {
+        const custom = getCustomTitle(path.join(dir, s.sessionId + '.jsonl'));
+        if (custom) s.summary = custom;
+      });
       const usageMap = getProjectUsageMap(req.params.slug);
       sessions.forEach(s => {
         const u = usageMap[s.sessionId];
@@ -86,7 +91,9 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
       for (const line of lines) {
         try {
           const entry = JSON.parse(line);
-          if (entry.type === 'user') {
+          if (entry.type === 'custom-title' && entry.customTitle) {
+            session.summary = entry.customTitle;
+          } else if (entry.type === 'user') {
             userMessages++;
             if (userMessages === 1) {
               session.firstPrompt = typeof entry.message?.content === 'string'
@@ -158,12 +165,17 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
     let modified = null;
     let gitBranch = '';
     let lastGitBranch = '';
+    let customTitle = '';
 
     try {
       const lines = fs.readFileSync(filePath, 'utf-8').split('\n').filter(Boolean);
       for (const line of lines) {
         try {
           const entry = JSON.parse(line);
+          if (entry.type === 'custom-title' && entry.customTitle) {
+            customTitle = entry.customTitle;
+            continue;
+          }
           if (entry.type !== 'user' && entry.type !== 'assistant') continue;
 
           if (entry.type === 'user') {
@@ -224,10 +236,10 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
       }
     } catch (_) { continue; }
 
-    // Also check index metadata (summary/firstPrompt)
+    // Also check title/metadata fields (custom title, index summary, first prompt)
     const meta = indexMeta[sessionId];
-    if (snippets.length === 0 && meta) {
-      const checkFields = [meta.summary, meta.firstPrompt].filter(Boolean);
+    if (snippets.length === 0) {
+      const checkFields = [customTitle, meta?.summary, meta?.firstPrompt, firstPrompt].filter(Boolean);
       for (const field of checkFields) {
         if (field.toLowerCase().includes(qLower)) {
           const idx = field.toLowerCase().indexOf(qLower);
@@ -243,7 +255,7 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
 
     const session = {
       sessionId,
-      summary: meta?.summary || '',
+      summary: customTitle || meta?.summary || '',
       firstPrompt: meta?.firstPrompt || firstPrompt,
       messageCount: meta?.messageCount || messageCount,
       created: meta?.created || created,
@@ -373,6 +385,44 @@ router.post('/:slug/sessions/:sessionId/resume', wrapRoute((req, res) => {
   } catch (e) {
     res.status(500).json({ error: 'Failed to open terminal: ' + e.message });
   }
+}));
+
+router.post('/:slug/sessions/:sessionId/rename', wrapRoute((req, res) => {
+  const dir = safeSlug(req.params.slug);
+  if (!dir) return res.status(400).json({ error: 'Invalid slug' });
+
+  const sessionId = req.params.sessionId;
+  if (sessionId.includes('..') || sessionId.includes('/') || sessionId.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid session ID' });
+  }
+
+  const title = (req.body?.title || '').trim();
+  if (!title) return res.status(400).json({ error: 'Title is required' });
+  if (title.length > 500) return res.status(400).json({ error: 'Title too long' });
+
+  const filePath = path.join(dir, sessionId + '.jsonl');
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Session not found' });
+
+  backup(filePath);
+  const line = JSON.stringify({ type: 'custom-title', customTitle: title, sessionId }) + '\n';
+  const existing = fs.readFileSync(filePath, 'utf-8');
+  const needsNewline = existing.length > 0 && !existing.endsWith('\n');
+  fs.appendFileSync(filePath, (needsNewline ? '\n' : '') + line);
+
+  const indexFile = path.join(dir, 'sessions-index.json');
+  if (fs.existsSync(indexFile)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(indexFile, 'utf-8'));
+      const entry = (data.entries || []).find(e => e.sessionId === sessionId);
+      if (entry) {
+        backup(indexFile);
+        entry.summary = title;
+        fs.writeFileSync(indexFile, JSON.stringify(data, null, 2), 'utf-8');
+      }
+    } catch (_) { /* malformed index, skip */ }
+  }
+
+  res.json({ ok: true, title });
 }));
 
 module.exports = router;

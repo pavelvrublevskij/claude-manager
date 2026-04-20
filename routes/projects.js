@@ -1,11 +1,23 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { wrapRoute } = require('../lib/file-helpers');
+const { execFile, spawn } = require('child_process');
+const { wrapRoute, safeSlug } = require('../lib/file-helpers');
 const { decodeSlug } = require('../lib/slug');
 const { PROJECTS_DIR } = require('../lib/paths');
 
 const router = express.Router();
+
+function openFolder(folderPath) {
+  const platform = process.platform;
+  if (platform === 'win32') {
+    spawn('explorer.exe', [folderPath], { detached: true, stdio: 'ignore' }).unref();
+  } else if (platform === 'darwin') {
+    execFile('open', [folderPath]);
+  } else {
+    execFile('xdg-open', [folderPath]);
+  }
+}
 
 router.get('/', wrapRoute((req, res) => {
   const dirs = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true })
@@ -63,6 +75,17 @@ router.get('/', wrapRoute((req, res) => {
   });
 
   res.json(projects);
+}));
+
+router.post('/:slug/open-folder', wrapRoute((req, res) => {
+  if (process.env.DOCKER) return res.status(400).json({ error: 'Disabled in Docker' });
+  if (!safeSlug(req.params.slug)) return res.status(400).json({ error: 'Invalid slug' });
+  const projectPath = decodeSlug(req.params.slug);
+  if (!fs.existsSync(projectPath) || !fs.statSync(projectPath).isDirectory()) {
+    return res.status(404).json({ error: 'Folder does not exist on disk' });
+  }
+  openFolder(projectPath);
+  res.json({ ok: true });
 }));
 
 module.exports = router;
