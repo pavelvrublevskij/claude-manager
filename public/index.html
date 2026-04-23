@@ -111,15 +111,66 @@
           <div class="subtitle">Aggregated token consumption and estimated costs</div>
         </div>
         <div class="view-body">
-          <div id="usage-model-filter"></div>
+          <div class="filter-bar" id="usage-filter-bar">
+            <div class="filter-field">
+              <label>Models</label>
+              <div class="multi-select" data-key="models">
+                <button type="button" class="multi-select-trigger" onclick="Usage.toggleDropdown('models', event)">
+                  <span class="multi-select-label" id="filter-models-label">All models</span>
+                  <span class="multi-select-chevron">&#9662;</span>
+                </button>
+                <div class="multi-select-panel" id="filter-models-panel" hidden>
+                  <input type="text" class="multi-select-search" placeholder="Search models..." oninput="Usage.filterOptions('models', this.value)">
+                  <div class="multi-select-list" id="filter-models-list"></div>
+                </div>
+              </div>
+            </div>
+            <div class="filter-field">
+              <label>Projects</label>
+              <div class="multi-select" data-key="projects">
+                <button type="button" class="multi-select-trigger" onclick="Usage.toggleDropdown('projects', event)">
+                  <span class="multi-select-label" id="filter-projects-label">All projects</span>
+                  <span class="multi-select-chevron">&#9662;</span>
+                </button>
+                <div class="multi-select-panel" id="filter-projects-panel" hidden>
+                  <input type="text" class="multi-select-search" placeholder="Search projects..." oninput="Usage.filterOptions('projects', this.value)">
+                  <div class="multi-select-list" id="filter-projects-list"></div>
+                </div>
+              </div>
+            </div>
+            <div class="filter-field">
+              <label>Period</label>
+              <select id="filter-date-preset" onchange="Usage.setDatePreset(this.value)">
+                <option value="all">All time</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="month">This month</option>
+                <option value="year">This year</option>
+                <option value="custom">Custom range</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label>From</label>
+              <input type="date" id="filter-from" onchange="Usage.applyCustomDates()">
+            </div>
+            <div class="filter-field">
+              <label>To</label>
+              <input type="date" id="filter-to" onchange="Usage.applyCustomDates()">
+            </div>
+            <button class="btn btn-sm filter-clear-all" onclick="Usage.clearFilters()">Clear all</button>
+          </div>
           <div class="dashboard-stats" id="usage-summary"></div>
+          <h3 style="margin:24px 0 12px">Your Usage by Model</h3>
+          <div id="usage-by-model"></div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin:24px 0 12px">
-            <h3 style="margin:0">Model Pricing</h3>
+            <h3 style="margin:0;cursor:pointer;user-select:none" onclick="Usage.togglePricing()">
+              <span id="usage-pricing-chevron">&#9654;</span> Model Pricing
+            </h3>
             <div style="display:flex;gap:8px">
               <button class="btn btn-sm" onclick="Usage.fetchPricing()">Update Pricing</button>
             </div>
           </div>
-          <div id="usage-pricing"></div>
+          <div id="usage-pricing" style="display:none"></div>
           <h3 style="margin:24px 0 12px">Usage by Period</h3>
           <div class="tab-bar" id="usage-period-tabs">
             <button class="tab-btn" data-group="day" onclick="Usage.setGroup('day', this)">Day</button>
@@ -313,6 +364,28 @@
         <div class="view-header">
           <h2 id="project-detail-title">Project</h2>
           <div class="subtitle" id="project-detail-path"></div>
+          <div class="filter-bar project-usage-filter">
+            <div class="filter-field">
+              <label>Period</label>
+              <select id="proj-filter-date-preset" onchange="ProjectUsage.setDatePreset(this.value)">
+                <option value="all">All time</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="month">This month</option>
+                <option value="year">This year</option>
+                <option value="custom">Custom range</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label>From</label>
+              <input type="date" id="proj-filter-from" onchange="ProjectUsage.applyCustomDates()">
+            </div>
+            <div class="filter-field">
+              <label>To</label>
+              <input type="date" id="proj-filter-to" onchange="ProjectUsage.applyCustomDates()">
+            </div>
+            <button class="btn btn-sm filter-clear-all" onclick="ProjectUsage.clearFilter()">Clear</button>
+          </div>
           <div id="project-detail-usage" class="project-usage-bar"></div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
             <div class="tab-bar">

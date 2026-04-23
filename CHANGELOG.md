@@ -1,3 +1,18 @@
+## v0.5.1
+
+### Token Usage Filters
+- New filter bar at the top of the Token Usage view replaces the per-row filter buttons and floating pills
+- Multi-select **Models** and **Projects** dropdowns with search — pick any combination
+- **Period** selector with presets (Last 7 / 30 days, This month, This year, All time) plus custom From/To date pickers; presets populate the date inputs, and editing a date switches the preset to Custom
+- **Clear all** button resets every filter in one click
+- Project names render as basenames with the full path preserved as a hover tooltip; dropdown search matches basenames, not full paths
+
+### Project Detail
+- Period/date filter above the per-project usage strip — same presets and custom range as the main Usage view; filters the project totals on the fly
+
+### Fixes
+- Token formatter now renders values above 1 billion as e.g. `1.0B` instead of overflowing into `1035.6M`
+
 ## v0.5.0
 
 ### Session Rename

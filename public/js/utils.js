@@ -128,9 +128,10 @@ function matchPricing(modelId, pricingMap) {
   return best ? pricingMap[best] : null;
 }
 
-/** Format a token count to human-readable (e.g. 1.2M, 3.5K). */
+/** Format a token count to human-readable (e.g. 1.2B, 1.2M, 3.5K). */
 function fmtTokens(n) {
   if (!n) return '0';
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + 'B';
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
   return String(n);

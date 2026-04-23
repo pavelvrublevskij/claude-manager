@@ -1,12 +1,40 @@
 // --- Project Usage (header strip) ---
 
 const ProjectUsage = {
+  currentSlug: null,
+  fromDate: null,
+  toDate: null,
+  datePreset: 'all',
+
   async load(slug) {
+    if (ProjectUsage.currentSlug !== slug) {
+      ProjectUsage.currentSlug = slug;
+      ProjectUsage.fromDate = null;
+      ProjectUsage.toDate = null;
+      ProjectUsage.datePreset = 'all';
+      const presetEl = document.getElementById('proj-filter-date-preset');
+      if (presetEl) presetEl.value = 'all';
+      const fromEl = document.getElementById('proj-filter-from');
+      if (fromEl) fromEl.value = '';
+      const toEl = document.getElementById('proj-filter-to');
+      if (toEl) toEl.value = '';
+    }
+    await ProjectUsage.render();
+  },
+
+  buildQuery() {
+    const parts = [];
+    if (ProjectUsage.fromDate) parts.push('from=' + encodeURIComponent(ProjectUsage.fromDate));
+    if (ProjectUsage.toDate) parts.push('to=' + encodeURIComponent(ProjectUsage.toDate));
+    return parts.length ? '?' + parts.join('&') : '';
+  },
+
+  async render() {
     const el = document.getElementById('project-detail-usage');
-    if (!el) return;
+    if (!el || !ProjectUsage.currentSlug) return;
     el.innerHTML = '';
     try {
-      const data = await api(`/api/usage/project/${slug}`);
+      const data = await api(`/api/usage/project/${ProjectUsage.currentSlug}${ProjectUsage.buildQuery()}`);
       if (!data.sessionCount) {
         el.innerHTML = '<span class="project-usage-empty">No token usage recorded</span>';
         return;
@@ -24,6 +52,50 @@ const ProjectUsage = {
     } catch (e) {
       el.innerHTML = `<span class="project-usage-empty">Could not load usage: ${escapeHtml(e.message)}</span>`;
     }
+  },
+
+  setDatePreset(preset) {
+    ProjectUsage.datePreset = preset;
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const fmt = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    if (preset === 'all') {
+      ProjectUsage.fromDate = null;
+      ProjectUsage.toDate = null;
+    } else if (preset === '7d') {
+      const from = new Date(now); from.setDate(from.getDate() - 6);
+      ProjectUsage.fromDate = fmt(from); ProjectUsage.toDate = fmt(now);
+    } else if (preset === '30d') {
+      const from = new Date(now); from.setDate(from.getDate() - 29);
+      ProjectUsage.fromDate = fmt(from); ProjectUsage.toDate = fmt(now);
+    } else if (preset === 'month') {
+      const from = new Date(now.getFullYear(), now.getMonth(), 1);
+      ProjectUsage.fromDate = fmt(from); ProjectUsage.toDate = fmt(now);
+    } else if (preset === 'year') {
+      const from = new Date(now.getFullYear(), 0, 1);
+      ProjectUsage.fromDate = fmt(from); ProjectUsage.toDate = fmt(now);
+    }
+    document.getElementById('proj-filter-from').value = ProjectUsage.fromDate || '';
+    document.getElementById('proj-filter-to').value = ProjectUsage.toDate || '';
+    if (preset !== 'custom') ProjectUsage.render();
+  },
+
+  applyCustomDates() {
+    ProjectUsage.fromDate = document.getElementById('proj-filter-from').value || null;
+    ProjectUsage.toDate = document.getElementById('proj-filter-to').value || null;
+    ProjectUsage.datePreset = 'custom';
+    document.getElementById('proj-filter-date-preset').value = 'custom';
+    ProjectUsage.render();
+  },
+
+  clearFilter() {
+    ProjectUsage.fromDate = null;
+    ProjectUsage.toDate = null;
+    ProjectUsage.datePreset = 'all';
+    document.getElementById('proj-filter-date-preset').value = 'all';
+    document.getElementById('proj-filter-from').value = '';
+    document.getElementById('proj-filter-to').value = '';
+    ProjectUsage.render();
   }
 };
 
@@ -110,7 +182,8 @@ const ProjectSettings = {
 // --- Project MCP Tab ---
 
 const ProjectMcp = {
-  data: {},
+  projectScope: { servers: {}, path: '' },
+  localScope: { servers: {}, path: '', projectKey: '' },
   slug: null,
 
   async load(slug) {
@@ -119,37 +192,69 @@ const ProjectMcp = {
     showLoading(container);
     try {
       const res = await api(`/api/mcp/project/${slug}`);
-      ProjectMcp.data = res.data;
-      const servers = res.data.servers || {};
-      const names = Object.keys(servers);
-
-      if (names.length === 0) {
-        container.innerHTML = '<div class="empty-state"><p>No project-level MCP servers</p></div><div style="text-align:center;margin-top:12px"><button class="btn" onclick="ProjectMcp.add()">+ Add Server</button></div>';
-        return;
-      }
-
-      container.innerHTML = names.map(name => {
-        const s = servers[name];
-        return `<div class="card" style="margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div>
-              <strong style="color:var(--accent);font-family:var(--font-mono)">${escapeHtml(name)}</strong>
-              <span class="prop-type">${escapeHtml(s.type || 'stdio')}</span>
-              ${s.disabled ? '<span class="prop-type" style="color:var(--danger)">disabled</span>' : ''}
-              <div style="font-size:12px;color:var(--text-muted);margin-top:4px">${escapeHtml(s.command || s.url || '')}</div>
-            </div>
-            <button class="prop-action-btn danger" onclick="ProjectMcp.remove('${escapeHtml(name)}')">&#10005;</button>
-          </div>
-        </div>`;
-      }).join('') + '<div style="margin-top:12px"><button class="btn" onclick="ProjectMcp.add()">+ Add Server</button> <button class="btn btn-primary" onclick="ProjectMcp.save()">Save</button></div>';
+      ProjectMcp.projectScope = res.projectScope || { servers: {}, path: '' };
+      ProjectMcp.localScope = res.localScope || { servers: {}, path: '', projectKey: '' };
+      ProjectMcp.render();
     } catch (e) {
       container.innerHTML = `<div class="empty-state"><p>${escapeHtml(e.message)}</p></div>`;
     }
   },
 
-  add() {
+  render() {
+    const container = document.getElementById('proj-mcp-content');
+    container.innerHTML =
+      ProjectMcp.sectionHtml(
+        'project', 'Project Scope',
+        ProjectMcp.projectScope.servers,
+        ProjectMcp.projectScope.path,
+        'Committed to git via <code>.mcp.json</code> at the project root. Equivalent to <code>claude mcp add --scope project</code>.'
+      )
+      + ProjectMcp.sectionHtml(
+        'local', 'Local Scope',
+        ProjectMcp.localScope.servers,
+        ProjectMcp.localScope.path + ' → projects[' + ProjectMcp.localScope.projectKey + ']',
+        'Only for you, only in this project. Stored in <code>~/.claude.json</code>. Equivalent to <code>claude mcp add --scope local</code> (the default).'
+      );
+  },
+
+  sectionHtml(scope, title, servers, pathLabel, description) {
+    const names = Object.keys(servers || {});
+    const cards = names.length === 0
+      ? '<p style="color:var(--text-muted);margin:8px 0 12px">No servers</p>'
+      : names.map(name => {
+          const s = servers[name];
+          return `<div class="card" style="margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <strong style="color:var(--accent);font-family:var(--font-mono)">${escapeHtml(name)}</strong>
+                <span class="prop-type">${escapeHtml(s.type || 'stdio')}</span>
+                ${s.disabled ? '<span class="prop-type" style="color:var(--danger)">disabled</span>' : ''}
+                <div style="font-size:12px;color:var(--text-muted);margin-top:4px">${escapeHtml(s.command || s.url || '')}</div>
+              </div>
+              <button class="prop-action-btn danger" onclick="ProjectMcp.remove('${scope}','${escapeHtml(name)}')">&#10005;</button>
+            </div>
+          </div>`;
+        }).join('');
+
+    return `<div style="margin-bottom:24px">
+      <h3 style="margin:0 0 4px">${escapeHtml(title)}</h3>
+      <div class="info-note" style="margin-bottom:8px">${description}</div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;font-family:var(--font-mono)">${escapeHtml(pathLabel)}</p>
+      ${cards}
+      <div style="margin-top:8px">
+        <button class="btn" onclick="ProjectMcp.add('${scope}')">+ Add Server</button>
+        <button class="btn btn-primary" onclick="ProjectMcp.save('${scope}')">Save</button>
+      </div>
+    </div>`;
+  },
+
+  scopeRef(scope) {
+    return scope === 'project' ? ProjectMcp.projectScope : ProjectMcp.localScope;
+  },
+
+  add(scope) {
     openModal({
-      title: 'Add Project MCP Server',
+      title: 'Add ' + (scope === 'project' ? 'Project-Scope' : 'Local-Scope') + ' MCP Server',
       body: formGroup('Name', '<input type="text" id="mcp-new-name" placeholder="my-server">')
         + formGroup('Type', selectHtml('mcp-new-type', MCP_TYPES, 'stdio'))
         + formGroup('Command / URL', '<input type="text" id="mcp-new-cmd" placeholder="/path/to/server or http://...">'),
@@ -159,26 +264,29 @@ const ProjectMcp = {
           const type = document.getElementById('mcp-new-type').value;
           const cmd = document.getElementById('mcp-new-cmd').value.trim();
           if (!name) { toast('Name required', 'error'); return false; }
-          if (!ProjectMcp.data.servers) ProjectMcp.data.servers = {};
+          const ref = ProjectMcp.scopeRef(scope);
+          if (!ref.servers) ref.servers = {};
           const server = { type };
           if (type === 'stdio') { server.command = cmd; server.args = []; }
           else { server.url = cmd; }
-          ProjectMcp.data.servers[name] = server;
-          ProjectMcp.load(ProjectMcp.slug);
+          ref.servers[name] = server;
+          ProjectMcp.render();
         }
       }]
     });
   },
 
-  remove(name) {
-    delete ProjectMcp.data.servers[name];
-    ProjectMcp.load(ProjectMcp.slug);
+  remove(scope, name) {
+    const ref = ProjectMcp.scopeRef(scope);
+    delete ref.servers[name];
+    ProjectMcp.render();
   },
 
-  async save() {
+  async save(scope) {
+    const ref = ProjectMcp.scopeRef(scope);
     try {
-      await api(`/api/mcp/project/${ProjectMcp.slug}`, { method: 'PUT', body: ProjectMcp.data });
-      toast('Project MCP saved');
+      await api(`/api/mcp/project/${ProjectMcp.slug}/${scope}`, { method: 'PUT', body: { servers: ref.servers } });
+      toast(`${scope === 'project' ? 'Project-scope' : 'Local-scope'} MCP saved`);
     } catch (e) { toast('Save failed: ' + e.message, 'error'); }
   }
 };

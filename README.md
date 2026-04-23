@@ -30,18 +30,27 @@ The script will install Node.js if missing, install dependencies, and open the a
 | **Token Usage** | `data/usage-index.json` | Aggregated stats, cost estimates, period/project breakdowns |
 | **Settings** | `~/.claude/settings.json` | Visual tree editor + raw JSON |
 | **CLAUDE.md** | `~/.claude/CLAUDE.md` | Markdown editor with live preview |
-| **MCP Servers** | `~/.claude/.mcp.json` | Add, edit, enable/disable, delete |
-| **Cloud Integrations** | (read-only) | View OAuth-connected services (Atlassian, etc.) |
+| **MCP Servers (user scope)** | `~/.claude.json` → `mcpServers` | Add, edit, enable/disable, delete — available across all projects |
+| **Cloud Integrations** | `~/.claude/.credentials.json` (read-only) | View OAuth-connected services (Atlassian, etc.) |
 | **Keybindings** | `~/.claude/keybindings.json` | Add contexts, map key combos to actions |
 | **Skills** | `~/.claude/skills/*/SKILL.md` | Create, edit, delete custom slash commands |
 | **Output Styles** | `~/.claude/output-styles/*.md` | Create, edit, delete response presets |
 | **Plugins** | `~/.claude/plugins/` | View marketplaces and blocklist (read-only) |
 | **Project Memory** | `~/.claude/projects/*/memory/` | CRUD memory files with frontmatter editor |
 | **Sessions** | `~/.claude/projects/*/` | Browse session history with token/cost badges |
-| **Project Settings** | `.claude/settings.local.json` | Edit local and shared project permissions |
-| **Project MCP** | `.claude/.mcp.json` | Project-level MCP server config |
+| **Project Settings** | `.claude/settings.local.json`, `.claude/settings.json` | Edit local and shared project permissions |
+| **Project MCP (project scope)** | `<project>/.mcp.json` | Project-level MCP server config (checked into git) |
+| **Project MCP (local scope)** | `~/.claude.json` → `projects["<path>"].mcpServers` | Per-project, per-user MCP server config |
 | **Project Agents** | `.claude/agents/*.md` | Create, edit, delete custom subagents |
 | **Project Skills** | `.claude/skills/*/SKILL.md` | Project-scoped custom slash commands |
+
+### MCP scopes
+
+Claude Code supports three MCP scopes; Claude Manager shows all of them in the matching location Claude Code itself uses, so what you see in the UI matches what `claude mcp list` reports:
+
+- **User scope** (`claude mcp add --scope user`) → `~/.claude.json` → `mcpServers` — visible on the global **MCP Servers** page.
+- **Project scope** (`claude mcp add --scope project`) → `<project>/.mcp.json` at the project root (checked into git) — visible inside a project's **MCP** tab.
+- **Local scope** (`claude mcp add --scope local`, the default) → `~/.claude.json` → `projects["<project path>"].mcpServers` — visible inside a project's **MCP** tab alongside project scope.
 
 ## Custom Skills
 
