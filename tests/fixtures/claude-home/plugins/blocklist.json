@@ -1,0 +1,3 @@
+{
+  "plugins": ["evil-plugin", "bad-plugin"]
+}

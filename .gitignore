@@ -4,3 +4,4 @@ node_modules/
 .claude/*
 !.claude/skills/
 data/
+tests/tmp/

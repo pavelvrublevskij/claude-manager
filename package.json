@@ -1,15 +1,22 @@
 {
   "name": "claude-manager",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Local web UI for managing Claude Code settings and memory",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "test": "node --test --test-concurrency=1 tests/"
   },
   "dependencies": {
     "adm-zip": "^0.5.17",
     "express": "^4.21.0",
     "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "supertest": "^7.2.2"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

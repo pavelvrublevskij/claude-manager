@@ -1,3 +1,7 @@
+## v0.5.2
+
+No new features, just quality improvement to have tests.
+
 ## v0.5.1
 
 ### Token Usage Filters

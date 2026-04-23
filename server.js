@@ -146,15 +146,19 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, HOST, () => {
-  console.log(`Claude Manager running at http://${HOST}:${PORT}`);
+if (require.main === module) {
+  app.listen(PORT, HOST, () => {
+    console.log(`Claude Manager running at http://${HOST}:${PORT}`);
 
-  // Auto-fetch pricing on startup if stale (>24h) or missing
-  const lastFetch = pricing.getLastFetchedAt();
-  const stale = !lastFetch || (Date.now() - new Date(lastFetch).getTime()) > 24 * 60 * 60 * 1000;
-  if (stale) {
-    pricing.fetchAndUpdate()
-      .then(({ changed }) => console.log(changed ? 'Pricing updated from Anthropic' : 'Pricing checked, no changes'))
-      .catch(e => console.log('Pricing fetch skipped:', e.message));
-  }
-});
+    // Auto-fetch pricing on startup if stale (>24h) or missing
+    const lastFetch = pricing.getLastFetchedAt();
+    const stale = !lastFetch || (Date.now() - new Date(lastFetch).getTime()) > 24 * 60 * 60 * 1000;
+    if (stale) {
+      pricing.fetchAndUpdate()
+        .then(({ changed }) => console.log(changed ? 'Pricing updated from Anthropic' : 'Pricing checked, no changes'))
+        .catch(e => console.log('Pricing fetch skipped:', e.message));
+    }
+  });
+}
+
+module.exports = app;
