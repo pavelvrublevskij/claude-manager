@@ -1,0 +1,6 @@
+{
+  "theme": "dark",
+  "permissions": {
+    "allow": ["Bash(ls:*)"]
+  }
+}
