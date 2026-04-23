@@ -5,22 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const { app, paths } = require('./helpers/app');
 
-const DATA_FILES = ['usage-index.json'];
-const snapshots = {};
-
 before(() => {
-  for (const f of DATA_FILES) {
-    const p = path.join(paths.DATA_DIR, f);
-    if (fs.existsSync(p)) snapshots[f] = fs.readFileSync(p);
-  }
   fs.mkdirSync(paths.PROJECTS_DIR, { recursive: true });
-});
-
-process.on('exit', () => {
-  for (const f of DATA_FILES) {
-    const p = path.join(paths.DATA_DIR, f);
-    if (snapshots[f]) fs.writeFileSync(p, snapshots[f]);
-  }
 });
 
 test('GET /api/dashboard returns stats and recentSessions on empty HOME', async () => {

@@ -1,26 +1,7 @@
-const { test, before } = require('node:test');
+const { test } = require('node:test');
 const assert = require('node:assert');
 const request = require('supertest');
-const fs = require('fs');
-const path = require('path');
-const { app, paths } = require('./helpers/app');
-
-const DATA_FILES = ['pricing-history.json'];
-const snapshots = {};
-
-before(() => {
-  for (const f of DATA_FILES) {
-    const p = path.join(paths.DATA_DIR, f);
-    if (fs.existsSync(p)) snapshots[f] = fs.readFileSync(p);
-  }
-});
-
-process.on('exit', () => {
-  for (const f of DATA_FILES) {
-    const p = path.join(paths.DATA_DIR, f);
-    if (snapshots[f] !== undefined) fs.writeFileSync(p, snapshots[f]);
-  }
-});
+const { app } = require('./helpers/app');
 
 test('GET /api/pricing returns current pricing and source metadata', async () => {
   const res = await request(app).get('/api/pricing');
