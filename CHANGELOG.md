@@ -1,3 +1,11 @@
+## v0.5.3
+
+### Session ID
+- Session ID is now visible at a glance — short truncated badge in every session card's meta row, click to copy the full ID
+- Session detail header shows the full session ID under the title with a dedicated **Copy** button
+- New **Copy session ID** action in the `⋮` menu, both on session cards and the detail header
+- New shared `copyToClipboard()` helper — uses the modern Clipboard API with a textarea fallback for non-secure contexts
+
 ## v0.5.2
 
 No new features, just quality improvement to have tests.

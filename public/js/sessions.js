@@ -134,6 +134,13 @@ const Sessions = {
       meta.innerHTML = '';
     }
 
+    const idRow = document.getElementById('session-detail-id-row');
+    const idValue = document.getElementById('session-detail-id-value');
+    if (idRow && idValue) {
+      idValue.textContent = sessionId;
+      idRow.style.display = sessionId ? 'flex' : 'none';
+    }
+
     Sessions.detailState = { slug, sessionId, offset: 0, loading: false, hasMore: false, total: 0 };
     container.innerHTML = '';
 
@@ -417,6 +424,19 @@ const Sessions = {
 
   renameAction(btn) {
     Sessions.openRenameModal(btn.dataset.slug, btn.dataset.session, btn.dataset.title || '');
+  },
+
+  copyIdAction(sessionId) {
+    document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
+    if (!sessionId) { toast('No session ID', 'error'); return; }
+    copyToClipboard(sessionId, 'Session ID copied');
+  },
+
+  copyIdDetail() {
+    document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
+    const id = Sessions.detailState.sessionId;
+    if (!id) { toast('No session ID', 'error'); return; }
+    copyToClipboard(id, 'Session ID copied');
   },
 
   renameDetail() {

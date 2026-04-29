@@ -949,6 +949,56 @@ mark.search-highlight {
   border-radius: 10px;
 }
 
+.session-id-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  padding: 2px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid transparent;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.session-id-badge:hover {
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+.session-id-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  margin-bottom: 4px;
+}
+
+.session-id-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.session-id-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  user-select: all;
+  word-break: break-all;
+}
+
+.session-id-copy-btn {
+  font-size: 11px;
+  padding: 2px 10px;
+}
+
 .session-resume-btn {
   font-size: 11px;
   padding: 2px 10px;

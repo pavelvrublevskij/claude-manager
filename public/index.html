@@ -474,9 +474,15 @@
                 <button class="btn btn-sm action-menu-btn" onclick="event.stopPropagation(); Sessions.toggleActionMenu(this)" aria-label="More actions">&#8942;</button>
                 <div class="action-menu-panel">
                   <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.renameDetail()">Rename</button>
+                  <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.copyIdDetail()">Copy session ID</button>
                 </div>
               </div>
             </div>
+          </div>
+          <div class="session-id-row" id="session-detail-id-row" style="display:none">
+            <span class="session-id-label">Session ID</span>
+            <code class="session-id-value" id="session-detail-id-value"></code>
+            <button class="btn btn-sm session-id-copy-btn" onclick="Sessions.copyIdDetail()" title="Copy session ID">Copy</button>
           </div>
           <div class="session-meta" id="session-detail-meta"></div>
           <div class="subtitle" id="session-count" style="margin-top:4px;color:var(--text-muted)"></div>

@@ -52,6 +52,28 @@ function showLoading(container, text = 'Loading...') {
   container.innerHTML = `<div class="loading"><div class="spinner"></div>${escapeHtml(text)}</div>`;
 }
 
+/** Copy text to the clipboard with a toast on success/failure. */
+async function copyToClipboard(text, label = 'Copied') {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (!ok) throw new Error('execCommand failed');
+    }
+    toast(label);
+  } catch (e) {
+    toast('Copy failed', 'error');
+  }
+}
+
 // --- Theme ---
 
 const Theme = {
@@ -194,12 +216,18 @@ function renderSessionCard(s, opts = {}) {
     }
   }
 
+  const shortId = s.sessionId ? s.sessionId.slice(0, 8) + '…' : '';
+  const idBadge = s.sessionId
+    ? `<span class="session-id-badge" title="${escapeHtml(s.sessionId)} — click to copy" onclick="event.stopPropagation(); copyToClipboard('${s.sessionId}', 'Session ID copied')">${escapeHtml(shortId)}</span>`
+    : '';
+
   return `
     <div class="session-card" style="cursor:pointer" data-session-id="${s.sessionId}" onclick="${opts.onclick || ''}">
       ${headerHtml}
       ${opts.snippets || ''}
       <div class="session-meta">
         ${opts.project ? `<span class="project-badge">${escapeHtml(opts.project)}</span>` : ''}
+        ${idBadge}
         ${opts.dates ? `<div class="meta-item">Created <span class="meta-value">${s.created ? new Date(s.created).toLocaleString() : '—'}</span></div>
         <div class="meta-item">Modified <span class="meta-value">${s.modified ? new Date(s.modified).toLocaleString() : '—'}</span></div>` : ''}
         ${renderSessionBadges(s, { sidechain: opts.sidechain })}
@@ -209,6 +237,7 @@ function renderSessionCard(s, opts = {}) {
             <button class="btn btn-sm action-menu-btn" onclick="event.stopPropagation(); Sessions.toggleActionMenu(this)" aria-label="More actions">&#8942;</button>
             <div class="action-menu-panel">
               <button class="action-menu-item" data-slug="${slug}" data-session="${s.sessionId}" data-title="${escapeHtml(s.summary || s.firstPrompt || '')}" onclick="event.stopPropagation(); Sessions.renameAction(this)">Rename</button>
+              <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.copyIdAction('${s.sessionId}')">Copy session ID</button>
             </div>
           </div>
         </div>
