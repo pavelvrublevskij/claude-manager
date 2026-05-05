@@ -50,10 +50,10 @@ const Projects = {
   renderNav() {
     const list = document.getElementById('project-nav-list');
     list.innerHTML = Projects.data.map(p => `
-      <div class="nav-item" data-slug="${p.slug}" onclick="App.navigate('project-detail', { slug: '${p.slug}' })">
+      <div class="nav-item" data-slug="${p.slug}" onclick="App.navigate('project-detail', { slug: '${p.slug}' })" title="${escapeHtml(decodeName(p.slug))}">
         <span class="icon">&#128193;</span>
-        <span>${decodeName(p.slug)}</span>
-        ${p.memoryCount > 0 ? `<span class="badge">${p.memoryCount}</span>` : ''}
+        <span class="nav-label">${escapeHtml(decodeName(p.slug))}</span>
+        ${p.memoryCount > 0 ? `<span class="badge nav-label">${p.memoryCount}</span>` : ''}
       </div>
     `).join('');
     const countEl = document.getElementById('project-nav-count');

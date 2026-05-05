@@ -1,5 +1,7 @@
 // --- Navigation & App Shell ---
 
+const SIDEBAR_COLLAPSED_KEY = 'claude-manager-sidebar-collapsed';
+
 const App = {
   currentView: 'dashboard',
   currentProject: null,
@@ -11,6 +13,13 @@ const App = {
       });
     });
 
+    // Restore sidebar collapsed state
+    if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1') {
+      document.querySelector('.app').classList.add('sidebar-collapsed');
+      const btn = document.getElementById('sidebar-toggle');
+      if (btn) btn.textContent = '›';
+    }
+
     // Load projects first (needed for sidebar nav and routing)
     Projects.load().then(() => {
       // Restore route from hash or default to settings
@@ -19,6 +28,14 @@ const App = {
 
     // Listen for back/forward
     window.addEventListener('hashchange', () => App.restoreRoute());
+  },
+
+  toggleSidebar() {
+    const app = document.querySelector('.app');
+    const btn = document.getElementById('sidebar-toggle');
+    const collapsed = app.classList.toggle('sidebar-collapsed');
+    btn.textContent = collapsed ? '›' : '‹';
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
   },
 
   // Build hash from current state
@@ -152,7 +169,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (hostEl) hostEl.textContent = location.host;
   api('/api/version').then(data => {
     window.__docker = !!data.docker;
-    document.getElementById('app-version').textContent = 'v' + data.version;
+    const av = document.getElementById('app-version');
+    if (av) av.textContent = 'v' + data.version;
     const fv = document.getElementById('footer-version');
     if (fv) fv.textContent = 'v' + data.version;
     if (data.updateAvailable) {

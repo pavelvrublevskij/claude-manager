@@ -77,6 +77,61 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.2s ease, min-width 0.2s ease;
+}
+
+.app.sidebar-collapsed .sidebar {
+  width: 48px;
+  min-width: 48px;
+}
+
+.app.sidebar-collapsed .nav-label {
+  display: none;
+}
+
+.app.sidebar-collapsed .nav-item {
+  justify-content: center;
+  padding: 9px 0;
+}
+
+.app.sidebar-collapsed .nav-section-title {
+  height: 1px;
+  padding: 0;
+  margin: 6px 8px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.app.sidebar-collapsed .sidebar-header {
+  justify-content: center;
+  padding: 14px 0;
+}
+
+.app.sidebar-collapsed .sidebar-header h1 {
+  flex: none;
+  gap: 0;
+}
+
+.sidebar-toggle {
+  flex: 0 0 16px;
+  width: 16px;
+  background: var(--bg-secondary);
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+}
+
+.sidebar-toggle:hover {
+  background: var(--bg-hover, var(--border));
+  color: var(--text-primary);
 }
 
 .sidebar-header {

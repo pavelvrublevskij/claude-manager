@@ -13,10 +13,28 @@ const Sessions = {
     try {
       const sessions = await api(`/api/projects/${slug}/sessions`);
       Sessions.cache[slug] = sessions;
-      Sessions.renderList(slug, sessions);
+      Sessions.renderList(slug, Sessions.filterByDateRange(sessions));
     } catch (e) {
       container.innerHTML = `<div class="empty-state"><p>Could not load sessions</p></div>`;
     }
+  },
+
+  filterByDateRange(sessions) {
+    const pu = (typeof ProjectUsage !== 'undefined') ? ProjectUsage : {};
+    const { fromDate, toDate } = pu;
+    if (!fromDate && !toDate) return sessions;
+    return sessions.filter(s => {
+      const date = (s.modified || '').slice(0, 10);
+      if (fromDate && date < fromDate) return false;
+      if (toDate && date > toDate) return false;
+      return true;
+    });
+  },
+
+  rerenderWithFilter() {
+    const slug = Sessions._searchSlug;
+    if (!slug || !Sessions.cache[slug]) return;
+    Sessions.renderList(slug, Sessions.filterByDateRange(Sessions.cache[slug]));
   },
 
   renderSearchBar(slug) {
@@ -34,6 +52,14 @@ const Sessions = {
   },
 
   renderList(slug, sessions) {
+    const btn = document.getElementById('sessions-tab-btn');
+    if (btn) {
+      const total = (Sessions.cache[slug] || []).length;
+      const count = sessions.length;
+      btn.textContent = (total !== count)
+        ? `Sessions (${count}/${total})`
+        : count > 0 ? `Sessions (${count})` : 'Sessions';
+    }
     const container = document.getElementById('sessions-list');
     if (sessions.length === 0) {
       container.innerHTML = Sessions.renderSearchBar(slug) +
@@ -78,13 +104,10 @@ const Sessions = {
     Sessions._lastQuery = q;
 
     if (q.length < 2) {
-      const cached = Sessions.cache[slug];
-      if (cached) {
-        const container = document.getElementById('sessions-list');
+      if (Sessions.cache[slug]) {
         const searchInput = document.getElementById('session-search-input');
         const cursorPos = searchInput?.selectionStart;
-        container.innerHTML = Sessions.renderSearchBar(slug) +
-          cached.map((s, i) => Sessions.renderCard(slug, s, i)).join('');
+        Sessions.rerenderWithFilter();
         const newInput = document.getElementById('session-search-input');
         if (newInput) { newInput.value = value; newInput.focus(); newInput.selectionStart = newInput.selectionEnd = cursorPos; }
       }

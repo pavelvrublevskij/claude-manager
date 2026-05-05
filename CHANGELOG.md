@@ -1,3 +1,17 @@
+## v0.7.0
+
+### Sidebar
+- Collapsible to compact icon-only mode (48 px) — labels hidden, icons remain, native tooltips on hover
+- Toggle strip on the divider line; state persisted across page refreshes
+
+### Sessions
+- Period filter (Today / Last 7 days / etc.) now also filters the session list, not only the usage bar
+- Sessions tab label shows filtered count `(n/total)` when a period or date range is active
+- Bug fix: clicking a search result opened the wrong session (index was relative to search results, not the full cache)
+
+### App
+- Footer version badge was silently broken (missing element reference stopped the version from rendering)
+
 ## v0.6.0
 
 ### In-Session Terminal

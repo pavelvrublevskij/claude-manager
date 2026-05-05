@@ -80,7 +80,10 @@ const ProjectUsage = {
     }
     document.getElementById('proj-filter-from').value = ProjectUsage.fromDate || '';
     document.getElementById('proj-filter-to').value = ProjectUsage.toDate || '';
-    if (preset !== 'custom') ProjectUsage.render();
+    if (preset !== 'custom') {
+      ProjectUsage.render();
+      if (typeof Sessions !== 'undefined') Sessions.rerenderWithFilter();
+    }
   },
 
   applyCustomDates() {
@@ -89,6 +92,7 @@ const ProjectUsage = {
     ProjectUsage.datePreset = 'custom';
     document.getElementById('proj-filter-date-preset').value = 'custom';
     ProjectUsage.render();
+    if (typeof Sessions !== 'undefined') Sessions.rerenderWithFilter();
   },
 
   clearFilter() {
@@ -99,6 +103,7 @@ const ProjectUsage = {
     document.getElementById('proj-filter-from').value = '';
     document.getElementById('proj-filter-to').value = '';
     ProjectUsage.render();
+    if (typeof Sessions !== 'undefined') Sessions.rerenderWithFilter();
   }
 };
 

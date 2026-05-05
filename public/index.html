@@ -20,68 +20,71 @@
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <h1><span class="logo">C</span> Claude Manager</h1>
-        <button class="theme-toggle" id="theme-toggle" onclick="Theme.toggle()" title="Dark mode">
+        <h1><span class="logo">C</span><span class="nav-label"> Claude Manager</span></h1>
+        <button class="theme-toggle nav-label" id="theme-toggle" onclick="Theme.toggle()" title="Dark mode">
           <span id="theme-icon">&#9790;</span>
         </button>
       </div>
       <nav class="sidebar-nav">
         <div class="nav-section">
-          <div class="nav-section-title">General</div>
-          <div class="nav-item active" data-view="dashboard">
-            <span class="icon">&#9673;</span> Dashboard
+          <div class="nav-section-title"><span class="nav-label">General</span></div>
+          <div class="nav-item active" data-view="dashboard" title="Dashboard">
+            <span class="icon">&#9673;</span><span class="nav-label"> Dashboard</span>
           </div>
-          <div class="nav-item" data-view="usage">
-            <span class="icon">&#128200;</span> Token Usage
+          <div class="nav-item" data-view="usage" title="Token Usage">
+            <span class="icon">&#128200;</span><span class="nav-label"> Token Usage</span>
           </div>
         </div>
         <div class="nav-section">
-          <div class="nav-section-title">Claude Code</div>
-          <div class="nav-item" data-view="settings">
-            <span class="icon">&#9881;</span> Settings
+          <div class="nav-section-title"><span class="nav-label">Claude Code</span></div>
+          <div class="nav-item" data-view="settings" title="Settings">
+            <span class="icon">&#9881;</span><span class="nav-label"> Settings</span>
           </div>
-          <div class="nav-item" data-view="global-claude-md">
-            <span class="icon">&#9997;</span> Global CLAUDE.md
+          <div class="nav-item" data-view="global-claude-md" title="Global CLAUDE.md">
+            <span class="icon">&#9997;</span><span class="nav-label"> Global CLAUDE.md</span>
           </div>
-          <div class="nav-item" data-view="mcp-servers">
-            <span class="icon">&#9889;</span> MCP Servers
+          <div class="nav-item" data-view="mcp-servers" title="MCP Servers">
+            <span class="icon">&#9889;</span><span class="nav-label"> MCP Servers</span>
           </div>
-          <div class="nav-item" data-view="keybindings">
-            <span class="icon">&#9000;</span> Keybindings
+          <div class="nav-item" data-view="keybindings" title="Keybindings">
+            <span class="icon">&#9000;</span><span class="nav-label"> Keybindings</span>
           </div>
-          <div class="nav-item" data-view="skills">
-            <span class="icon">&#9733;</span> Skills
+          <div class="nav-item" data-view="skills" title="Skills">
+            <span class="icon">&#9733;</span><span class="nav-label"> Skills</span>
           </div>
-          <div class="nav-item" data-view="output-styles">
-            <span class="icon">&#9998;</span> Output Styles
+          <div class="nav-item" data-view="output-styles" title="Output Styles">
+            <span class="icon">&#9998;</span><span class="nav-label"> Output Styles</span>
           </div>
-          <div class="nav-item" data-view="plugins">
-            <span class="icon">&#9670;</span> Plugins
+          <div class="nav-item" data-view="plugins" title="Plugins">
+            <span class="icon">&#9670;</span><span class="nav-label"> Plugins</span>
           </div>
         </div>
         <div class="nav-section">
           <div class="nav-section-title" onclick="ProjectNav.toggle()" style="cursor:pointer;user-select:none">
-            <span id="project-nav-arrow" class="nav-arrow">&#9654;</span> Projects
-            <span class="badge" id="project-nav-count"></span>
+            <span id="project-nav-arrow" class="nav-arrow nav-label">&#9654;</span><span class="nav-label"> Projects</span>
+            <span class="badge nav-label" id="project-nav-count"></span>
           </div>
           <div id="project-nav-body" class="collapsed">
-            <div class="nav-item" data-view="projects">
-              <span class="icon">&#9776;</span> All Projects
+            <div class="nav-item" data-view="projects" title="All Projects">
+              <span class="icon">&#9776;</span><span class="nav-label"> All Projects</span>
             </div>
             <div class="project-list" id="project-nav-list"></div>
           </div>
         </div>
         <div class="nav-section">
-          <div class="nav-section-title">Claude Manager</div>
-          <div class="nav-item" data-view="manager-settings">
-            <span class="icon">&#9878;</span> Settings
+          <div class="nav-section-title"><span class="nav-label">Claude Manager</span></div>
+          <div class="nav-item" data-view="manager-settings" title="Settings">
+            <span class="icon">&#9878;</span><span class="nav-label"> Settings</span>
           </div>
-          <div class="nav-item" data-view="changelog">
-            <span class="icon">&#9776;</span> Changelog
+          <div class="nav-item" data-view="changelog" title="Changelog">
+            <span class="icon">&#9776;</span><span class="nav-label"> Changelog</span>
           </div>
         </div>
       </nav>
     </aside>
+
+    <!-- Sidebar collapse toggle -->
+    <button class="sidebar-toggle" id="sidebar-toggle" onclick="App.toggleSidebar()" title="Toggle sidebar">&#8249;</button>
 
     <!-- Main Content -->
     <main class="main">
