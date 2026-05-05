@@ -150,6 +150,12 @@ app.get('*', (req, res) => {
 if (require.main === module) {
   const http = require('http');
   const terminalServer = require('./lib/terminal-server');
+
+  // Safety net: keep the server alive on otherwise-uncaught failures.
+  // Root causes are still visible in the log; we don't exit.
+  process.on('uncaughtException', err => console.error('[uncaughtException]', err));
+  process.on('unhandledRejection', reason => console.error('[unhandledRejection]', reason));
+
   const server = http.createServer(app);
   server.on('upgrade', (req, socket, head) => {
     if (!terminalServer.handleUpgrade(req, socket, head)) socket.destroy();

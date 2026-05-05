@@ -497,6 +497,10 @@ const Sessions = {
     try {
       await Sessions.checkPricing();
       await api(`/api/projects/${slug}/sessions/${sessionId}/resume`, { method: 'POST' });
+      if (typeof TerminalPanel !== 'undefined' && TerminalPanel.isOpen()) {
+        TerminalPanel.setAutoOpen(false);
+        TerminalPanel.close();
+      }
       toast('Terminal opened with session');
     } catch (e) {
       toast('Failed to open terminal: ' + e.message, 'error');

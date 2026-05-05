@@ -2,9 +2,15 @@
 
 ### In-Session Terminal
 - In-page terminal panel on the session detail view (xterm.js + node-pty + WebSocket)
+- Pane is always visible in the session view; `Open Terminal` button lives inside it
 - Auto-opens on subsequent sessions once enabled
 - Splitter click toggles conversation hide/show; drag resizes; persisted width
 - Restart icon, OS-terminal launch moved to the action menu
+- Single active terminal per `(slug, sessionId)` — duplicate connection is rejected with a notice
+- `Resume in OS Terminal` disconnects any in-page terminal for the same session
+- Warning note in the pane: keep one terminal per session
+- Bug fix: silent server abort caused by double `term.kill()` on Windows ConPTY (idempotent termination)
+- Top-level `uncaughtException` / `unhandledRejection` safety net on the server
 
 ### Conversation
 - Auto-refresh every 5s while open; instant refresh on show; paused while hidden
@@ -19,6 +25,7 @@
 ### Sessions
 - Cards show full branch chain (every branch the session touched)
 - New `gitBranches` field on list / search / dashboard recents APIs
+- Scroll-to-top button now lives inside the conversation pane (no longer overlaps the footer or terminal)
 
 ### App
 - Sticky app footer (version, host, live status indicator)

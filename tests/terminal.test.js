@@ -74,3 +74,12 @@ test('validateTerminal: rejects empty slug, accepts valid combinations', () => {
   assert.strictEqual(okWithSession.ok, true);
   assert.strictEqual(okWithSession.sessionId, SESSION_ID);
 });
+
+test('disconnectFor / hasActiveTerminal are no-ops when nothing is registered', () => {
+  const { disconnectFor, hasActiveTerminal } = require('../lib/terminal-server');
+  assert.strictEqual(hasActiveTerminal(SLUG, SESSION_ID), false);
+  assert.strictEqual(disconnectFor(SLUG, SESSION_ID, 'reason'), false);
+  // empty sessionId is never registered (each empty-session terminal spawns a fresh claude session)
+  assert.strictEqual(hasActiveTerminal(SLUG, ''), false);
+  assert.strictEqual(disconnectFor(SLUG, '', 'reason'), false);
+});

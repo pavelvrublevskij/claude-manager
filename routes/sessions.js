@@ -7,8 +7,16 @@ const { getProjectUsageMap } = require('../lib/usage-index');
 const { decodeSlug } = require('../lib/slug');
 const { getCustomTitle } = require('../lib/session-title');
 const { collectBranches } = require('../lib/session-branches');
+const terminalServer = require('../lib/terminal-server');
 
 const router = express.Router({ mergeParams: true });
+
+function safeSpawn(cmd, args, opts) {
+  const proc = spawn(cmd, args, opts);
+  // Without an 'error' listener, an async spawn failure crashes Node.
+  proc.on('error', () => { /* swallowed; caller decides what to do */ });
+  return proc;
+}
 
 function launchTerminal(projectPath, cmd) {
   const platform = process.platform;
@@ -16,12 +24,13 @@ function launchTerminal(projectPath, cmd) {
     const wtArgs = ['-d', projectPath, 'cmd.exe', '/k', cmd];
     const proc = spawn('wt.exe', wtArgs, { detached: true, stdio: 'ignore' });
     proc.on('error', () => {
-      spawn('cmd.exe', ['/c', `start "" cmd.exe /k "cd /d ${projectPath} && ${cmd}"`], { shell: true, detached: true, stdio: 'ignore' }).unref();
+      safeSpawn('cmd.exe', ['/c', `start "" cmd.exe /k "cd /d ${projectPath} && ${cmd}"`], { shell: true, detached: true, stdio: 'ignore' }).unref();
     });
     proc.unref();
   } else if (platform === 'darwin') {
     const script = `tell application "Terminal" to do script "cd '${projectPath}' && ${cmd}"`;
-    execFile('osascript', ['-e', script]);
+    const proc = safeSpawn('osascript', ['-e', script]);
+    proc.unref();
   } else {
     const terminals = ['x-terminal-emulator', 'gnome-terminal', 'konsole', 'xfce4-terminal', 'xterm'];
     for (const term of terminals) {
@@ -29,7 +38,8 @@ function launchTerminal(projectPath, cmd) {
         const args = term === 'gnome-terminal'
           ? ['--', 'bash', '-c', `cd '${projectPath}' && ${cmd}; exec bash`]
           : ['-e', `bash -c "cd '${projectPath}' && ${cmd}; exec bash"`];
-        execFile(term, args);
+        const proc = safeSpawn(term, args);
+        proc.unref();
         return;
       } catch (_) { continue; }
     }
@@ -405,6 +415,7 @@ router.post('/:slug/sessions/:sessionId/resume', wrapRoute((req, res) => {
 
   const projectPath = decodeSlug(req.params.slug);
   try {
+    terminalServer.disconnectFor(req.params.slug, sessionId, 'Resumed in OS terminal.');
     launchTerminal(projectPath, `claude --resume "${sessionId}"`);
     res.json({ ok: true });
   } catch (e) {

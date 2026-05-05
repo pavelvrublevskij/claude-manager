@@ -516,7 +516,6 @@
               <h2 id="session-detail-title">Session</h2>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-              <button class="btn btn-sm btn-primary" id="session-terminal-toggle" onclick="TerminalPanel.toggleFromSession()">Open Terminal</button>
               <div class="action-menu">
                 <button class="btn btn-sm action-menu-btn" onclick="event.stopPropagation(); Sessions.toggleActionMenu(this)" aria-label="More actions">&#8942;</button>
                 <div class="action-menu-panel">
@@ -541,22 +540,29 @@
           </div>
         </div>
         <div class="view-body session-detail-body" id="session-detail-body">
-          <div class="session-messages-pane" id="session-messages-pane">
-            <div id="session-messages" class="chat-container"></div>
+          <div class="session-messages-wrap" id="session-messages-wrap">
+            <div class="session-messages-pane" id="session-messages-pane">
+              <div id="session-messages" class="chat-container"></div>
+            </div>
+            <button class="scroll-to-top" id="scroll-to-top-btn" onclick="Sessions.scrollToTop()" aria-label="Scroll to top" title="Scroll to top">&#8593;</button>
           </div>
-          <div class="terminal-splitter" id="terminal-splitter" hidden onmousedown="TerminalPanel.startDrag(event)"></div>
-          <div class="terminal-pane" id="terminal-pane" hidden>
+          <div class="terminal-splitter" id="terminal-splitter" onmousedown="TerminalPanel.startDrag(event)"></div>
+          <div class="terminal-pane" id="terminal-pane">
             <div class="terminal-pane-header">
               <span class="terminal-pane-title">Terminal</span>
-              <span class="terminal-pane-status" id="terminal-status">connecting...</span>
+              <span class="terminal-pane-status" id="terminal-status">disconnected</span>
               <div class="terminal-pane-actions">
-                <button class="icon-btn" onclick="TerminalPanel.reconnect()" title="Restart claude in this panel" aria-label="Restart">&#x21bb;</button>
+                <button class="icon-btn terminal-action-when-connected" onclick="TerminalPanel.reconnect()" title="Restart claude in this panel" aria-label="Restart">&#x21bb;</button>
+                <button class="icon-btn terminal-action-when-connected" onclick="TerminalPanel.closeFromUser()" title="Close terminal" aria-label="Close">&#x2715;</button>
               </div>
+            </div>
+            <div class="terminal-pane-note">Recommended: keep only one terminal open per session to avoid conflicts.</div>
+            <div class="terminal-disconnected" id="terminal-disconnected">
+              <button class="btn btn-primary" onclick="TerminalPanel.openFromSession()">Open Terminal</button>
             </div>
             <div id="terminal-host" class="terminal-host"></div>
           </div>
         </div>
-        <button class="scroll-to-top" id="scroll-to-top-btn" onclick="Sessions.scrollToTop()" aria-label="Scroll to top" title="Scroll to top">&#8593;</button>
       </div>
 
       <!-- Manager Settings View -->

@@ -33,19 +33,20 @@ const TerminalPanel = {
 
   isOpen() { return this.state.open; },
 
-  toggleFromSession() {
+  openFromSession() {
     const detail = (typeof Sessions !== 'undefined') ? Sessions.detailState : null;
     if (!detail || !detail.slug) {
       toast('No active session', 'error');
       return;
     }
-    if (this.state.open) {
-      this.setAutoOpen(false);
-      this.close();
-      return;
-    }
+    if (this.state.open) return;
     this.setAutoOpen(true);
     this.open(detail.slug, detail.sessionId);
+  },
+
+  closeFromUser() {
+    this.setAutoOpen(false);
+    this.close();
   },
 
   open(slug, sessionId) {
@@ -57,19 +58,14 @@ const TerminalPanel = {
     }
 
     const pane = document.getElementById('terminal-pane');
-    const splitter = document.getElementById('terminal-splitter');
     const body = document.getElementById('session-detail-body');
     const host = document.getElementById('terminal-host');
-    const toggleBtn = document.getElementById('session-terminal-toggle');
     if (!pane || !host || !body) return;
 
     const savedWidth = parseFloat(localStorage.getItem(this.WIDTH_KEY)) || 50;
     body.style.setProperty('--terminal-width', savedWidth + '%');
 
-    pane.hidden = false;
-    splitter.hidden = false;
-    body.classList.add('terminal-open');
-    if (toggleBtn) toggleBtn.textContent = 'Close Terminal';
+    pane.classList.add('connected');
 
     host.innerHTML = '';
     const term = new XtermCls({
@@ -165,13 +161,8 @@ const TerminalPanel = {
     if (this.state.term) { try { this.state.term.dispose(); } catch (_) {} }
 
     const pane = document.getElementById('terminal-pane');
-    const splitter = document.getElementById('terminal-splitter');
-    const body = document.getElementById('session-detail-body');
-    const toggleBtn = document.getElementById('session-terminal-toggle');
-    if (pane) pane.hidden = true;
-    if (splitter) splitter.hidden = true;
-    if (body) body.classList.remove('terminal-open');
-    if (toggleBtn) toggleBtn.textContent = 'Open Terminal';
+    if (pane) pane.classList.remove('connected');
+    this._setStatus('disconnected', '');
 
     this.state = { open: false, slug: null, sessionId: null, term: null, fitAddon: null, ws: null, resizeObserver: null, dataDisposable: null };
   },
