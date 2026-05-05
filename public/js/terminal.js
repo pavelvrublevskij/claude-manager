@@ -240,3 +240,111 @@ const TerminalPanel = {
 };
 
 window.TerminalPanel = TerminalPanel;
+
+// --- TerminalModal ---
+// Standalone modal-hosted terminal — used for "New Session in browser" where
+// no session-detail route exists yet (no session ID until claude creates one).
+
+const TerminalModal = {
+  state: null,
+
+  open(slug, sessionId, label) {
+    const XtermCls = window.Terminal;
+    const FitCls = window.FitAddon && window.FitAddon.FitAddon;
+    if (typeof XtermCls !== 'function' || typeof FitCls !== 'function') {
+      toast('Terminal libraries failed to load', 'error');
+      return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay terminal-modal-overlay';
+
+    const modal = document.createElement('div');
+    modal.className = 'modal terminal-modal';
+
+    const header = document.createElement('div');
+    header.className = 'terminal-modal-header';
+    const title = document.createElement('h3');
+    title.textContent = label || 'Terminal';
+    const status = document.createElement('span');
+    status.className = 'terminal-modal-status';
+    status.textContent = 'connecting...';
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'btn btn-sm';
+    closeBtn.textContent = 'Close';
+    closeBtn.onclick = () => TerminalModal.close();
+    header.appendChild(title);
+    header.appendChild(status);
+    header.appendChild(closeBtn);
+
+    const host = document.createElement('div');
+    host.className = 'terminal-modal-host';
+
+    modal.appendChild(header);
+    modal.appendChild(host);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    const term = new XtermCls({
+      cursorBlink: true,
+      fontFamily: 'Menlo, Consolas, "DejaVu Sans Mono", monospace',
+      fontSize: 13,
+      theme: { background: '#000000', foreground: '#e6edf3' },
+      scrollback: 5000,
+      convertEol: false,
+    });
+    const fit = new FitCls();
+    term.loadAddon(fit);
+    term.open(host);
+    setTimeout(() => { try { fit.fit(); } catch (_) {} }, 0);
+
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const qs = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : '';
+    const wsUrl = `${proto}//${location.host}/api/projects/${encodeURIComponent(slug)}/terminal${qs}`;
+    let ws;
+    try { ws = new WebSocket(wsUrl); }
+    catch (e) {
+      status.textContent = 'connection failed';
+      term.write(`\r\n\x1b[31mFailed to open WebSocket: ${e.message}\x1b[0m\r\n`);
+      TerminalModal.state = { overlay, term, ws: null, fit, dataDisposable: null, ro: null };
+      return;
+    }
+
+    const sendResize = () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      try { fit.fit(); } catch (_) {}
+      const cols = term.cols, rows = term.rows;
+      if (cols > 0 && rows > 0) ws.send(JSON.stringify({ t: 'r', c: cols, r: rows }));
+    };
+
+    ws.onopen = () => { status.textContent = 'connected'; sendResize(); };
+    ws.onmessage = ev => { term.write(typeof ev.data === 'string' ? ev.data : ''); };
+    ws.onclose = () => { status.textContent = 'disconnected'; };
+    ws.onerror = () => { status.textContent = 'error'; };
+
+    const dataDisposable = term.onData(d => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: 'i', d }));
+    });
+
+    let ro = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => sendResize());
+      ro.observe(host);
+    }
+
+    TerminalModal.state = { overlay, term, ws, fit, dataDisposable, ro };
+  },
+
+  close() {
+    const s = TerminalModal.state;
+    if (!s) return;
+    if (s.ro) { try { s.ro.disconnect(); } catch (_) {} }
+    if (s.dataDisposable) { try { s.dataDisposable.dispose(); } catch (_) {} }
+    if (s.ws) { try { s.ws.close(); } catch (_) {} }
+    if (s.term) { try { s.term.dispose(); } catch (_) {} }
+    if (s.overlay && s.overlay.parentNode) s.overlay.parentNode.removeChild(s.overlay);
+    TerminalModal.state = null;
+  },
+};
+
+window.TerminalModal = TerminalModal;

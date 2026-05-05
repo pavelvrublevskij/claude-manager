@@ -184,6 +184,18 @@ test('GET /api/projects/:slug/sessions/:sessionId returns paginated messages (de
   assert.strictEqual(res.body.messages[0].content[0].text, 'Third message');
 });
 
+test('GET /api/projects/:slug/sessions/:sessionId includes stats for badge rendering', async () => {
+  const res = await request(app).get(`/api/projects/${SLUG}/sessions/${SESSION_A}`);
+  assert.strictEqual(res.status, 200);
+  assert.ok(res.body.stats, 'stats field should be present');
+  // messageCount counts user messages only (prompts sent); total counts all rendered messages
+  assert.strictEqual(res.body.stats.messageCount, 3);
+  assert.strictEqual(res.body.total, 5);
+  assert.deepStrictEqual(res.body.stats.gitBranches, ['main']);
+  assert.strictEqual(res.body.stats.lastGitBranch, 'main');
+  assert.strictEqual(res.body.stats.isSidechain, false);
+});
+
 test('GET /api/projects/:slug/sessions/:sessionId honors offset and limit', async () => {
   const res = await request(app).get(`/api/projects/${SLUG}/sessions/${SESSION_A}`).query({ offset: 1, limit: 2 });
   assert.strictEqual(res.status, 200);

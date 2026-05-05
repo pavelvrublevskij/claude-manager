@@ -23,7 +23,13 @@ const Sessions = {
     return `<div class="session-search-wrap">
       <input type="text" class="session-search" id="session-search-input"
         placeholder="Search sessions..." oninput="Sessions.onSearch('${slug}', this.value)">
-      ${window.__docker ? '' : `<button class="btn btn-sm btn-primary" onclick="Sessions.newSession('${slug}')">New Session</button>`}
+      ${window.__docker ? '' : `<div class="action-menu">
+        <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); Sessions.toggleActionMenu(this)">New Session &#9662;</button>
+        <div class="action-menu-panel">
+          <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.newSessionOS('${slug}')">In OS terminal</button>
+          <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.newSessionBrowser('${slug}')">In browser terminal</button>
+        </div>
+      </div>`}
     </div>`;
   },
 
@@ -42,11 +48,13 @@ const Sessions = {
     const snippetsHtml = (s.snippets || []).map(sn => {
       const label = sn.label ? `<span class="snippet-label">${escapeHtml(sn.label)}</span> ` : '';
       const roleTag = sn.role === 'user' ? 'You' : sn.role === 'assistant' ? 'Claude' : '';
-      const roleHtml = roleTag ? `<span class="snippet-role">${roleTag}</span> ` : '';
-      return `<div class="session-snippet">${roleHtml}${label}${Sessions.highlightMatch(sn.text, Sessions._lastQuery)}</div>`;
+      const roleHtml = roleTag ? `<span class="snippet-role snippet-role-${sn.role}">${roleTag}</span> ` : '';
+      return `<div class="session-snippet snippet-${sn.role}">${roleHtml}${label}${Sessions.highlightMatch(sn.text, Sessions._lastQuery)}</div>`;
     }).join('');
+    const cached = Sessions.cache[slug] || [];
+    const correctIndex = cached.findIndex(x => x.sessionId === s.sessionId);
     return renderSessionCard(s, {
-      onclick: `Sessions.open('${slug}', '${s.sessionId}', ${i})`,
+      onclick: `Sessions.open('${slug}', '${s.sessionId}', ${correctIndex >= 0 ? correctIndex : i})`,
       slug,
       dates: true,
       sidechain: true,
@@ -126,6 +134,7 @@ const Sessions = {
   REFRESH_INTERVAL_DEFAULT_MS: 5000,
   REFRESH_INTERVAL_MIN_MS: 1000,
   CONVERSATION_HIDDEN_KEY: 'claude-manager-conversation-hidden',
+  SHOW_TOOL_DETAILS_KEY: 'claude-manager-show-tool-details',
   _refreshTimer: null,
 
   refreshIntervalMs() {
@@ -150,26 +159,74 @@ const Sessions = {
     if (body) body.classList.toggle('conversation-hidden', Sessions.isConversationHidden());
   },
 
-  async loadDetail(slug, sessionId, info) {
-    const title = document.getElementById('session-detail-title');
-    const meta = document.getElementById('session-detail-meta');
-    const container = document.getElementById('session-messages');
+  showToolDetails() {
+    return localStorage.getItem(Sessions.SHOW_TOOL_DETAILS_KEY) === '1';
+  },
 
-    title.textContent = info?.summary || info?.firstPrompt?.slice(0, 80) || 'Session';
-    if (info) {
-      const createdHtml = info.created
-        ? `<div class="meta-item">Created <span class="meta-value">${new Date(info.created).toLocaleString()}</span></div>`
-        : '';
-      meta.innerHTML = createdHtml + renderSessionBadges(info, { sidechain: true });
+  applyToolDetailsState() {
+    const container = document.getElementById('session-messages');
+    if (container) container.classList.toggle('tools-hidden', !Sessions.showToolDetails());
+    const checkbox = document.getElementById('session-detail-show-tools');
+    if (checkbox) checkbox.checked = Sessions.showToolDetails();
+  },
+
+  setShowToolDetails(checked) {
+    localStorage.setItem(Sessions.SHOW_TOOL_DETAILS_KEY, checked ? '1' : '0');
+    Sessions.applyToolDetailsState();
+    Sessions.updateMessageCount();
+    if (Sessions._detailSearchQuery) Sessions.applyDetailFilter(Sessions._detailSearchQuery);
+  },
+
+  updateMessageCount() {
+    const countEl = document.getElementById('session-count');
+    if (!countEl) return;
+    const state = Sessions.detailState;
+    if (!state.total) { countEl.textContent = ''; return; }
+    const container = document.getElementById('session-messages');
+    const showTools = Sessions.showToolDetails();
+    const toolOnly = container ? container.querySelectorAll('.chat-msg-tools-only').length : 0;
+    if (!showTools && toolOnly) {
+      const visible = state.offset - toolOnly;
+      countEl.textContent = `Showing ${visible} of ${state.total} messages (${state.offset} with tool details)`;
     } else {
-      meta.innerHTML = '';
+      countEl.textContent = `Showing ${state.offset} of ${state.total} messages`;
+    }
+  },
+
+  renderDetailMeta(stats) {
+    const meta = document.getElementById('session-detail-meta');
+    if (!meta) return;
+    const info = Sessions._detailInfo || {};
+    const merged = Object.assign({}, info, stats || {});
+
+    // Fill title from stats when navigated without info (e.g. from dashboard)
+    const title = document.getElementById('session-detail-title');
+    if (title && title.textContent === 'Session' && (merged.summary || merged.firstPrompt)) {
+      const titleText = merged.summary || merged.firstPrompt.slice(0, 80);
+      title.textContent = titleText;
+      title.title = titleText;
     }
 
-    const idRow = document.getElementById('session-detail-id-row');
+    const createdHtml = merged.created
+      ? `<div class="meta-item">Created <span class="meta-value">${new Date(merged.created).toLocaleString()}</span></div>`
+      : '';
+    meta.innerHTML = createdHtml + renderSessionBadges(merged, { sidechain: true });
+  },
+
+  async loadDetail(slug, sessionId, info) {
+    const title = document.getElementById('session-detail-title');
+    const container = document.getElementById('session-messages');
+
+    const titleText = info?.summary || info?.firstPrompt?.slice(0, 80) || 'Session';
+    title.textContent = titleText;
+    title.title = titleText;
+    Sessions._detailInfo = info || {};
+    Sessions.renderDetailMeta(null);
+
     const idValue = document.getElementById('session-detail-id-value');
-    if (idRow && idValue) {
-      idValue.textContent = sessionId;
-      idRow.style.display = sessionId ? 'flex' : 'none';
+    if (idValue) {
+      idValue.textContent = sessionId || '';
+      idValue.style.display = sessionId ? 'inline-block' : 'none';
     }
 
     Sessions.detailState = { slug, sessionId, offset: 0, loading: false, hasMore: false, total: 0 };
@@ -189,6 +246,7 @@ const Sessions = {
     }
 
     Sessions.applyConversationHiddenState();
+    Sessions.applyToolDetailsState();
     if (!Sessions.isConversationHidden()) Sessions.startAutoRefresh();
   },
 
@@ -219,6 +277,9 @@ const Sessions = {
     try {
       const data = await api(`/api/projects/${slugAtStart}/sessions/${sessionAtStart}?offset=0&limit=20`);
       if (state.slug !== slugAtStart || state.sessionId !== sessionAtStart) return;
+
+      if (data.stats) Sessions.renderDetailMeta(data.stats);
+
       if (typeof data.total !== 'number' || data.total <= state.total) return;
 
       const added = data.total - state.total;
@@ -232,8 +293,7 @@ const Sessions = {
       state.total = data.total;
       state.offset += added;
 
-      const countEl = document.getElementById('session-count');
-      if (countEl) countEl.textContent = `Showing ${state.offset} of ${state.total} messages`;
+      Sessions.updateMessageCount();
     } catch (_) { /* silent — transient network error */ }
   },
 
@@ -297,11 +357,12 @@ const Sessions = {
       state.hasMore = data.hasMore;
       state.offset += data.messages.length;
 
+      if (data.stats) Sessions.renderDetailMeta(data.stats);
+
       const html = data.messages.map(m => Sessions.renderMessage(m)).join('');
       container.insertAdjacentHTML('beforeend', html);
 
-      const countEl = document.getElementById('session-count');
-      if (countEl) countEl.textContent = `Showing ${state.offset} of ${state.total} messages`;
+      Sessions.updateMessageCount();
 
       // Remove old load-more button
       const oldBtn = document.getElementById('load-more-btn');
@@ -331,6 +392,7 @@ const Sessions = {
   renderMessage(msg) {
     const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
     let bodyHtml = '';
+    const hasText = msg.content.some(b => b.type === 'text' && b.text && b.text.trim());
 
     for (const block of msg.content) {
       if (block.type === 'text') {
@@ -362,9 +424,9 @@ const Sessions = {
     }
 
     return `
-      <div class="chat-msg ${msg.role}">
+      <div class="chat-msg ${msg.role}${hasText ? '' : ' chat-msg-tools-only'}">
         <div class="chat-role ${msg.role}">
-          ${msg.role === 'user' ? 'You' : 'Claude'}
+          <span class="chat-role-label">${msg.role === 'user' ? 'You' : 'Claude'}</span>
           ${msg.model && msg.role === 'assistant' ? `<span class="chat-model">${escapeHtml(shortModel(msg.model))}</span>` : ''}
           <span class="chat-time">${time}</span>
         </div>
@@ -404,6 +466,7 @@ const Sessions = {
     const container = document.getElementById('session-messages');
     const countEl = document.getElementById('session-detail-search-count');
     const messages = container.querySelectorAll('.chat-msg');
+    const showTools = Sessions.showToolDetails();
 
     // Remove any existing highlights
     container.querySelectorAll('mark.search-highlight').forEach(m => {
@@ -423,11 +486,28 @@ const Sessions = {
     let totalMatches = 0;
 
     messages.forEach(msg => {
-      const text = msg.textContent.toLowerCase();
+      // When tools are hidden, tool-only messages are invisible — skip them.
+      if (!showTools && msg.classList.contains('chat-msg-tools-only')) {
+        msg.style.display = '';
+        return;
+      }
+      // When tools are hidden, search only the visible chat-text blocks.
+      let text;
+      if (showTools) {
+        text = msg.textContent.toLowerCase();
+      } else {
+        text = Array.from(msg.querySelectorAll('.chat-text'))
+          .map(n => n.textContent).join(' ').toLowerCase();
+      }
       if (text.includes(qLower)) {
         msg.style.display = '';
         matchedMessages++;
-        totalMatches += Sessions.highlightInNode(msg, query);
+        const scope = showTools ? msg : msg.querySelectorAll('.chat-text');
+        if (showTools) {
+          totalMatches += Sessions.highlightInNode(msg, query);
+        } else {
+          scope.forEach(n => { totalMatches += Sessions.highlightInNode(n, query); });
+        }
       } else {
         msg.style.display = 'none';
       }
@@ -483,7 +563,8 @@ const Sessions = {
     }
   },
 
-  async newSession(slug) {
+  async newSessionOS(slug) {
+    document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
     try {
       await Sessions.checkPricing();
       await api(`/api/projects/${slug}/sessions/new`, { method: 'POST' });
@@ -493,7 +574,20 @@ const Sessions = {
     }
   },
 
-  async resume(slug, sessionId) {
+  async newSessionBrowser(slug) {
+    document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
+    try {
+      await Sessions.checkPricing();
+    } catch (_) { /* non-fatal */ }
+    if (typeof TerminalModal === 'undefined') {
+      toast('Terminal libraries not loaded', 'error');
+      return;
+    }
+    TerminalModal.open(slug, '', 'New session');
+  },
+
+  async resumeOS(slug, sessionId) {
+    document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
     try {
       await Sessions.checkPricing();
       await api(`/api/projects/${slug}/sessions/${sessionId}/resume`, { method: 'POST' });
@@ -507,11 +601,22 @@ const Sessions = {
     }
   },
 
+  async resumeBrowser(slug, sessionId) {
+    document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
+    try {
+      await Sessions.checkPricing();
+    } catch (_) { /* non-fatal */ }
+    if (typeof TerminalPanel !== 'undefined') TerminalPanel.setAutoOpen(true);
+    const cached = Sessions.cache[slug] || [];
+    const info = cached.find(s => s.sessionId === sessionId);
+    App.navigate('session-detail', { slug, sessionId, sessionInfo: info });
+  },
+
   resumeFromMenu() {
     document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
     const { slug, sessionId } = Sessions.detailState;
     if (!slug || !sessionId) return;
-    Sessions.resume(slug, sessionId);
+    Sessions.resumeOS(slug, sessionId);
   },
 
   toggleActionMenu(btn) {
@@ -582,7 +687,7 @@ const Sessions = {
     }
     if (Sessions.detailState.slug === slug && Sessions.detailState.sessionId === sessionId) {
       const el = document.getElementById('session-detail-title');
-      if (el) el.textContent = title;
+      if (el) { el.textContent = title; el.title = title; }
     }
     document.querySelectorAll(`.session-card[data-session-id="${sessionId}"] .session-summary`).forEach(el => {
       el.textContent = title;

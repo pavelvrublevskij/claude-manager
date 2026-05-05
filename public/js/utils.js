@@ -176,7 +176,7 @@ function fmtTokens(n) {
 function renderSessionBadges(s, opts = {}) {
   const parts = [];
   if (s.messageCount != null) {
-    parts.push(`<div class="meta-item">Messages <span class="meta-value">${s.messageCount}</span></div>`);
+    parts.push(`<div class="meta-item" title="User messages (prompts you sent)">Messages <span class="meta-value">${s.messageCount}</span></div>`);
   }
   if (s.tokens) {
     const total = (s.tokens.input_tokens || 0) + (s.tokens.output_tokens || 0);
@@ -245,10 +245,11 @@ function renderSessionCard(s, opts = {}) {
         <div class="meta-item">Modified <span class="meta-value">${s.modified ? new Date(s.modified).toLocaleString() : '—'}</span></div>` : ''}
         ${renderSessionBadges(s, { sidechain: opts.sidechain })}
         <div class="session-actions">
-          ${window.__docker ? '' : `<button class="btn btn-sm btn-primary session-resume-btn" onclick="event.stopPropagation(); Sessions.resume('${slug}', '${s.sessionId}')">Resume</button>`}
           <div class="action-menu">
             <button class="btn btn-sm action-menu-btn" onclick="event.stopPropagation(); Sessions.toggleActionMenu(this)" aria-label="More actions">&#8942;</button>
             <div class="action-menu-panel">
+              ${window.__docker ? '' : `<button class="action-menu-item" onclick="event.stopPropagation(); Sessions.resumeOS('${slug}', '${s.sessionId}')">Resume in OS terminal</button>
+              <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.resumeBrowser('${slug}', '${s.sessionId}')">Resume in browser terminal</button>`}
               <button class="action-menu-item" data-slug="${slug}" data-session="${s.sessionId}" data-title="${escapeHtml(s.summary || s.firstPrompt || '')}" onclick="event.stopPropagation(); Sessions.renameAction(this)">Rename</button>
               <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.copyIdAction('${s.sessionId}')">Copy session ID</button>
             </div>

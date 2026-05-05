@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFile, spawn } = require('child_process');
 const { safeSlug, wrapRoute, backup } = require('../lib/file-helpers');
-const { getProjectUsageMap } = require('../lib/usage-index');
+const { getProjectUsageMap, getSessionUsage } = require('../lib/usage-index');
 const { decodeSlug } = require('../lib/slug');
 const { getCustomTitle } = require('../lib/session-title');
 const { collectBranches } = require('../lib/session-branches');
@@ -326,10 +326,25 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
 
   const lines = fs.readFileSync(filePath, 'utf-8').split('\n').filter(Boolean);
   const messages = [];
+  let isSidechain = false;
+  let userMessageCount = 0;
+  let firstPrompt = '';
+  let indexSummary = '';
 
   for (const line of lines) {
     try {
       const entry = JSON.parse(line);
+      if (entry.isSidechain) isSidechain = true;
+      if (entry.type === 'summary' && entry.summary) indexSummary = entry.summary;
+      if (entry.type === 'user') userMessageCount++;
+      if (entry.type === 'user' && !firstPrompt) {
+        const c = entry.message?.content;
+        if (typeof c === 'string' && c.trim()) firstPrompt = c.slice(0, 200);
+        else if (Array.isArray(c)) {
+          const tb = c.find(b => b.type === 'text' && b.text?.trim());
+          if (tb) firstPrompt = tb.text.slice(0, 200);
+        }
+      }
       if (entry.type === 'user' || entry.type === 'assistant') {
         const msg = {
           role: entry.type,
@@ -381,7 +396,26 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
   const offset = parseInt(req.query.offset) || 0;
   const limit = parseInt(req.query.limit) || 20;
   const page = messages.slice(offset, offset + limit);
-  res.json({ messages: page, total: messages.length, hasMore: offset + limit < messages.length });
+
+  const gitBranches = collectBranches(filePath);
+  const lastGitBranch = gitBranches.length ? gitBranches[gitBranches.length - 1] : '';
+  const usage = getSessionUsage(req.params.slug, sessionId);
+  const customTitle = getCustomTitle(filePath);
+  const stats = {
+    messageCount: userMessageCount,
+    summary: customTitle || indexSummary || firstPrompt.slice(0, 80) || '',
+    firstPrompt,
+    gitBranches,
+    lastGitBranch,
+    isSidechain
+  };
+  if (usage) {
+    stats.tokens = usage.totals;
+    stats.cost = (usage.cost && typeof usage.cost.total === 'number') ? usage.cost.total : 0;
+    stats.models = Object.keys(usage.byModel || {});
+  }
+
+  res.json({ messages: page, total: messages.length, hasMore: offset + limit < messages.length, stats });
 }));
 
 router.post('/:slug/sessions/new', wrapRoute((req, res) => {
