@@ -4,26 +4,53 @@ const Usage = {
   currentProjects: new Map(),
   fromDate: null,
   toDate: null,
-  datePreset: 'all',
+  datePreset: 'month',
   allModels: [],
   allProjects: [],
   searchTerms: { models: '', projects: '' },
   openDropdown: null,
+  viewMode: 'charts',
 
   async load() {
     Usage.currentModels = new Set();
     Usage.currentProjects = new Map();
-    Usage.fromDate = null;
-    Usage.toDate = null;
-    Usage.datePreset = 'all';
     Usage.currentGroup = 'month';
     Usage.searchTerms = { models: '', projects: '' };
-    const presetEl = document.getElementById('filter-date-preset');
-    if (presetEl) presetEl.value = 'all';
-    document.getElementById('filter-from').value = '';
-    document.getElementById('filter-to').value = '';
+    Usage.applyDatePresetState('month');
+    const savedMode = localStorage.getItem('usage-view-mode') || 'charts';
+    Usage.setViewMode(savedMode, { silent: true });
     Usage.bindOutsideClick();
     await Usage.refresh();
+  },
+
+  applyDatePresetState(preset) {
+    Usage.datePreset = preset;
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const fmt = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    if (preset === 'all') { Usage.fromDate = null; Usage.toDate = null; }
+    else if (preset === '7d') { const f = new Date(now); f.setDate(f.getDate() - 6); Usage.fromDate = fmt(f); Usage.toDate = fmt(now); }
+    else if (preset === '30d') { const f = new Date(now); f.setDate(f.getDate() - 29); Usage.fromDate = fmt(f); Usage.toDate = fmt(now); }
+    else if (preset === 'month') { Usage.fromDate = fmt(new Date(now.getFullYear(), now.getMonth(), 1)); Usage.toDate = fmt(now); }
+    else if (preset === 'year') { Usage.fromDate = fmt(new Date(now.getFullYear(), 0, 1)); Usage.toDate = fmt(now); }
+    const presetEl = document.getElementById('filter-date-preset');
+    if (presetEl) presetEl.value = preset;
+    document.getElementById('filter-from').value = Usage.fromDate || '';
+    document.getElementById('filter-to').value = Usage.toDate || '';
+  },
+
+  setViewMode(mode, opts) {
+    if (mode !== 'charts' && mode !== 'tables') mode = 'charts';
+    Usage.viewMode = mode;
+    if (!opts || !opts.silent) localStorage.setItem('usage-view-mode', mode);
+    const view = document.getElementById('view-usage');
+    if (view) view.dataset.viewMode = mode;
+    document.querySelectorAll('#usage-view-toggle .view-toggle-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.mode === mode);
+    });
+    if (mode === 'charts' && typeof UsageCharts !== 'undefined' && UsageCharts.lastData) {
+      UsageCharts.rerenderForTheme();
+    }
   },
 
   basename(p) {
@@ -49,8 +76,9 @@ const Usage = {
     document.getElementById('usage-periods').innerHTML = '';
     document.getElementById('usage-projects').innerHTML = '';
 
-    document.querySelectorAll('#usage-period-tabs .tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('#usage-period-tabs .tab-btn[data-group="' + Usage.currentGroup + '"]').classList.add('active');
+    document.querySelectorAll('#usage-period-tabs .tab-btn, #usage-period-tabs-chart .tab-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.group === Usage.currentGroup);
+    });
 
     const q = Usage.buildQuery();
 
@@ -68,6 +96,9 @@ const Usage = {
       Usage.renderPricing(summary.modelPricing, summary.byModel, summary.pricingUpdated, summary.pricingSource);
       Usage.renderPeriods(periods.periods);
       Usage.renderProjects(projects.projects);
+      if (typeof UsageCharts !== 'undefined') {
+        UsageCharts.render(summary, periods.periods, projects.projects);
+      }
       Usage.renderTriggerLabels();
       Usage.renderDropdownList('models');
       Usage.renderDropdownList('projects');
@@ -79,8 +110,9 @@ const Usage = {
 
   async setGroup(group, btn) {
     Usage.currentGroup = group;
-    document.querySelectorAll('#usage-period-tabs .tab-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+    document.querySelectorAll('#usage-period-tabs .tab-btn, #usage-period-tabs-chart .tab-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.group === group);
+    });
     const viewBody = document.querySelector('#view-usage .view-body');
     const scrollTop = viewBody ? viewBody.scrollTop : 0;
     showLoading('usage-periods');
@@ -88,6 +120,10 @@ const Usage = {
     try {
       const data = await api('/api/usage/by-period?group=' + group + q);
       Usage.renderPeriods(data.periods);
+      if (typeof UsageCharts !== 'undefined') {
+        UsageCharts.renderPeriod(data.periods, UsageCharts.palette());
+        if (UsageCharts.lastData) UsageCharts.lastData.periods = data.periods;
+      }
       if (viewBody) viewBody.scrollTop = scrollTop;
     } catch (e) {
       toast('Could not load period data: ' + e.message, 'error');
@@ -204,29 +240,9 @@ const Usage = {
   },
 
   setDatePreset(preset) {
-    Usage.datePreset = preset;
-    const now = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    const fmt = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-    if (preset === 'all') {
-      Usage.fromDate = null;
-      Usage.toDate = null;
-    } else if (preset === '7d') {
-      const from = new Date(now); from.setDate(from.getDate() - 6);
-      Usage.fromDate = fmt(from); Usage.toDate = fmt(now);
-    } else if (preset === '30d') {
-      const from = new Date(now); from.setDate(from.getDate() - 29);
-      Usage.fromDate = fmt(from); Usage.toDate = fmt(now);
-    } else if (preset === 'month') {
-      const from = new Date(now.getFullYear(), now.getMonth(), 1);
-      Usage.fromDate = fmt(from); Usage.toDate = fmt(now);
-    } else if (preset === 'year') {
-      const from = new Date(now.getFullYear(), 0, 1);
-      Usage.fromDate = fmt(from); Usage.toDate = fmt(now);
-    }
-    document.getElementById('filter-from').value = Usage.fromDate || '';
-    document.getElementById('filter-to').value = Usage.toDate || '';
-    if (preset !== 'custom') Usage.refresh();
+    if (preset === 'custom') { Usage.datePreset = 'custom'; return; }
+    Usage.applyDatePresetState(preset);
+    Usage.refresh();
   },
 
   applyCustomDates() {
@@ -242,13 +258,8 @@ const Usage = {
   clearFilters() {
     Usage.currentModels = new Set();
     Usage.currentProjects = new Map();
-    Usage.fromDate = null;
-    Usage.toDate = null;
-    Usage.datePreset = 'all';
     Usage.searchTerms = { models: '', projects: '' };
-    document.getElementById('filter-date-preset').value = 'all';
-    document.getElementById('filter-from').value = '';
-    document.getElementById('filter-to').value = '';
+    Usage.applyDatePresetState('month');
     Usage.refresh();
   },
 

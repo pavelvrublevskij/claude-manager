@@ -106,7 +106,17 @@
         <div class="view-header">
           <div style="display:flex;align-items:center;justify-content:space-between">
             <h2>Token Usage</h2>
-            <button class="btn btn-sm" onclick="Usage.refresh()">Refresh</button>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="view-toggle" id="usage-view-toggle" role="tablist" aria-label="View mode">
+                <button class="view-toggle-btn active" data-mode="charts" onclick="Usage.setViewMode('charts')" title="Charts view">
+                  <span class="view-toggle-icon">&#9930;</span> Charts
+                </button>
+                <button class="view-toggle-btn" data-mode="tables" onclick="Usage.setViewMode('tables')" title="Tables view">
+                  <span class="view-toggle-icon">&#8801;</span> Tables
+                </button>
+              </div>
+              <button class="btn btn-sm" onclick="Usage.refresh()">Refresh</button>
+            </div>
           </div>
           <div class="subtitle">Aggregated token consumption and estimated costs</div>
         </div>
@@ -144,7 +154,7 @@
                 <option value="all">All time</option>
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
-                <option value="month">This month</option>
+                <option value="month" selected>This month</option>
                 <option value="year">This year</option>
                 <option value="custom">Custom range</option>
               </select>
@@ -160,6 +170,40 @@
             <button class="btn btn-sm filter-clear-all" onclick="Usage.clearFilters()">Clear all</button>
           </div>
           <div class="dashboard-stats" id="usage-summary"></div>
+
+          <div class="charts-grid" id="usage-charts-grid">
+            <div class="chart-card chart-card-wide">
+              <div class="chart-card-header">
+                <h3 class="chart-card-title">Cost &amp; Tokens over Time</h3>
+                <div class="tab-bar tab-bar-mini" id="usage-period-tabs-chart">
+                  <button class="tab-btn" data-group="day" onclick="Usage.setGroup('day', this)">Day</button>
+                  <button class="tab-btn" data-group="week" onclick="Usage.setGroup('week', this)">Week</button>
+                  <button class="tab-btn active" data-group="month" onclick="Usage.setGroup('month', this)">Month</button>
+                  <button class="tab-btn" data-group="year" onclick="Usage.setGroup('year', this)">Year</button>
+                </div>
+              </div>
+              <div class="chart-canvas-wrap"><canvas id="chart-period"></canvas></div>
+              <div class="chart-empty" id="chart-period-empty" hidden>No data for the current filters.</div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <h3 class="chart-card-title">Cost by Model</h3>
+                <span class="chart-card-sub" id="chart-models-total"></span>
+              </div>
+              <div class="chart-canvas-wrap chart-canvas-doughnut"><canvas id="chart-models"></canvas></div>
+              <div class="chart-empty" id="chart-models-empty" hidden>No model usage.</div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <h3 class="chart-card-title">Top Projects by Cost</h3>
+                <span class="chart-card-sub" id="chart-projects-sub"></span>
+              </div>
+              <div class="chart-canvas-wrap"><canvas id="chart-projects"></canvas></div>
+              <div class="chart-empty" id="chart-projects-empty" hidden>No project usage.</div>
+            </div>
+          </div>
+
+          <div class="usage-tables-section">
           <h3 style="margin:24px 0 12px">Your Usage by Model</h3>
           <div id="usage-by-model"></div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin:24px 0 12px">
@@ -181,6 +225,7 @@
           <div id="usage-periods" style="margin-top:12px"></div>
           <h3 style="margin:24px 0 12px">Usage by Project</h3>
           <div id="usage-projects"></div>
+          </div>
         </div>
       </div>
 
@@ -544,6 +589,7 @@
   <div class="toast-container" id="toast-container"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="/js/utils.js"></script>
   <script src="/js/modal.js"></script>
   <script src="/js/dashboard.js"></script>
@@ -559,6 +605,7 @@
   <script src="/js/output-styles.js"></script>
   <script src="/js/plugins.js"></script>
   <script src="/js/usage.js"></script>
+  <script src="/js/usage-charts.js"></script>
   <script src="/js/manager-settings.js"></script>
   <script src="/js/app.js"></script>
 </body>

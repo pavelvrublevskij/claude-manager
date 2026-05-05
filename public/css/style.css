@@ -948,6 +948,18 @@ mark.search-highlight {
   padding: 2px 8px;
   border-radius: 10px;
 }
+.session-branch-arrow {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1;
+  align-self: center;
+  margin: 0 -2px;
+}
+.session-branch-more {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  cursor: help;
+}
 
 .session-id-badge {
   font-family: var(--font-mono);
@@ -1782,4 +1794,141 @@ mark.search-highlight {
   text-align: center;
   font-size: 12px;
   color: var(--text-muted);
+}
+
+/* --- Usage view: chart/table view toggle --- */
+
+.view-toggle {
+  display: inline-flex;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px;
+  gap: 2px;
+}
+.view-toggle-btn {
+  padding: 5px 12px;
+  background: transparent;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.view-toggle-btn:hover {
+  color: var(--text-primary);
+}
+.view-toggle-btn.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.view-toggle-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* When charts mode is on, hide tables; when tables mode, hide charts */
+#view-usage[data-view-mode="charts"] .usage-tables-section { display: none; }
+#view-usage[data-view-mode="tables"] .charts-grid { display: none; }
+
+/* Hide the duplicate period tab-bar inside the chart card when in tables mode,
+   and hide the original tab-bar above the periods table when in charts mode. */
+#view-usage[data-view-mode="charts"] #usage-period-tabs { display: none; }
+
+/* --- Charts grid --- */
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 20px 0 8px;
+}
+.chart-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px 18px;
+  position: relative;
+  overflow: hidden;
+}
+.chart-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at top right, var(--accent-bg), transparent 60%);
+  opacity: 0.6;
+}
+.chart-card-wide {
+  grid-column: 1 / -1;
+}
+.chart-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  position: relative;
+  z-index: 1;
+}
+.chart-card-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.2px;
+}
+.chart-card-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.chart-canvas-wrap {
+  position: relative;
+  height: 320px;
+  z-index: 1;
+}
+.chart-canvas-wrap canvas {
+  max-width: 100%;
+}
+.chart-canvas-doughnut {
+  height: 280px;
+}
+.chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+.chart-card .chart-canvas-wrap[hidden] + .chart-empty,
+.chart-card .chart-empty:not([hidden]) {
+  position: relative;
+  inset: auto;
+  height: 200px;
+}
+
+.tab-bar-mini .tab-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: var(--radius-sm);
+  border-bottom: 1px solid var(--border);
+}
+.tab-bar-mini .tab-btn.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+@media (max-width: 1100px) {
+  .charts-grid { grid-template-columns: 1fr; }
 }

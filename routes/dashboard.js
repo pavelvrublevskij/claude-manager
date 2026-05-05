@@ -6,6 +6,7 @@ const { readJson, wrapRoute } = require('../lib/file-helpers');
 const { decodeSlug } = require('../lib/slug');
 const { buildIndex, calcCostMultiModel } = require('../lib/usage-index');
 const { getCustomTitle } = require('../lib/session-title');
+const { collectBranches } = require('../lib/session-branches');
 
 /** Gather dashboard stats and recent sessions across all projects. */
 router.get('/', wrapRoute(async (req, res) => {
@@ -34,7 +35,9 @@ router.get('/', wrapRoute(async (req, res) => {
         const entries = (data.entries || []).filter(e => e.messageCount > 0);
         totalSessions += entries.length;
         for (const e of entries) {
-          const custom = getCustomTitle(path.join(projectDir, e.sessionId + '.jsonl'));
+          const filePath = path.join(projectDir, e.sessionId + '.jsonl');
+          const custom = getCustomTitle(filePath);
+          const gitBranches = collectBranches(filePath);
           recentSessions.push({
             slug,
             projectName: decodedPath,
@@ -44,7 +47,9 @@ router.get('/', wrapRoute(async (req, res) => {
             messageCount: e.messageCount || 0,
             created: e.created || null,
             modified: e.modified || null,
-            gitBranch: e.gitBranch || ''
+            gitBranch: e.gitBranch || (gitBranches[0] || ''),
+            lastGitBranch: gitBranches[gitBranches.length - 1] || '',
+            gitBranches
           });
         }
       } catch (_) { /* malformed index */ }
@@ -59,7 +64,9 @@ router.get('/', wrapRoute(async (req, res) => {
           const stat = fs.statSync(filePath);
           try {
             const lines = fs.readFileSync(filePath, 'utf-8').split('\n').filter(Boolean);
-            let firstPrompt = '', created = null, gitBranch = '', msgCount = 0, customTitle = '';
+            let firstPrompt = '', created = null, gitBranch = '', lastGitBranch = '', msgCount = 0, customTitle = '';
+            const gitBranches = [];
+            const branchSeen = new Set();
             for (const line of lines) {
               try {
                 const entry = JSON.parse(line);
@@ -71,6 +78,13 @@ router.get('/', wrapRoute(async (req, res) => {
                     firstPrompt = typeof entry.message?.content === 'string' ? entry.message.content.slice(0, 200) : '';
                     created = entry.timestamp || stat.birthtime.toISOString();
                     gitBranch = entry.gitBranch || '';
+                  }
+                  if (entry.gitBranch) {
+                    lastGitBranch = entry.gitBranch;
+                    if (!branchSeen.has(entry.gitBranch)) {
+                      branchSeen.add(entry.gitBranch);
+                      gitBranches.push(entry.gitBranch);
+                    }
                   }
                 }
               } catch (_) { /* malformed line */ }
@@ -85,7 +99,9 @@ router.get('/', wrapRoute(async (req, res) => {
                 messageCount: msgCount,
                 created,
                 modified: stat.mtime.toISOString(),
-                gitBranch
+                gitBranch,
+                lastGitBranch,
+                gitBranches
               });
             }
           } catch (_) { /* unreadable file */ }

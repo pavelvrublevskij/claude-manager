@@ -8,6 +8,7 @@ const { app, paths } = require('./helpers/app');
 const SLUG = 'sessions-test-proj';
 const SESSION_A = '11111111-1111-1111-1111-111111111111';
 const SESSION_B = '22222222-2222-2222-2222-222222222222';
+const SESSION_C = '33333333-3333-3333-3333-333333333333';
 const PROJECT_DIR = path.join(paths.PROJECTS_DIR, SLUG);
 
 function writeJsonl(filePath, entries) {
@@ -61,6 +62,33 @@ before(() => {
     }
   ]);
 
+  writeJsonl(path.join(PROJECT_DIR, SESSION_C + '.jsonl'), [
+    {
+      type: 'user', uuid: 'c1', parentUuid: null,
+      timestamp: '2026-03-01T08:00:00.000Z',
+      gitBranch: 'main',
+      message: { content: 'Start work on main' }
+    },
+    {
+      type: 'user', uuid: 'c2', parentUuid: 'c1',
+      timestamp: '2026-03-01T08:30:00.000Z',
+      gitBranch: 'feature/x',
+      message: { content: 'Switched to feature' }
+    },
+    {
+      type: 'user', uuid: 'c3', parentUuid: 'c2',
+      timestamp: '2026-03-01T09:00:00.000Z',
+      gitBranch: 'main',
+      message: { content: 'Back to main' }
+    },
+    {
+      type: 'user', uuid: 'c4', parentUuid: 'c3',
+      timestamp: '2026-03-01T09:30:00.000Z',
+      gitBranch: 'bugfix/y',
+      message: { content: 'Hotfix branch' }
+    }
+  ]);
+
   writeJsonl(path.join(PROJECT_DIR, SESSION_B + '.jsonl'), [
     {
       type: 'user',
@@ -84,9 +112,9 @@ test('GET /api/projects/:slug/sessions returns array with expected fields', asyn
   const res = await request(app).get(`/api/projects/${SLUG}/sessions`);
   assert.strictEqual(res.status, 200);
   assert.ok(Array.isArray(res.body));
-  assert.ok(res.body.length >= 2);
+  assert.ok(res.body.length >= 3);
   const ids = res.body.map(s => s.sessionId).sort();
-  assert.deepStrictEqual(ids, [SESSION_A, SESSION_B].sort());
+  assert.deepStrictEqual(ids, [SESSION_A, SESSION_B, SESSION_C].sort());
   const a = res.body.find(s => s.sessionId === SESSION_A);
   assert.strictEqual(a.messageCount, 3);
   assert.strictEqual(a.gitBranch, 'main');
@@ -98,8 +126,22 @@ test('GET /api/projects/:slug/sessions returns array with expected fields', asyn
 test('GET /api/projects/:slug/sessions sorts by modified descending', async () => {
   const res = await request(app).get(`/api/projects/${SLUG}/sessions`);
   assert.strictEqual(res.status, 200);
-  assert.strictEqual(res.body[0].sessionId, SESSION_B);
-  assert.strictEqual(res.body[1].sessionId, SESSION_A);
+  assert.strictEqual(res.body[0].sessionId, SESSION_C);
+  assert.strictEqual(res.body[1].sessionId, SESSION_B);
+  assert.strictEqual(res.body[2].sessionId, SESSION_A);
+});
+
+test('GET /api/projects/:slug/sessions includes ordered distinct gitBranches', async () => {
+  const res = await request(app).get(`/api/projects/${SLUG}/sessions`);
+  assert.strictEqual(res.status, 200);
+  const c = res.body.find(s => s.sessionId === SESSION_C);
+  assert.ok(c, 'session C present');
+  assert.deepStrictEqual(c.gitBranches, ['main', 'feature/x', 'bugfix/y'],
+    'gitBranches should be distinct in first-seen order');
+  const a = res.body.find(s => s.sessionId === SESSION_A);
+  assert.deepStrictEqual(a.gitBranches, ['main']);
+  const b = res.body.find(s => s.sessionId === SESSION_B);
+  assert.deepStrictEqual(b.gitBranches, ['feature']);
 });
 
 test('GET /api/projects/:slug/sessions with invalid slug returns 400', async () => {

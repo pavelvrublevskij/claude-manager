@@ -6,6 +6,7 @@ const { safeSlug, wrapRoute, backup } = require('../lib/file-helpers');
 const { getProjectUsageMap } = require('../lib/usage-index');
 const { decodeSlug } = require('../lib/slug');
 const { getCustomTitle } = require('../lib/session-title');
+const { collectBranches } = require('../lib/session-branches');
 
 const router = express.Router({ mergeParams: true });
 
@@ -52,11 +53,18 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
         created: e.created || null,
         modified: e.modified || null,
         gitBranch: e.gitBranch || '',
+        gitBranches: [],
         isSidechain: e.isSidechain || false
       }));
       sessions.forEach(s => {
-        const custom = getCustomTitle(path.join(dir, s.sessionId + '.jsonl'));
+        const filePath = path.join(dir, s.sessionId + '.jsonl');
+        const custom = getCustomTitle(filePath);
         if (custom) s.summary = custom;
+        s.gitBranches = collectBranches(filePath);
+        if (s.gitBranches.length) {
+          if (!s.gitBranch) s.gitBranch = s.gitBranches[0];
+          s.lastGitBranch = s.gitBranches[s.gitBranches.length - 1];
+        }
       });
       const usageMap = getProjectUsageMap(req.params.slug);
       sessions.forEach(s => {
@@ -82,12 +90,14 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
       modified: null,
       gitBranch: '',
       lastGitBranch: '',
+      gitBranches: [],
       isSidechain: false
     };
 
     try {
       const lines = fs.readFileSync(filePath, 'utf-8').split('\n').filter(Boolean);
       let userMessages = 0;
+      const branchSeen = new Set();
       for (const line of lines) {
         try {
           const entry = JSON.parse(line);
@@ -102,7 +112,13 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
               session.created = entry.timestamp || stat.birthtime.toISOString();
               session.gitBranch = entry.gitBranch || '';
             }
-            if (entry.gitBranch) session.lastGitBranch = entry.gitBranch;
+            if (entry.gitBranch) {
+              session.lastGitBranch = entry.gitBranch;
+              if (!branchSeen.has(entry.gitBranch)) {
+                branchSeen.add(entry.gitBranch);
+                session.gitBranches.push(entry.gitBranch);
+              }
+            }
             session.modified = entry.timestamp || stat.mtime.toISOString();
           }
         } catch (_) { /* malformed JSONL line, skip */ }
@@ -165,6 +181,8 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
     let modified = null;
     let gitBranch = '';
     let lastGitBranch = '';
+    const gitBranches = [];
+    const branchSeen = new Set();
     let customTitle = '';
 
     try {
@@ -186,7 +204,13 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
               created = entry.timestamp;
               gitBranch = entry.gitBranch || '';
             }
-            if (entry.gitBranch) lastGitBranch = entry.gitBranch;
+            if (entry.gitBranch) {
+              lastGitBranch = entry.gitBranch;
+              if (!branchSeen.has(entry.gitBranch)) {
+                branchSeen.add(entry.gitBranch);
+                gitBranches.push(entry.gitBranch);
+              }
+            }
             modified = entry.timestamp;
           }
 
@@ -262,6 +286,7 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
       modified: meta?.modified || modified,
       gitBranch: meta?.gitBranch || gitBranch,
       lastGitBranch: meta?.lastGitBranch || lastGitBranch,
+      gitBranches,
       isSidechain: meta?.isSidechain || false,
       snippets
     };

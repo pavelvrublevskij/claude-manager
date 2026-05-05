@@ -1,3 +1,21 @@
+## v0.6.0
+
+### Token Usage Charts
+- New **Charts** view in Token Usage — visual companion to the existing tables. Toggle between **Charts** and **Tables** in the view header; preference is saved in `localStorage`
+- **Cost & Tokens over Time** — stacked bar chart for token components (input, output, cache write, cache read) with a smooth cost line on a secondary axis. Reuses the Day/Week/Month/Year selector
+- **Cost by Model** — doughnut chart with per-model share, total cost in the card header
+- **Top Projects by Cost** — horizontal bar chart of the top 10 spenders, with rich tooltips (cost, sessions, input/output)
+- All charts respect the same filters as the table view (Models, Projects, Period)
+- Theme-aware: charts re-render automatically when switching dark/light/matrix/default themes
+- Powered by Chart.js (loaded via CDN, no build step)
+
+### Performance
+- **Default Period is now "This month"** (was "All time") — initial load aggregates a much smaller slice for users with long histories. **Clear all** also resets to "This month"
+
+### Sessions
+- Session cards now show **every branch the session touched**, not just the first and last. Branches are displayed as a chain (`main → feature/x → hotfix/y`) in chronological first-seen order, deduplicated. Lists with many switches collapse to first 3 + `+N` with the full chain available on hover
+- New `gitBranches` field on the sessions list, search, and dashboard recents APIs; `gitBranch`/`lastGitBranch` retained for back-compat
+
 ## v0.5.3
 
 ### Session ID

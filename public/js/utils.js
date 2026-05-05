@@ -188,11 +188,24 @@ function renderSessionBadges(s, opts = {}) {
   (s.models || []).forEach(m => {
     parts.push(`<span class="token-badge badge-model">${escapeHtml(shortModel(m))}</span>`);
   });
-  if (s.gitBranch) {
-    parts.push(`<span class="session-branch">${escapeHtml(s.gitBranch)}</span>`);
+  let branches = Array.isArray(s.gitBranches) ? s.gitBranches.filter(Boolean) : [];
+  if (!branches.length) {
+    const fallback = [s.gitBranch, s.lastGitBranch].filter(Boolean);
+    branches = Array.from(new Set(fallback));
   }
-  if (opts.sidechain && s.lastGitBranch && s.lastGitBranch !== s.gitBranch) {
-    parts.push(`<span class="session-branch" style="opacity:0.7">&#8594; ${escapeHtml(s.lastGitBranch)}</span>`);
+  if (branches.length) {
+    const MAX = 3;
+    const visible = branches.slice(0, MAX);
+    const hiddenCount = branches.length - visible.length;
+    visible.forEach((b, i) => {
+      if (i > 0) parts.push('<span class="session-branch-arrow">&#8594;</span>');
+      parts.push(`<span class="session-branch">${escapeHtml(b)}</span>`);
+    });
+    if (hiddenCount > 0) {
+      const titleAttr = escapeHtml(branches.join(' → '));
+      parts.push(`<span class="session-branch-arrow">&#8594;</span>`);
+      parts.push(`<span class="session-branch session-branch-more" title="${titleAttr}">+${hiddenCount}</span>`);
+    }
   }
   if (opts.sidechain && s.isSidechain) {
     parts.push('<span class="session-sidechain">sidechain</span>');
