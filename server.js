@@ -131,6 +131,7 @@ app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/projects', require('./routes/sessions'));
+app.use('/api/projects', require('./routes/terminal'));
 app.use('/api/projects', require('./routes/memory'));
 app.use('/api/claude-md', require('./routes/claude-md'));
 app.use('/api/mcp', require('./routes/mcp'));
@@ -147,7 +148,13 @@ app.get('*', (req, res) => {
 });
 
 if (require.main === module) {
-  app.listen(PORT, HOST, () => {
+  const http = require('http');
+  const terminalServer = require('./lib/terminal-server');
+  const server = http.createServer(app);
+  server.on('upgrade', (req, socket, head) => {
+    if (!terminalServer.handleUpgrade(req, socket, head)) socket.destroy();
+  });
+  server.listen(PORT, HOST, () => {
     console.log(`Claude Manager running at http://${HOST}:${PORT}`);
 
     // Auto-fetch pricing on startup if stale (>24h) or missing

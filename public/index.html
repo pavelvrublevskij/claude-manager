@@ -6,6 +6,7 @@
   <title>Claude Manager</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/css/themes/dark.css" id="theme-stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
   <script>
     (function() {
       var t = localStorage.getItem('claude-manager-theme') || 'dark';
@@ -152,6 +153,7 @@
               <label>Period</label>
               <select id="filter-date-preset" onchange="Usage.setDatePreset(this.value)">
                 <option value="all">All time</option>
+                <option value="today">Today</option>
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
                 <option value="month" selected>This month</option>
@@ -414,6 +416,7 @@
               <label>Period</label>
               <select id="proj-filter-date-preset" onchange="ProjectUsage.setDatePreset(this.value)">
                 <option value="all">All time</option>
+                <option value="today">Today</option>
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
                 <option value="month">This month</option>
@@ -513,13 +516,13 @@
               <h2 id="session-detail-title">Session</h2>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-              <button class="btn btn-sm btn-primary" onclick="Sessions.resume(Sessions.detailState.slug, Sessions.detailState.sessionId)">Resume in Terminal</button>
-              <button class="btn btn-sm" onclick="Sessions.loadDetail(Sessions.detailState.slug, Sessions.detailState.sessionId, null)">Refresh</button>
+              <button class="btn btn-sm btn-primary" id="session-terminal-toggle" onclick="TerminalPanel.toggleFromSession()">Open Terminal</button>
               <div class="action-menu">
                 <button class="btn btn-sm action-menu-btn" onclick="event.stopPropagation(); Sessions.toggleActionMenu(this)" aria-label="More actions">&#8942;</button>
                 <div class="action-menu-panel">
                   <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.renameDetail()">Rename</button>
                   <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.copyIdDetail()">Copy session ID</button>
+                  <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.resumeFromMenu()">Resume in OS Terminal</button>
                 </div>
               </div>
             </div>
@@ -537,8 +540,21 @@
             <span id="session-detail-search-count" style="font-size:12px;color:var(--text-muted);white-space:nowrap"></span>
           </div>
         </div>
-        <div class="view-body">
-          <div id="session-messages" class="chat-container"></div>
+        <div class="view-body session-detail-body" id="session-detail-body">
+          <div class="session-messages-pane" id="session-messages-pane">
+            <div id="session-messages" class="chat-container"></div>
+          </div>
+          <div class="terminal-splitter" id="terminal-splitter" hidden onmousedown="TerminalPanel.startDrag(event)"></div>
+          <div class="terminal-pane" id="terminal-pane" hidden>
+            <div class="terminal-pane-header">
+              <span class="terminal-pane-title">Terminal</span>
+              <span class="terminal-pane-status" id="terminal-status">connecting...</span>
+              <div class="terminal-pane-actions">
+                <button class="icon-btn" onclick="TerminalPanel.reconnect()" title="Restart claude in this panel" aria-label="Restart">&#x21bb;</button>
+              </div>
+            </div>
+            <div id="terminal-host" class="terminal-host"></div>
+          </div>
         </div>
         <button class="scroll-to-top" id="scroll-to-top-btn" onclick="Sessions.scrollToTop()" aria-label="Scroll to top" title="Scroll to top">&#8593;</button>
       </div>
@@ -549,26 +565,54 @@
           <h2>Manager Settings</h2>
           <div class="subtitle">Claude Manager configuration</div>
         </div>
-        <div class="view-body">
-          <h3 style="margin:0 0 12px">Pricing Fetch URL</h3>
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:24px">
-            <input type="text" id="pricing-fetch-url" style="flex:1">
-            <button class="btn btn-sm" onclick="ManagerSettings.saveUrl()">Save</button>
-            <button class="btn btn-sm" onclick="ManagerSettings.resetUrl()">Reset Default</button>
+        <div class="view-body settings-body">
+          <nav class="settings-nav" id="settings-nav">
+            <div class="settings-nav-item active" data-section="general">General</div>
+            <div class="settings-nav-item" data-section="pricing-source">Pricing Source</div>
+            <div class="settings-nav-item" data-section="pricing-history">Pricing History</div>
+            <div class="settings-nav-item" data-section="model-pricing">Model Pricing</div>
+          </nav>
+          <div class="settings-content">
+
+            <section class="settings-panel active" data-section="general">
+              <h3>Conversation Refresh Rate</h3>
+              <div class="subtitle" style="margin:0 0 12px">How often the open session view polls for new messages. Minimum 1 second.</div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="number" id="conversation-refresh-rate" min="1" step="1" style="width:120px">
+                <span style="color:var(--text-muted)">seconds</span>
+                <button class="btn btn-sm" onclick="ManagerSettings.saveRefreshRate()">Save</button>
+                <button class="btn btn-sm" onclick="ManagerSettings.resetRefreshRate()">Reset Default (5s)</button>
+              </div>
+            </section>
+
+            <section class="settings-panel" data-section="pricing-source">
+              <h3>Pricing Fetch URL</h3>
+              <div class="subtitle" style="margin:0 0 12px">Where Claude Manager fetches model pricing from.</div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="text" id="pricing-fetch-url" style="flex:1">
+                <button class="btn btn-sm" onclick="ManagerSettings.saveUrl()">Save</button>
+                <button class="btn btn-sm" onclick="ManagerSettings.resetUrl()">Reset Default</button>
+              </div>
+            </section>
+
+            <section class="settings-panel" data-section="pricing-history">
+              <h3 style="margin:0 0 12px">Pricing History</h3>
+              <div id="manager-pricing-history"></div>
+            </section>
+
+            <section class="settings-panel" data-section="model-pricing">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin:0 0 12px">
+                <h3 style="margin:0">Model Pricing</h3>
+                <div style="display:flex;gap:8px">
+                  <button class="btn btn-sm" onclick="ManagerSettings.addModel()">Add Model</button>
+                  <button class="btn btn-sm" onclick="ManagerSettings.updateEntry()">Update Entry</button>
+                  <button class="btn btn-sm btn-primary" onclick="ManagerSettings.savePricing()">Save as New</button>
+                </div>
+              </div>
+              <div id="manager-pricing-table"></div>
+            </section>
+
           </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <h3 style="margin:0">Pricing History</h3>
-          </div>
-          <div id="manager-pricing-history"></div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin:24px 0 12px">
-            <h3 style="margin:0">Model Pricing</h3>
-            <div style="display:flex;gap:8px">
-              <button class="btn btn-sm" onclick="ManagerSettings.addModel()">Add Model</button>
-              <button class="btn btn-sm" onclick="ManagerSettings.updateEntry()">Update Entry</button>
-              <button class="btn btn-sm btn-primary" onclick="ManagerSettings.savePricing()">Save as New</button>
-            </div>
-          </div>
-          <div id="manager-pricing-table"></div>
         </div>
       </div>
 
@@ -586,10 +630,22 @@
     </main>
   </div>
 
+  <footer class="app-footer">
+    <div class="app-footer-left">
+      <span>Claude Manager <span id="footer-version"></span></span>
+    </div>
+    <div class="app-footer-right">
+      <span class="app-footer-status" id="footer-status">Idle</span>
+      <span id="footer-host"></span>
+    </div>
+  </footer>
+
   <div class="toast-container" id="toast-container"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
   <script src="/js/utils.js"></script>
   <script src="/js/modal.js"></script>
   <script src="/js/dashboard.js"></script>
@@ -606,6 +662,7 @@
   <script src="/js/plugins.js"></script>
   <script src="/js/usage.js"></script>
   <script src="/js/usage-charts.js"></script>
+  <script src="/js/terminal.js"></script>
   <script src="/js/manager-settings.js"></script>
   <script src="/js/app.js"></script>
 </body>

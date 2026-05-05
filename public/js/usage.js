@@ -29,6 +29,7 @@ const Usage = {
     const pad = n => String(n).padStart(2, '0');
     const fmt = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
     if (preset === 'all') { Usage.fromDate = null; Usage.toDate = null; }
+    else if (preset === 'today') { Usage.fromDate = fmt(now); Usage.toDate = fmt(now); }
     else if (preset === '7d') { const f = new Date(now); f.setDate(f.getDate() - 6); Usage.fromDate = fmt(f); Usage.toDate = fmt(now); }
     else if (preset === '30d') { const f = new Date(now); f.setDate(f.getDate() - 29); Usage.fromDate = fmt(f); Usage.toDate = fmt(now); }
     else if (preset === 'month') { Usage.fromDate = fmt(new Date(now.getFullYear(), now.getMonth(), 1)); Usage.toDate = fmt(now); }

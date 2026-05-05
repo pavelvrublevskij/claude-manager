@@ -106,11 +106,15 @@ const Sessions = {
   },
 
   open(slug, sessionId, index) {
+    Sessions.stopAutoRefresh();
+    if (typeof TerminalPanel !== 'undefined' && TerminalPanel.isOpen()) TerminalPanel.close();
     const sessions = Sessions.cache[slug] || [];
     App.navigate('session-detail', { slug, sessionId, sessionInfo: sessions[index] });
   },
 
   goBack() {
+    Sessions.stopAutoRefresh();
+    if (typeof TerminalPanel !== 'undefined' && TerminalPanel.isOpen()) TerminalPanel.close();
     const slug = App.currentProject;
     App.navigate('project-detail', { slug });
     const btn = document.getElementById('sessions-tab-btn');
@@ -118,6 +122,33 @@ const Sessions = {
   },
 
   detailState: { slug: null, sessionId: null, offset: 0, loading: false, hasMore: false, total: 0 },
+  REFRESH_INTERVAL_KEY: 'claude-manager-conversation-refresh-ms',
+  REFRESH_INTERVAL_DEFAULT_MS: 5000,
+  REFRESH_INTERVAL_MIN_MS: 1000,
+  CONVERSATION_HIDDEN_KEY: 'claude-manager-conversation-hidden',
+  _refreshTimer: null,
+
+  refreshIntervalMs() {
+    const raw = parseInt(localStorage.getItem(Sessions.REFRESH_INTERVAL_KEY), 10);
+    if (Number.isFinite(raw) && raw >= Sessions.REFRESH_INTERVAL_MIN_MS) return raw;
+    return Sessions.REFRESH_INTERVAL_DEFAULT_MS;
+  },
+
+  setRefreshIntervalMs(ms) {
+    if (!Number.isFinite(ms) || ms < Sessions.REFRESH_INTERVAL_MIN_MS) return false;
+    localStorage.setItem(Sessions.REFRESH_INTERVAL_KEY, String(ms));
+    if (Sessions._refreshTimer && !Sessions.isConversationHidden()) Sessions.startAutoRefresh();
+    return true;
+  },
+
+  isConversationHidden() {
+    return localStorage.getItem(Sessions.CONVERSATION_HIDDEN_KEY) === '1';
+  },
+
+  applyConversationHiddenState() {
+    const body = document.getElementById('session-detail-body');
+    if (body) body.classList.toggle('conversation-hidden', Sessions.isConversationHidden());
+  },
 
   async loadDetail(slug, sessionId, info) {
     const title = document.getElementById('session-detail-title');
@@ -152,30 +183,88 @@ const Sessions = {
 
     await Sessions.loadMore();
     Sessions.setupScroll();
+
+    if (typeof TerminalPanel !== 'undefined' && TerminalPanel.shouldAutoOpen() && !TerminalPanel.isOpen()) {
+      TerminalPanel.open(slug, sessionId);
+    }
+
+    Sessions.applyConversationHiddenState();
+    if (!Sessions.isConversationHidden()) Sessions.startAutoRefresh();
+  },
+
+  startAutoRefresh() {
+    Sessions.stopAutoRefresh();
+    if (Sessions.isConversationHidden()) return;
+    Sessions._refreshTimer = setInterval(() => Sessions.pollNewMessages(), Sessions.refreshIntervalMs());
+    if (typeof setFooterStatus === 'function') {
+      const sec = Math.round(Sessions.refreshIntervalMs() / 1000);
+      setFooterStatus(`Live · refresh ${sec}s`, true);
+    }
+  },
+
+  stopAutoRefresh() {
+    if (Sessions._refreshTimer) { clearInterval(Sessions._refreshTimer); Sessions._refreshTimer = null; }
+    if (typeof setFooterStatus === 'function') setFooterStatus('Idle', false);
+  },
+
+  async pollNewMessages() {
+    const state = Sessions.detailState;
+    if (!state.slug || !state.sessionId) return;
+    if (state.loading) return;
+    if (Sessions.isConversationHidden()) return;
+    if (Sessions._detailSearchQuery) return; // don't disturb active filter
+    const slugAtStart = state.slug;
+    const sessionAtStart = state.sessionId;
+
+    try {
+      const data = await api(`/api/projects/${slugAtStart}/sessions/${sessionAtStart}?offset=0&limit=20`);
+      if (state.slug !== slugAtStart || state.sessionId !== sessionAtStart) return;
+      if (typeof data.total !== 'number' || data.total <= state.total) return;
+
+      const added = data.total - state.total;
+      const newMessages = data.messages.slice(0, added);
+      const html = newMessages.map(m => Sessions.renderMessage(m)).join('');
+
+      const container = document.getElementById('session-messages');
+      if (!container) return;
+      container.insertAdjacentHTML('afterbegin', html);
+
+      state.total = data.total;
+      state.offset += added;
+
+      const countEl = document.getElementById('session-count');
+      if (countEl) countEl.textContent = `Showing ${state.offset} of ${state.total} messages`;
+    } catch (_) { /* silent — transient network error */ }
+  },
+
+  scrollContainer() {
+    return document.getElementById('session-messages-pane')
+      || document.querySelector('#view-session-detail .view-body');
   },
 
   setupScroll() {
-    const viewBody = document.querySelector('#view-session-detail .view-body');
-    if (!viewBody) return;
-    if (Sessions._scrollHandler) {
-      viewBody.removeEventListener('scroll', Sessions._scrollHandler);
+    const scroller = Sessions.scrollContainer();
+    if (!scroller) return;
+    if (Sessions._scrollHandler && Sessions._scrollTarget) {
+      Sessions._scrollTarget.removeEventListener('scroll', Sessions._scrollHandler);
     }
     const topBtn = document.getElementById('scroll-to-top-btn');
     if (topBtn) topBtn.classList.remove('visible');
     Sessions._scrollHandler = () => {
-      const { scrollTop, scrollHeight, clientHeight } = viewBody;
+      const { scrollTop, scrollHeight, clientHeight } = scroller;
       if (topBtn) topBtn.classList.toggle('visible', scrollTop > 400);
       if (Sessions.detailState.loading || !Sessions.detailState.hasMore) return;
       if (scrollTop + clientHeight >= scrollHeight - 300) {
         Sessions.loadMore();
       }
     };
-    viewBody.addEventListener('scroll', Sessions._scrollHandler);
+    Sessions._scrollTarget = scroller;
+    scroller.addEventListener('scroll', Sessions._scrollHandler);
   },
 
   scrollToTop() {
-    const viewBody = document.querySelector('#view-session-detail .view-body');
-    if (viewBody) viewBody.scrollTo({ top: 0, behavior: 'smooth' });
+    const scroller = Sessions.scrollContainer();
+    if (scroller) scroller.scrollTo({ top: 0, behavior: 'smooth' });
   },
 
   async loadMore() {
@@ -412,6 +501,13 @@ const Sessions = {
     } catch (e) {
       toast('Failed to open terminal: ' + e.message, 'error');
     }
+  },
+
+  resumeFromMenu() {
+    document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
+    const { slug, sessionId } = Sessions.detailState;
+    if (!slug || !sessionId) return;
+    Sessions.resume(slug, sessionId);
   },
 
   toggleActionMenu(btn) {

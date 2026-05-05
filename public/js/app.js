@@ -55,6 +55,12 @@ const App = {
   },
 
   navigate(view, opts = {}, fromHash = false) {
+    // Stop auto-refresh + close in-page terminal when leaving session-detail
+    if (App.currentView === 'session-detail' && view !== 'session-detail') {
+      if (typeof Sessions !== 'undefined') Sessions.stopAutoRefresh();
+      if (typeof TerminalPanel !== 'undefined' && TerminalPanel.isOpen()) TerminalPanel.close();
+    }
+
     // Deactivate all nav items
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
 
@@ -142,9 +148,13 @@ const App = {
 
 document.addEventListener('DOMContentLoaded', () => {
   App.init();
+  const hostEl = document.getElementById('footer-host');
+  if (hostEl) hostEl.textContent = location.host;
   api('/api/version').then(data => {
     window.__docker = !!data.docker;
     document.getElementById('app-version').textContent = 'v' + data.version;
+    const fv = document.getElementById('footer-version');
+    if (fv) fv.textContent = 'v' + data.version;
     if (data.updateAvailable) {
       const banner = document.getElementById('update-banner');
       banner.innerHTML = `New version <strong>v${escapeHtml(data.latest)}</strong> available!
@@ -153,3 +163,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }).catch(() => {});
 });
+
+window.setFooterStatus = function(text, live) {
+  const el = document.getElementById('footer-status');
+  if (!el) return;
+  el.textContent = text || 'Idle';
+  el.classList.toggle('live', !!live);
+};

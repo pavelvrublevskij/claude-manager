@@ -2,8 +2,12 @@ const ManagerSettings = {
   pricing: {},
   history: [],
   activeIdx: -1,
+  SECTION_KEY: 'claude-manager-settings-section',
+  _navBound: false,
 
   async load() {
+    ManagerSettings.bindNav();
+    ManagerSettings.restoreSection();
     try {
       const [config, pricingData, history] = await Promise.all([
         api('/api/pricing/config'),
@@ -16,8 +20,40 @@ const ManagerSettings = {
       ManagerSettings.pricing = pricingData.current || {};
       ManagerSettings.renderHistory();
       ManagerSettings.renderTable();
+      ManagerSettings.loadRefreshRate();
     } catch (e) {
       toast('Failed to load manager settings: ' + e.message, 'error');
+    }
+  },
+
+  bindNav() {
+    if (ManagerSettings._navBound) return;
+    document.querySelectorAll('#settings-nav .settings-nav-item').forEach(item => {
+      item.addEventListener('click', () => ManagerSettings.selectSection(item.dataset.section));
+    });
+    ManagerSettings._navBound = true;
+  },
+
+  selectSection(name) {
+    const navItems = document.querySelectorAll('#settings-nav .settings-nav-item');
+    const panels = document.querySelectorAll('#view-manager-settings .settings-panel');
+    let matched = false;
+    navItems.forEach(n => {
+      const active = n.dataset.section === name;
+      n.classList.toggle('active', active);
+      if (active) matched = true;
+    });
+    panels.forEach(p => p.classList.toggle('active', p.dataset.section === name));
+    if (matched) try { localStorage.setItem(ManagerSettings.SECTION_KEY, name); } catch (_) {}
+  },
+
+  restoreSection() {
+    let name = '';
+    try { name = localStorage.getItem(ManagerSettings.SECTION_KEY) || ''; } catch (_) {}
+    if (name && document.querySelector(`#settings-nav .settings-nav-item[data-section="${name}"]`)) {
+      ManagerSettings.selectSection(name);
+    } else {
+      ManagerSettings.selectSection('general');
     }
   },
 
@@ -206,5 +242,30 @@ const ManagerSettings = {
     } catch (e) {
       toast('Failed to reset URL: ' + e.message, 'error');
     }
+  },
+
+  loadRefreshRate() {
+    const input = document.getElementById('conversation-refresh-rate');
+    if (!input) return;
+    const ms = (typeof Sessions !== 'undefined') ? Sessions.refreshIntervalMs() : 5000;
+    input.value = String(Math.round(ms / 1000));
+  },
+
+  saveRefreshRate() {
+    const input = document.getElementById('conversation-refresh-rate');
+    if (!input) return;
+    const seconds = parseFloat(input.value);
+    if (!Number.isFinite(seconds) || seconds < 1) { toast('Refresh rate must be at least 1 second', 'error'); return; }
+    const ms = Math.round(seconds * 1000);
+    if (typeof Sessions === 'undefined' || !Sessions.setRefreshIntervalMs(ms)) { toast('Failed to save refresh rate', 'error'); return; }
+    toast('Refresh rate saved');
+  },
+
+  resetRefreshRate() {
+    const input = document.getElementById('conversation-refresh-rate');
+    if (!input) return;
+    if (typeof Sessions !== 'undefined') Sessions.setRefreshIntervalMs(Sessions.REFRESH_INTERVAL_DEFAULT_MS);
+    input.value = String(Math.round((typeof Sessions !== 'undefined' ? Sessions.REFRESH_INTERVAL_DEFAULT_MS : 5000) / 1000));
+    toast('Refresh rate reset to default');
   }
 };

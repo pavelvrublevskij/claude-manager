@@ -62,6 +62,9 @@ const ProjectUsage = {
     if (preset === 'all') {
       ProjectUsage.fromDate = null;
       ProjectUsage.toDate = null;
+    } else if (preset === 'today') {
+      ProjectUsage.fromDate = fmt(now);
+      ProjectUsage.toDate = fmt(now);
     } else if (preset === '7d') {
       const from = new Date(now); from.setDate(from.getDate() - 6);
       ProjectUsage.fromDate = fmt(from); ProjectUsage.toDate = fmt(now);
