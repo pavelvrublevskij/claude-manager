@@ -98,7 +98,15 @@ const Usage = {
       Usage.renderPeriods(periods.periods);
       Usage.renderProjects(projects.projects);
       if (typeof UsageCharts !== 'undefined') {
-        UsageCharts.render(summary, periods.periods, projects.projects);
+        UsageCharts.lastData = { summary: summary, periods: periods.periods, projects: projects.projects };
+        if (Usage.viewMode === 'charts') {
+          const view = document.getElementById('view-usage');
+          if (view) view.dataset.viewMode = 'tables';
+          requestAnimationFrame(() => {
+            if (view) view.dataset.viewMode = 'charts';
+            UsageCharts.rerenderForTheme();
+          });
+        }
       }
       Usage.renderTriggerLabels();
       Usage.renderDropdownList('models');
@@ -242,6 +250,13 @@ const Usage = {
 
   setDatePreset(preset) {
     if (preset === 'custom') { Usage.datePreset = 'custom'; return; }
+    const autoGroup = { today: 'day', '7d': 'day', '30d': 'day', month: 'day', year: 'month', all: 'month' };
+    if (autoGroup[preset]) {
+      Usage.currentGroup = autoGroup[preset];
+      document.querySelectorAll('#usage-period-tabs .tab-btn, #usage-period-tabs-chart .tab-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.group === Usage.currentGroup);
+      });
+    }
     Usage.applyDatePresetState(preset);
     Usage.refresh();
   },

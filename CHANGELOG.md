@@ -1,3 +1,13 @@
+## v0.7.2
+
+### Session Conversation
+- Bug fix: multi-line user messages now display all lines (single newlines were collapsed by the Markdown renderer)
+
+### In-Session Terminal
+- Ctrl+C copies selected text to clipboard (when text is selected); passes through as SIGINT otherwise
+- Ctrl+V pastes from clipboard into the terminal
+- "Copied" toast confirmation when text is copied
+
 ## v0.7.1
 
 ### Token Usage — Charts

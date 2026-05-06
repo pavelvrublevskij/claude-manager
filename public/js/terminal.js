@@ -121,6 +121,22 @@ const TerminalPanel = {
     this.state.dataDisposable = term.onData(d => {
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: 'i', d }));
     });
+
+    term.attachCustomKeyEventHandler(ev => {
+      if (ev.type !== 'keydown' || !ev.ctrlKey || ev.shiftKey || ev.altKey || ev.metaKey) return true;
+      if (ev.key === 'c' && term.hasSelection()) {
+        navigator.clipboard.writeText(term.getSelection()).then(() => toast('Copied')).catch(() => {});
+        return false;
+      }
+      if (ev.key === 'v') {
+        navigator.clipboard.readText().then(text => {
+          const { ws: currentWs } = TerminalPanel.state;
+          if (currentWs && currentWs.readyState === WebSocket.OPEN) currentWs.send(JSON.stringify({ t: 'i', d: text }));
+        }).catch(() => {});
+        return false;
+      }
+      return true;
+    });
   },
 
   reconnect() {
@@ -324,6 +340,21 @@ const TerminalModal = {
 
     const dataDisposable = term.onData(d => {
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: 'i', d }));
+    });
+
+    term.attachCustomKeyEventHandler(ev => {
+      if (ev.type !== 'keydown' || !ev.ctrlKey || ev.shiftKey || ev.altKey || ev.metaKey) return true;
+      if (ev.key === 'c' && term.hasSelection()) {
+        navigator.clipboard.writeText(term.getSelection()).then(() => toast('Copied')).catch(() => {});
+        return false;
+      }
+      if (ev.key === 'v') {
+        navigator.clipboard.readText().then(text => {
+          if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: 'i', d: text }));
+        }).catch(() => {});
+        return false;
+      }
+      return true;
     });
 
     let ro = null;

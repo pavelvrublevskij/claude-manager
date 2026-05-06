@@ -32,7 +32,7 @@ function toast(message, type = 'success') {
 /** Render markdown to HTML using the marked library. */
 function renderMarkdown(text) {
   if (typeof marked !== 'undefined') {
-    return marked.parse(text || '');
+    return marked.parse(text || '', { breaks: true });
   }
   return (text || '').replace(/</g, '&lt;').replace(/\n/g, '<br>');
 }
