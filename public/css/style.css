@@ -1770,6 +1770,119 @@ mark.search-highlight {
   display: none;
 }
 
+.tool-name { font-weight: 600; }
+
+.tool-param {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: rgba(230, 162, 60, 0.15);
+  color: var(--warning);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 400;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.tool-param-muted {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 1px 4px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.tool-file-path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 6px 12px 4px;
+  word-break: break-all;
+}
+
+.tool-replace-all {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--warning);
+  background: rgba(230, 162, 60, 0.15);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin: 0 12px 4px;
+}
+
+.tool-code {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-secondary);
+}
+
+.tool-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tool-diff-section {
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.tool-diff-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+}
+
+.tool-diff-old {
+  background: rgba(248, 81, 73, 0.08);
+  border: 1px solid rgba(248, 81, 73, 0.2);
+}
+
+.tool-diff-old .tool-diff-label {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+}
+
+.tool-diff-new {
+  background: rgba(63, 185, 80, 0.08);
+  border: 1px solid rgba(63, 185, 80, 0.2);
+}
+
+.tool-diff-new .tool-diff-label {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+}
+
+.chat-tool-body:has(.tool-diff) {
+  padding: 0;
+  white-space: normal;
+}
+
+.tool-diff-section pre {
+  margin: 0;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-secondary);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 .session-tool-toggle {
   display: inline-flex;
   align-items: center;

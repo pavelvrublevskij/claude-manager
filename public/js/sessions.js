@@ -421,14 +421,14 @@ const Sessions = {
       if (block.type === 'text') {
         bodyHtml += `<div class="chat-text">${renderMarkdown(block.text)}</div>`;
       } else if (block.type === 'tool_use') {
-        const inputStr = JSON.stringify(block.input, null, 2);
         const toolId = 'tool-' + Math.random().toString(36).slice(2, 8);
+        const { headerSuffix, bodyContent } = Sessions.formatToolUse(block.name, block.input);
         bodyHtml += `
           <div class="chat-tool">
             <div class="chat-tool-header" onclick="document.getElementById('${toolId}').classList.toggle('open')">
-              &#9654; ${escapeHtml(block.name)}
+              &#9654; <span class="tool-name">${escapeHtml(block.name)}</span>${headerSuffix}
             </div>
-            <div class="chat-tool-body" id="${toolId}">${escapeHtml(inputStr)}</div>
+            <div class="chat-tool-body" id="${toolId}">${bodyContent}</div>
           </div>
         `;
       } else if (block.type === 'tool_result') {
@@ -576,6 +576,96 @@ const Sessions = {
       textNode.parentNode.replaceChild(frag, textNode);
     }
     return count;
+  },
+
+  formatToolUse(name, input) {
+    const basename = p => p ? escapeHtml(p.split(/[/\\]/).pop()) : '';
+    const param = html => `<span class="tool-param">${html}</span>`;
+
+    switch (name) {
+      case 'Edit': {
+        const file = basename(input.file_path || '');
+        return {
+          headerSuffix: file ? ` ${param(file)}` : '',
+          bodyContent: Sessions.renderEditDiff(input)
+        };
+      }
+      case 'Write': {
+        const file = basename(input.file_path || '');
+        const preview = (input.content || '').slice(0, 600);
+        return {
+          headerSuffix: file ? ` ${param(file)}` : '',
+          bodyContent: `<div class="tool-file-path">${escapeHtml(input.file_path || '')}</div><pre class="tool-code">${escapeHtml(preview)}${(input.content || '').length > 600 ? '\n…' : ''}</pre>`
+        };
+      }
+      case 'Read': {
+        const file = basename(input.file_path || '');
+        const extras = [input.offset ? `offset:${input.offset}` : '', input.limit ? `limit:${input.limit}` : ''].filter(Boolean).join('  ');
+        return {
+          headerSuffix: file ? ` ${param(file)}${extras ? ` <span class="tool-param-muted">${escapeHtml(extras)}</span>` : ''}` : '',
+          bodyContent: `<div class="tool-file-path">${escapeHtml(input.file_path || '')}</div>`
+        };
+      }
+      case 'Bash': {
+        const cmd = input.command || '';
+        const preview = cmd.slice(0, 80) + (cmd.length > 80 ? '…' : '');
+        return {
+          headerSuffix: cmd ? ` ${param(escapeHtml(preview))}` : '',
+          bodyContent: `<pre class="tool-code">${escapeHtml(cmd)}</pre>`
+        };
+      }
+      case 'Glob': {
+        return {
+          headerSuffix: input.pattern ? ` ${param(escapeHtml(input.pattern))}` : '',
+          bodyContent: escapeHtml(JSON.stringify(input, null, 2))
+        };
+      }
+      case 'Grep': {
+        return {
+          headerSuffix: input.pattern ? ` ${param(escapeHtml(input.pattern))}` : '',
+          bodyContent: escapeHtml(JSON.stringify(input, null, 2))
+        };
+      }
+      case 'Agent': {
+        const desc = input.description ? input.description.slice(0, 60) : '';
+        return {
+          headerSuffix: desc ? ` ${param(escapeHtml(desc))}` : '',
+          bodyContent: escapeHtml(JSON.stringify(input, null, 2))
+        };
+      }
+      case 'WebFetch': {
+        let host = '';
+        try { host = new URL(input.url || '').hostname; } catch (_) { host = (input.url || '').slice(0, 60); }
+        return {
+          headerSuffix: host ? ` ${param(escapeHtml(host))}` : '',
+          bodyContent: escapeHtml(JSON.stringify(input, null, 2))
+        };
+      }
+      case 'WebSearch': {
+        return {
+          headerSuffix: input.query ? ` ${param(escapeHtml(input.query.slice(0, 60)))}` : '',
+          bodyContent: escapeHtml(JSON.stringify(input, null, 2))
+        };
+      }
+      default:
+        return { headerSuffix: '', bodyContent: escapeHtml(JSON.stringify(input, null, 2)) };
+    }
+  },
+
+  renderEditDiff(input) {
+    const filePath = input.file_path ? `<div class="tool-file-path">${escapeHtml(input.file_path)}</div>` : '';
+    const replaceAll = input.replace_all ? `<div class="tool-replace-all">replace_all</div>` : '';
+    const oldStr = input.old_string != null ? `
+      <div class="tool-diff-section tool-diff-old">
+        <div class="tool-diff-label">Before</div>
+        <pre>${escapeHtml(input.old_string.trim())}</pre>
+      </div>` : '';
+    const newStr = input.new_string != null ? `
+      <div class="tool-diff-section tool-diff-new">
+        <div class="tool-diff-label">After</div>
+        <pre>${escapeHtml(input.new_string.trim())}</pre>
+      </div>` : '';
+    return `${filePath}${replaceAll}<div class="tool-diff">${oldStr}${newStr}</div>`;
   },
 
   async checkPricing() {

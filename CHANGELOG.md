@@ -1,3 +1,16 @@
+## v0.7.1
+
+### Token Usage — Charts
+
+- Bug fix: charts did not show today's data on initial page load or after clicking Refresh
+- Bug fix: changing the date range preset (e.g. "Today", "Last 7 days") now auto-selects an appropriate period grouping — Today/7d/30d/Month → Day, Year/All time → Month
+
+### Session Conversation — Tool Use Display
+
+- Tool calls now show a key parameter inline in the header (filename, command, pattern, etc.) without needing to expand
+- `Edit` tool renders a structured before/after diff view instead of raw JSON
+- `Bash` tool shows the command in a code block; `Read`/`Write`/`Glob`/`Grep`/`Agent`/`WebFetch`/`WebSearch` each have tailored displays
+
 ## v0.7.0
 
 ### Sidebar
