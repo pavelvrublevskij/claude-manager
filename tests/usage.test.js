@@ -105,3 +105,22 @@ test('GET /api/usage/project/:slug for unknown slug returns zeroed totals', asyn
   assert.strictEqual(res.body.totals.input_tokens, 0);
   assert.strictEqual(res.body.totals.output_tokens, 0);
 });
+
+test('GET /api/usage/by-period?group=hour returns hourly buckets', async () => {
+  const res = await request(app).get('/api/usage/by-period?group=hour');
+  assert.strictEqual(res.status, 200);
+  assert.ok(Array.isArray(res.body.periods));
+  const hourEntry = res.body.periods.find(p => p.label === '2026-03-01 12:00');
+  assert.ok(hourEntry, 'hourly label from seeded session should exist');
+  assert.ok(hourEntry.input_tokens >= 100);
+});
+
+test('GET /api/usage/summary with fromTime/toTime filters by hour', async () => {
+  const inRange = await request(app).get('/api/usage/summary?fromTime=12:00&toTime=12:59');
+  assert.strictEqual(inRange.status, 200);
+  assert.ok(inRange.body.totals.input_tokens >= 100, 'hour 12 is in range');
+
+  const outRange = await request(app).get('/api/usage/summary?fromTime=13:00&toTime=23:00');
+  assert.strictEqual(outRange.status, 200);
+  assert.strictEqual(outRange.body.totals.input_tokens, 0, 'hour 12 excluded');
+});

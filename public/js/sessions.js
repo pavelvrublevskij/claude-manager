@@ -233,7 +233,7 @@ const Sessions = {
     const createdHtml = merged.created
       ? `<div class="meta-item">Created <span class="meta-value">${new Date(merged.created).toLocaleString()}</span></div>`
       : '';
-    meta.innerHTML = createdHtml + renderSessionBadges(merged, { sidechain: true });
+    meta.innerHTML = createdHtml + renderSessionBadges(merged, { sidechain: true, modelPricing: true });
   },
 
   async loadDetail(slug, sessionId, info) {

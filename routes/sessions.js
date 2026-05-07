@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFile, spawn } = require('child_process');
 const { safeSlug, wrapRoute, backup } = require('../lib/file-helpers');
-const { getProjectUsageMap, getSessionUsage } = require('../lib/usage-index');
+const { getProjectUsageMap, getSessionUsage, calcCost } = require('../lib/usage-index');
 const { decodeSlug } = require('../lib/slug');
 const { getCustomTitle } = require('../lib/session-title');
 const { collectBranches } = require('../lib/session-branches');
@@ -413,6 +413,9 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
     stats.tokens = usage.totals;
     stats.cost = (usage.cost && typeof usage.cost.total === 'number') ? usage.cost.total : 0;
     stats.models = Object.keys(usage.byModel || {});
+    stats.modelCosts = Object.fromEntries(
+      Object.entries(usage.byModel || {}).map(([m, t]) => [m, calcCost(t, m)])
+    );
   }
 
   res.json({ messages: page, total: messages.length, hasMore: offset + limit < messages.length, stats });

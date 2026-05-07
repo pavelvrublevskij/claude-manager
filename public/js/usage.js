@@ -4,6 +4,8 @@ const Usage = {
   currentProjects: new Map(),
   fromDate: null,
   toDate: null,
+  fromTime: null,
+  toTime: null,
   datePreset: 'month',
   allModels: [],
   allProjects: [],
@@ -27,17 +29,26 @@ const Usage = {
     Usage.datePreset = preset;
     const now = new Date();
     const pad = n => String(n).padStart(2, '0');
-    const fmt = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-    if (preset === 'all') { Usage.fromDate = null; Usage.toDate = null; }
-    else if (preset === 'today') { Usage.fromDate = fmt(now); Usage.toDate = fmt(now); }
-    else if (preset === '7d') { const f = new Date(now); f.setDate(f.getDate() - 6); Usage.fromDate = fmt(f); Usage.toDate = fmt(now); }
-    else if (preset === '30d') { const f = new Date(now); f.setDate(f.getDate() - 29); Usage.fromDate = fmt(f); Usage.toDate = fmt(now); }
-    else if (preset === 'month') { Usage.fromDate = fmt(new Date(now.getFullYear(), now.getMonth(), 1)); Usage.toDate = fmt(now); }
-    else if (preset === 'year') { Usage.fromDate = fmt(new Date(now.getFullYear(), 0, 1)); Usage.toDate = fmt(now); }
+    const fmtDate = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    const fmtDT = (d, h, m) => fmtDate(d) + 'T' + pad(h) + ':' + pad(m);
+
+    let fromDT = null, toDT = null;
+    if (preset === 'all') { /* nothing */ }
+    else if (preset === 'today') { fromDT = fmtDT(now, 0, 0); toDT = fmtDT(now, 23, 59); }
+    else if (preset === '7d') { const f = new Date(now); f.setDate(f.getDate() - 6); fromDT = fmtDT(f, 0, 0); toDT = fmtDT(now, 23, 59); }
+    else if (preset === '30d') { const f = new Date(now); f.setDate(f.getDate() - 29); fromDT = fmtDT(f, 0, 0); toDT = fmtDT(now, 23, 59); }
+    else if (preset === 'month') { fromDT = fmtDT(new Date(now.getFullYear(), now.getMonth(), 1), 0, 0); toDT = fmtDT(now, 23, 59); }
+    else if (preset === 'year') { fromDT = fmtDT(new Date(now.getFullYear(), 0, 1), 0, 0); toDT = fmtDT(now, 23, 59); }
+
+    Usage.fromDate = fromDT ? fromDT.slice(0, 10) : null;
+    Usage.toDate = toDT ? toDT.slice(0, 10) : null;
+    Usage.fromTime = null;
+    Usage.toTime = null;
+
     const presetEl = document.getElementById('filter-date-preset');
     if (presetEl) presetEl.value = preset;
-    document.getElementById('filter-from').value = Usage.fromDate || '';
-    document.getElementById('filter-to').value = Usage.toDate || '';
+    document.getElementById('filter-from').value = fromDT || '';
+    document.getElementById('filter-to').value = toDT || '';
   },
 
   setViewMode(mode, opts) {
@@ -66,6 +77,8 @@ const Usage = {
     for (const slug of Usage.currentProjects.keys()) q += '&projects=' + encodeURIComponent(slug);
     if (Usage.fromDate) q += '&from=' + encodeURIComponent(Usage.fromDate);
     if (Usage.toDate) q += '&to=' + encodeURIComponent(Usage.toDate);
+    if (Usage.fromTime) q += '&fromTime=' + encodeURIComponent(Usage.fromTime);
+    if (Usage.toTime) q += '&toTime=' + encodeURIComponent(Usage.toTime);
     return q;
   },
 
@@ -250,7 +263,7 @@ const Usage = {
 
   setDatePreset(preset) {
     if (preset === 'custom') { Usage.datePreset = 'custom'; return; }
-    const autoGroup = { today: 'day', '7d': 'day', '30d': 'day', month: 'day', year: 'month', all: 'month' };
+    const autoGroup = { today: 'hour', '7d': 'day', '30d': 'day', month: 'day', year: 'month', all: 'month' };
     if (autoGroup[preset]) {
       Usage.currentGroup = autoGroup[preset];
       document.querySelectorAll('#usage-period-tabs .tab-btn, #usage-period-tabs-chart .tab-btn').forEach(b => {
@@ -262,10 +275,12 @@ const Usage = {
   },
 
   applyCustomDates() {
-    const f = document.getElementById('filter-from').value || null;
+    const f = document.getElementById('filter-from').value || null; // "YYYY-MM-DDTHH:MM"
     const t = document.getElementById('filter-to').value || null;
-    Usage.fromDate = f;
-    Usage.toDate = t;
+    Usage.fromDate = f ? f.slice(0, 10) : null;
+    Usage.toDate = t ? t.slice(0, 10) : null;
+    Usage.fromTime = f && f.length > 10 ? f.slice(11, 16) : null;
+    Usage.toTime = t && t.length > 10 ? t.slice(11, 16) : null;
     Usage.datePreset = 'custom';
     document.getElementById('filter-date-preset').value = 'custom';
     Usage.refresh();

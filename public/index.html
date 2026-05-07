@@ -163,11 +163,11 @@
             </div>
             <div class="filter-field">
               <label>From</label>
-              <input type="date" id="filter-from" onchange="Usage.applyCustomDates()">
+              <input type="datetime-local" id="filter-from" onchange="Usage.applyCustomDates()">
             </div>
             <div class="filter-field">
               <label>To</label>
-              <input type="date" id="filter-to" onchange="Usage.applyCustomDates()">
+              <input type="datetime-local" id="filter-to" onchange="Usage.applyCustomDates()">
             </div>
             <button class="btn btn-sm filter-clear-all" onclick="Usage.clearFilters()">Clear all</button>
           </div>
@@ -178,6 +178,7 @@
               <div class="chart-card-header">
                 <h3 class="chart-card-title">Cost &amp; Tokens over Time</h3>
                 <div class="tab-bar tab-bar-mini" id="usage-period-tabs-chart">
+                  <button class="tab-btn" data-group="hour" onclick="Usage.setGroup('hour', this)">Hour</button>
                   <button class="tab-btn" data-group="day" onclick="Usage.setGroup('day', this)">Day</button>
                   <button class="tab-btn" data-group="week" onclick="Usage.setGroup('week', this)">Week</button>
                   <button class="tab-btn active" data-group="month" onclick="Usage.setGroup('month', this)">Month</button>
@@ -219,6 +220,7 @@
           <div id="usage-pricing" style="display:none"></div>
           <h3 style="margin:24px 0 12px">Usage by Period</h3>
           <div class="tab-bar" id="usage-period-tabs">
+            <button class="tab-btn" data-group="hour" onclick="Usage.setGroup('hour', this)">Hour</button>
             <button class="tab-btn" data-group="day" onclick="Usage.setGroup('day', this)">Day</button>
             <button class="tab-btn" data-group="week" onclick="Usage.setGroup('week', this)">Week</button>
             <button class="tab-btn active" data-group="month" onclick="Usage.setGroup('month', this)">Month</button>
@@ -642,6 +644,7 @@
   <footer class="app-footer">
     <div class="app-footer-left">
       <span>Claude Manager <span id="footer-version"></span></span>
+      <a href="https://github.com/pavelvrublevskij/claude-manager/issues/new" target="_blank" rel="noopener" class="app-footer-issue-link" title="Raise an issue on GitHub">&#9888; Raise Issue</a>
     </div>
     <div class="app-footer-right">
       <span class="app-footer-status" id="footer-status">Idle</span>

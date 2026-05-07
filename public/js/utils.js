@@ -185,27 +185,28 @@ function renderSessionBadges(s, opts = {}) {
   if (s.cost) {
     parts.push(`<span class="token-badge badge-cost">$${s.cost.toFixed(2)}</span>`);
   }
-  (s.models || []).forEach(m => {
-    parts.push(`<span class="token-badge badge-model">${escapeHtml(shortModel(m))}</span>`);
-  });
+  if (opts.modelPricing && s.modelCosts && Object.keys(s.modelCosts).length) {
+    const rows = Object.entries(s.modelCosts).map(([m, c]) =>
+      `<span class="model-pricing-row"><span class="token-badge badge-model">${escapeHtml(shortModel(m))}</span><span class="model-pricing-cost">$${c.total.toFixed(4)}</span></span>`
+    );
+    parts.push(`<div class="session-branches-row" style="gap:8px">${rows.join('')}</div>`);
+  } else {
+    (s.models || []).forEach(m => {
+      parts.push(`<span class="token-badge badge-model">${escapeHtml(shortModel(m))}</span>`);
+    });
+  }
   let branches = Array.isArray(s.gitBranches) ? s.gitBranches.filter(Boolean) : [];
   if (!branches.length) {
     const fallback = [s.gitBranch, s.lastGitBranch].filter(Boolean);
     branches = Array.from(new Set(fallback));
   }
   if (branches.length) {
-    const MAX = 3;
-    const visible = branches.slice(0, MAX);
-    const hiddenCount = branches.length - visible.length;
-    visible.forEach((b, i) => {
-      if (i > 0) parts.push('<span class="session-branch-arrow">&#8594;</span>');
-      parts.push(`<span class="session-branch">${escapeHtml(b)}</span>`);
+    const branchParts = [];
+    branches.forEach((b, i) => {
+      if (i > 0) branchParts.push('<span class="session-branch-arrow">&#8594;</span>');
+      branchParts.push(`<span class="session-branch">${escapeHtml(b)}</span>`);
     });
-    if (hiddenCount > 0) {
-      const titleAttr = escapeHtml(branches.join(' → '));
-      parts.push(`<span class="session-branch-arrow">&#8594;</span>`);
-      parts.push(`<span class="session-branch session-branch-more" title="${titleAttr}">+${hiddenCount}</span>`);
-    }
+    parts.push(`<div class="session-branches-row">${branchParts.join('')}</div>`);
   }
   if (opts.sidechain && s.isSidechain) {
     parts.push('<span class="session-sidechain">sidechain</span>');

@@ -1,3 +1,16 @@
+## v0.7.3
+
+### Token Usage
+- From / To filters are now datetime pickers — filter by date and time of day
+- New **Hour** group in the period breakdown tabs
+
+### Sessions
+- Branch display: all branches shown (removed +N overflow), each on its own line below the model/cost badges
+- Session detail header: per-model cost breakdown — each model badge shows its individual cost
+
+### App
+- Footer: "Raise Issue" link opens GitHub Issues in a new tab
+
 ## v0.7.2
 
 ### Session Conversation

@@ -48,6 +48,15 @@ body {
   align-items: center;
   gap: 12px;
 }
+.app-footer-issue-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  opacity: 0.7;
+}
+.app-footer-issue-link:hover {
+  color: var(--text-primary);
+  opacity: 1;
+}
 .app-footer-status {
   display: inline-flex;
   align-items: center;
@@ -671,6 +680,7 @@ input[type="password"],
 input[type="email"],
 input[type="number"],
 input[type="date"],
+input[type="datetime-local"],
 input[type="search"],
 select {
   background: var(--bg-tertiary);
@@ -691,6 +701,7 @@ input[type="password"],
 input[type="email"],
 input[type="number"],
 input[type="date"],
+input[type="datetime-local"],
 input[type="search"],
 select {
   position: relative;
@@ -702,6 +713,7 @@ input[type="password"]:hover:not(:disabled),
 input[type="email"]:hover:not(:disabled),
 input[type="number"]:hover:not(:disabled),
 input[type="date"]:hover:not(:disabled),
+input[type="datetime-local"]:hover:not(:disabled),
 input[type="search"]:hover:not(:disabled),
 select:hover:not(:disabled) {
   border-color: var(--border-light, var(--border));
@@ -714,6 +726,7 @@ input[type="password"]:focus,
 input[type="email"]:focus,
 input[type="number"]:focus,
 input[type="date"]:focus,
+input[type="datetime-local"]:focus,
 input[type="search"]:focus,
 select:focus {
   outline: none;
@@ -728,6 +741,7 @@ input[type="password"]::placeholder,
 input[type="email"]::placeholder,
 input[type="number"]::placeholder,
 input[type="date"]::placeholder,
+input[type="datetime-local"]::placeholder,
 input[type="search"]::placeholder {
   color: var(--text-muted);
   opacity: 0.7;
@@ -739,6 +753,7 @@ input[type="password"]:disabled,
 input[type="email"]:disabled,
 input[type="number"]:disabled,
 input[type="date"]:disabled,
+input[type="datetime-local"]:disabled,
 input[type="search"]:disabled,
 select:disabled {
   opacity: 0.6;
@@ -1399,6 +1414,7 @@ mark.search-highlight {
   padding: 16px;
   margin-bottom: 8px;
   transition: border-color 0.15s;
+  position: relative;
 }
 
 .session-card:hover {
@@ -1424,7 +1440,8 @@ mark.search-highlight {
 .session-meta {
   display: flex;
   align-items: center;
-  gap: 16px;
+  row-gap: 4px;
+  column-gap: 16px;
   flex-wrap: wrap;
 }
 
@@ -1441,6 +1458,13 @@ mark.search-highlight {
   font-weight: 500;
 }
 
+.session-branches-row {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
 .session-branch {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -1455,11 +1479,6 @@ mark.search-highlight {
   line-height: 1;
   align-self: center;
   margin: 0 -2px;
-}
-.session-branch-more {
-  background: var(--bg-hover);
-  color: var(--text-secondary);
-  cursor: help;
 }
 
 .session-id-badge {
@@ -1518,7 +1537,9 @@ mark.search-highlight {
 }
 
 .session-actions {
-  margin-left: auto;
+  position: absolute;
+  top: 12px;
+  right: 12px;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -2284,6 +2305,16 @@ mark.search-highlight {
   background: rgba(163, 113, 247, 0.12);
   color: #a371f7;
 }
+.model-pricing-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.model-pricing-cost {
+  font-size: 11px;
+  color: var(--token-cost, #f85149);
+  font-family: var(--font-mono);
+}
 
 .pricing-input {
   background: var(--bg-secondary);
@@ -2389,7 +2420,8 @@ mark.search-highlight {
   font-weight: 600;
 }
 .filter-field select,
-.filter-field input[type="date"] {
+.filter-field input[type="date"],
+.filter-field input[type="datetime-local"] {
   padding: 6px 10px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
