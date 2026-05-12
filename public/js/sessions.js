@@ -265,6 +265,18 @@ const Sessions = {
     const countEl = document.getElementById('session-detail-search-count');
     if (countEl) countEl.textContent = '';
 
+    if (!sessionId) {
+      Sessions.switchTab('conversation');
+      container.innerHTML = '<div class="empty-state"><p>Waiting for session to start...</p></div>';
+      if (typeof TerminalPanel !== 'undefined' && !TerminalPanel.isOpen()) {
+        TerminalPanel.open(slug, null);
+      }
+      Sessions.applyConversationHiddenState();
+      Sessions.applyToolDetailsState();
+      Sessions._startDiscovery(slug);
+      return;
+    }
+
     // Start on File Changes tab; loadContext will switch to Conversation if empty
     Sessions.switchTab('file-changes');
     const ctxEl = document.getElementById('session-context');
@@ -294,8 +306,44 @@ const Sessions = {
   },
 
   stopAutoRefresh() {
+    Sessions._stopDiscovery();
     if (Sessions._refreshTimer) { clearInterval(Sessions._refreshTimer); Sessions._refreshTimer = null; }
     if (typeof setFooterStatus === 'function') setFooterStatus('Idle', false);
+  },
+
+  _startDiscovery(slug) {
+    Sessions._stopDiscovery();
+    Sessions._discoverTimer = setInterval(async () => {
+      try {
+        const sessions = await api(`/api/projects/${slug}/sessions`);
+        const state = Sessions.detailState;
+        if (!state.slug || state.sessionId) { Sessions._stopDiscovery(); return; }
+        const found = (sessions || []).find(s => !Sessions._knownSessionIds.has(s.sessionId));
+        if (found) {
+          Sessions._stopDiscovery();
+          Sessions._onSessionDiscovered(found);
+        }
+      } catch (_) {}
+    }, 3000);
+  },
+
+  _stopDiscovery() {
+    if (Sessions._discoverTimer) { clearInterval(Sessions._discoverTimer); Sessions._discoverTimer = null; }
+  },
+
+  _onSessionDiscovered(session) {
+    const state = Sessions.detailState;
+    state.sessionId = session.sessionId;
+    const idValue = document.getElementById('session-detail-id-value');
+    if (idValue) { idValue.textContent = session.sessionId; idValue.style.display = 'inline-block'; }
+    App.setHash('session-detail', { slug: state.slug, sessionId: session.sessionId });
+    const container = document.getElementById('session-messages');
+    if (container) container.innerHTML = '';
+    Sessions.loadContext(session.sessionId, session);
+    Sessions.loadMore().then(() => {
+      Sessions.setupScroll();
+      if (!Sessions.isConversationHidden()) Sessions.startAutoRefresh();
+    });
   },
 
   async pollNewMessages() {
@@ -328,6 +376,42 @@ const Sessions = {
 
       Sessions.updateMessageCount();
     } catch (_) { /* silent — transient network error */ }
+
+    Sessions.pollContext(slugAtStart, sessionAtStart);
+  },
+
+  async pollContext(slug, sessionId) {
+    const el = document.getElementById('session-context');
+    if (!el) return;
+
+    const info = Sessions._detailInfo;
+    const from = info && info.created ? new Date(info.created).toISOString() : '';
+    const to = info && info.modified ? new Date(info.modified).toISOString() : '';
+    const qs = from && to ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` : '';
+
+    try {
+      const data = await api(`/api/file-history/${encodeURIComponent(sessionId)}/context${qs}`);
+      if (Sessions.detailState.sessionId !== sessionId) return;
+
+      const hasFiles = data.files && data.files.length > 0;
+      const hasPlans = data.plans && data.plans.length > 0;
+      if (!hasFiles && !hasPlans) return;
+
+      const ctx = Sessions._ctx;
+      const sameFiles = ctx && ctx.files.length === data.files.length;
+      const samePlans = ctx && ctx.plans.length === (data.plans ? data.plans.length : 0);
+      if (sameFiles && samePlans) return;
+
+      const savedPair = ctx && ctx.pair ? [...ctx.pair] : null;
+      const savedSort = ctx && ctx.sort || 'default';
+
+      Sessions.renderContext(el, sessionId, data);
+
+      if (savedSort !== 'default') Sessions.sortCtxFiles(savedSort);
+      if (savedPair && Sessions._ctx.files.some(f =>
+        f.versions.includes(savedPair[0]) && f.versions.includes(savedPair[1])
+      )) Sessions.selectCtxVersion(savedPair[0], savedPair[1]);
+    } catch (_) {}
   },
 
   scrollContainer() {
@@ -699,14 +783,19 @@ const Sessions = {
 
   async newSessionBrowser(slug) {
     document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
-    try {
-      await Sessions.checkPricing();
-    } catch (_) { /* non-fatal */ }
-    if (typeof TerminalModal === 'undefined') {
+    try { await Sessions.checkPricing(); } catch (_) { /* non-fatal */ }
+    if (typeof TerminalPanel === 'undefined') {
       toast('Terminal libraries not loaded', 'error');
       return;
     }
-    TerminalModal.open(slug, '', 'New session');
+    try {
+      const existing = await api(`/api/projects/${slug}/sessions`);
+      Sessions._knownSessionIds = new Set((existing || []).map(s => s.sessionId));
+    } catch (_) {
+      Sessions._knownSessionIds = new Set();
+    }
+    TerminalPanel.setAutoOpen(true);
+    App.navigate('session-detail', { slug, sessionId: null });
   },
 
   async resumeOS(slug, sessionId) {
@@ -877,7 +966,7 @@ const Sessions = {
     const hasPlans = data.plans && data.plans.length > 0;
     if (!hasFiles && !hasPlans) { Sessions.switchTab('conversation'); return; }
 
-    Sessions._ctx = { sessionId, files: data.files || [], sort: 'default' };
+    Sessions._ctx = { sessionId, files: data.files || [], plans: data.plans || [], sort: 'default' };
 
     let html = '';
 
