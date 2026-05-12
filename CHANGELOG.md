@@ -1,3 +1,12 @@
+## v0.8.1
+
+### Bug fixes
+
+- **Conversation scroll**: fixed — `min-height: 0` added to `session-messages-wrap` and `session-messages-pane` so the flex layout properly constrains the pane height and `overflow-y: auto` triggers
+- **File Changes panel bleed**: `pollContext` (called on every auto-refresh) was forcing the file-changes panel visible even when the user was on the Conversation tab, stealing height and breaking scroll — fixed by letting `switchTab` be the sole owner of panel visibility
+- **New session in browser**: replaced the small popup terminal modal with the full in-page terminal panel — new sessions now open in the same split view as resumed sessions, with auto-discovery polling that detects the new session and starts live message refresh automatically
+- **Terminal modal window size**: removed the now-unused `TerminalModal` and its CSS
+
 ## v0.8.0
 
 ### Session Detail — File Changes & Plans
