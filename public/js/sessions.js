@@ -1025,7 +1025,6 @@ const Sessions = {
     }
 
     el.innerHTML = html;
-    el.style.display = 'block';
   },
 
   _renderCtxFileList() {
