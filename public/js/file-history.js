@@ -1,20 +1,15 @@
 // --- File History diff rendering ---
 
 const FileHistory = {
-  showDiffFromBtn(btn) {
-    const { session, hash, from, to, path } = btn.dataset;
-    FileHistory.showDiff(session, hash, parseInt(from, 10), parseInt(to, 10), path);
-  },
-
-  async showDiff(sessionId, hash, from, to, filePath) {
+  async showDiffCurrent(sessionId, hash, version, projSlug, filePath) {
     const overlay = openModal({
-      title: `Diff: ${filePath} v${from} → v${to}`,
+      title: `Diff: ${filePath} v${version} → current`,
       width: 860,
       body: '<div id="fh-diff-body"><div class="loading"><div class="spinner"></div>Computing diff…</div></div>',
       buttons: []
     });
     try {
-      const result = await api(`/api/file-history/${encodeURIComponent(sessionId)}/${encodeURIComponent(hash)}/diff?from=${from}&to=${to}`);
+      const result = await api(`/api/file-history/${encodeURIComponent(sessionId)}/${encodeURIComponent(hash)}/diff-current?version=${version}&projSlug=${encodeURIComponent(projSlug)}&filePath=${encodeURIComponent(filePath)}`);
       FileHistory.renderDiff(overlay.querySelector('#fh-diff-body'), result);
     } catch (e) {
       overlay.querySelector('#fh-diff-body').innerHTML =

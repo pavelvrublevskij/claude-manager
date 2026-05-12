@@ -128,13 +128,7 @@ const TerminalPanel = {
         navigator.clipboard.writeText(term.getSelection()).then(() => toast('Copied')).catch(() => {});
         return false;
       }
-      if (ev.key === 'v') {
-        navigator.clipboard.readText().then(text => {
-          const { ws: currentWs } = TerminalPanel.state;
-          if (currentWs && currentWs.readyState === WebSocket.OPEN) currentWs.send(JSON.stringify({ t: 'i', d: text }));
-        }).catch(() => {});
-        return false;
-      }
+      if (ev.key === 'v') return false;
       return true;
     });
   },

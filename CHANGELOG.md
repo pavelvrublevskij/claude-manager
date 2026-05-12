@@ -1,3 +1,11 @@
+## v0.8.2
+
+### Bug fixes
+
+- **Modal overflow**: modals now scroll when content exceeds viewport height (`max-height: 90vh`, flex layout, `.modal-body` with `overflow-y: auto`)
+- **File Changes — diff vs current**: replaced version-pair filter pills with a direct "snapshot vs current file" model — clicking a file diffs its first recorded snapshot against the live file on disk; new `/diff-current` endpoint handles the comparison
+- **Terminal Ctrl+V**: removed clipboard-to-WebSocket paste (key is consumed but no longer reads from clipboard — terminal handles paste natively)
+
 ## v0.8.1
 
 ### Bug fixes

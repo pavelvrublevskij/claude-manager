@@ -22,6 +22,7 @@ function openModal({ title, width, body, buttons = [] }) {
   modal.appendChild(h3);
 
   const content = document.createElement('div');
+  content.className = 'modal-body';
   content.innerHTML = body;
   modal.appendChild(content);
 

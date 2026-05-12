@@ -966,29 +966,11 @@ const Sessions = {
     const hasPlans = data.plans && data.plans.length > 0;
     if (!hasFiles && !hasPlans) { Sessions.switchTab('conversation'); return; }
 
-    Sessions._ctx = { sessionId, files: data.files || [], plans: data.plans || [], sort: 'default' };
+    Sessions._ctx = { sessionId, projSlug: data.projSlug || '', files: data.files || [], plans: data.plans || [], sort: 'default' };
 
     let html = '';
 
     if (hasFiles) {
-      // Collect all unique version pairs across files that have 2+ versions
-      const pairSet = new Set();
-      for (const f of data.files) {
-        for (let i = 0; i < f.versions.length - 1; i++) {
-          pairSet.add(`${f.versions[i]},${f.versions[i + 1]}`);
-        }
-      }
-      const pairs = [...pairSet].map(p => p.split(',').map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-      const defaultPair = pairs.length ? pairs[pairs.length - 1] : null;
-      Sessions._ctx.pair = defaultPair;
-
-      const filterHtml = pairs.length > 1
-        ? `<div class="ctx-version-filter">${pairs.map(([f, t]) =>
-            `<button class="ctx-ver-btn${defaultPair && f === defaultPair[0] && t === defaultPair[1] ? ' active' : ''}"
-              onclick="Sessions.selectCtxVersion(${f},${t})">v${f}→v${t}</button>`
-          ).join('')}</div>`
-        : '';
-
       const sortHtml = `<div class="ctx-sort-bar">
         <span class="ctx-sort-label">Sort:</span>
         <button class="ctx-sort-btn active" onclick="Sessions.sortCtxFiles('default')">Default</button>
@@ -1001,7 +983,6 @@ const Sessions = {
           <span class="ctx-arrow">&#9660;</span> Files edited (${data.files.length})
         </button>
         <div class="ctx-body">
-          ${filterHtml}
           ${sortHtml}
           <div id="ctx-file-list">${Sessions._renderCtxFileList()}</div>
         </div>
@@ -1028,20 +1009,17 @@ const Sessions = {
   },
 
   _renderCtxFileList() {
-    const { sessionId, files, pair, sort } = Sessions._ctx;
-    const [from, to] = pair || [null, null];
-    let visible = from !== null
-      ? files.filter(f => f.versions.includes(from) && f.versions.includes(to))
-      : files.slice();
+    const { sessionId, files, sort } = Sessions._ctx;
+    let visible = files.slice();
     if (sort === 'asc') visible.sort((a, b) => a.path.split(/[\\/]/).pop().localeCompare(b.path.split(/[\\/]/).pop()));
     else if (sort === 'desc') visible.sort((a, b) => b.path.split(/[\\/]/).pop().localeCompare(a.path.split(/[\\/]/).pop()));
-    if (!visible.length) return '<div class="ctx-empty">No files changed in this version</div>';
+    if (!visible.length) return '<div class="ctx-empty">No files changed</div>';
     return visible.map(f => {
       const name = f.path.replace(/\\/g, '/').split('/').pop();
       return `<div class="ctx-file-item"
         data-session="${escapeHtml(sessionId)}"
         data-hash="${escapeHtml(f.hash)}"
-        data-from="${from}" data-to="${to}"
+        data-from="${f.versions[0]}"
         data-path="${escapeHtml(f.path)}"
         title="${escapeHtml(f.path)}"
         onclick="Sessions._openCtxDiff(this)">${escapeHtml(name)}</div>`;
@@ -1058,18 +1036,9 @@ const Sessions = {
     if (list) list.innerHTML = Sessions._renderCtxFileList();
   },
 
-  selectCtxVersion(from, to) {
-    Sessions._ctx.pair = [from, to];
-    document.querySelectorAll('.ctx-ver-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.textContent.trim() === `v${from}→v${to}`);
-    });
-    const list = document.getElementById('ctx-file-list');
-    if (list) list.innerHTML = Sessions._renderCtxFileList();
-  },
-
   _openCtxDiff(el) {
-    const { session, hash, from, to, path } = el.dataset;
-    FileHistory.showDiff(session, hash, parseInt(from, 10), parseInt(to, 10), path);
+    const { session, hash, from, path } = el.dataset;
+    FileHistory.showDiffCurrent(session, hash, parseInt(from, 10), Sessions._ctx.projSlug, path);
   },
 
   toggleCtx(sectionId) {

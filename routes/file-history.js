@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { CLAUDE_DIR, PROJECTS_DIR } = require('../lib/paths');
 const { wrapRoute } = require('../lib/file-helpers');
+const { decodeSlug } = require('../lib/slug');
 
 const PLANS_DIR = path.join(CLAUDE_DIR, 'plans');
 
@@ -18,13 +19,14 @@ router.get('/:sessionId/context', wrapRoute((req, res) => {
   const histDir = path.join(FILE_HISTORY_DIR, sessionId);
   let files = [];
 
+  let projSlug = null;
   if (fs.existsSync(histDir)) {
     // Find the session JSONL to get file path mappings
     let sessionContent = null;
     for (const proj of fs.readdirSync(PROJECTS_DIR, { withFileTypes: true }).filter(d => d.isDirectory())) {
       const candidate = path.join(PROJECTS_DIR, proj.name, sessionId + '.jsonl');
       if (fs.existsSync(candidate)) {
-        try { sessionContent = fs.readFileSync(candidate, 'utf-8'); } catch (_) {}
+        try { sessionContent = fs.readFileSync(candidate, 'utf-8'); projSlug = proj.name; } catch (_) {}
         break;
       }
     }
@@ -74,7 +76,7 @@ router.get('/:sessionId/context', wrapRoute((req, res) => {
       .map(({ name, mtime }) => ({ name, mtime }));
   }
 
-  res.json({ files, plans });
+  res.json({ files, plans, projSlug });
 }));
 
 
@@ -99,6 +101,39 @@ router.get('/:sessionId/:hash/diff', wrapRoute((req, res) => {
 
   const oldText = fs.readFileSync(fromFile, 'utf-8');
   const newText = fs.readFileSync(toFile, 'utf-8');
+  res.json(computeDiff(oldText, newText));
+}));
+
+router.get('/:sessionId/:hash/diff-current', wrapRoute((req, res) => {
+  const { sessionId, hash } = req.params;
+  const version = parseInt(req.query.version, 10);
+  const { projSlug, filePath } = req.query;
+
+  for (const p of [sessionId, hash]) {
+    if (p.includes('..') || p.includes('/') || p.includes('\\')) {
+      return res.status(400).json({ error: 'Invalid parameters' });
+    }
+  }
+  if (!projSlug || projSlug.includes('..') || projSlug.includes('/') || projSlug.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid projSlug' });
+  }
+
+  const histDir = path.join(FILE_HISTORY_DIR, sessionId);
+  const fromFile = path.join(histDir, `${hash}@v${version}`);
+  if (!fs.existsSync(fromFile)) return res.status(404).json({ error: 'Version not found' });
+
+  const projectDir = decodeSlug(projSlug);
+  if (!projectDir) return res.status(404).json({ error: 'Project not found' });
+
+  const currentFile = path.resolve(projectDir, filePath);
+  const rel = path.relative(path.resolve(projectDir), currentFile);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    return res.status(400).json({ error: 'Invalid file path' });
+  }
+  if (!fs.existsSync(currentFile)) return res.status(404).json({ error: 'Current file not found' });
+
+  const oldText = fs.readFileSync(fromFile, 'utf-8');
+  const newText = fs.readFileSync(currentFile, 'utf-8');
   res.json(computeDiff(oldText, newText));
 }));
 

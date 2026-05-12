@@ -2036,16 +2036,27 @@ mark.search-highlight {
   padding: 24px;
   width: 480px;
   max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal h3 {
   margin-bottom: 16px;
   font-size: 16px;
+  flex-shrink: 0;
+}
+
+.modal-body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .modal .btn-group {
   margin-top: 16px;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 /* --- Scrollbar --- */
@@ -2704,38 +2715,6 @@ mark.search-highlight {
   padding: 6px 16px 10px;
 }
 
-.ctx-version-filter {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  padding-bottom: 8px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--border);
-}
-
-.ctx-ver-btn {
-  padding: 2px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  font-family: var(--font-mono);
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: border-color 0.1s, color 0.1s;
-}
-
-.ctx-ver-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.ctx-ver-btn.active {
-  background: var(--accent-bg);
-  border-color: var(--accent);
-  color: var(--accent);
-}
 
 .ctx-sort-bar {
   display: flex;
