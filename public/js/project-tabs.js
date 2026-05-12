@@ -4,28 +4,52 @@ const ProjectUsage = {
   currentSlug: null,
   fromDate: null,
   toDate: null,
-  datePreset: 'all',
+  fromTime: null,
+  toTime: null,
+  datePreset: 'today',
 
   async load(slug) {
     if (ProjectUsage.currentSlug !== slug) {
       ProjectUsage.currentSlug = slug;
-      ProjectUsage.fromDate = null;
-      ProjectUsage.toDate = null;
-      ProjectUsage.datePreset = 'all';
-      const presetEl = document.getElementById('proj-filter-date-preset');
-      if (presetEl) presetEl.value = 'all';
-      const fromEl = document.getElementById('proj-filter-from');
-      if (fromEl) fromEl.value = '';
-      const toEl = document.getElementById('proj-filter-to');
-      if (toEl) toEl.value = '';
+      ProjectUsage.applyDatePresetState('today');
     }
     await ProjectUsage.render();
+  },
+
+  applyDatePresetState(preset) {
+    ProjectUsage.datePreset = preset;
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const fmtDate = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    const fmtDT = (d, h, m) => fmtDate(d) + 'T' + pad(h) + ':' + pad(m);
+
+    let fromDT = null, toDT = null;
+    if (preset === 'all') { /* nothing */ }
+    else if (preset === 'today') { fromDT = fmtDT(now, 0, 0); toDT = fmtDT(now, 23, 59); }
+    else if (preset === '7d') { const f = new Date(now); f.setDate(f.getDate() - 6); fromDT = fmtDT(f, 0, 0); toDT = fmtDT(now, 23, 59); }
+    else if (preset === '30d') { const f = new Date(now); f.setDate(f.getDate() - 29); fromDT = fmtDT(f, 0, 0); toDT = fmtDT(now, 23, 59); }
+    else if (preset === 'month') { fromDT = fmtDT(new Date(now.getFullYear(), now.getMonth(), 1), 0, 0); toDT = fmtDT(now, 23, 59); }
+    else if (preset === 'year') { fromDT = fmtDT(new Date(now.getFullYear(), 0, 1), 0, 0); toDT = fmtDT(now, 23, 59); }
+
+    ProjectUsage.fromDate = fromDT ? fromDT.slice(0, 10) : null;
+    ProjectUsage.toDate = toDT ? toDT.slice(0, 10) : null;
+    ProjectUsage.fromTime = null;
+    ProjectUsage.toTime = null;
+
+    const presetEl = document.getElementById('proj-filter-date-preset');
+    if (presetEl) presetEl.value = preset;
+    const fromEl = document.getElementById('proj-filter-from');
+    if (fromEl) fromEl.value = fromDT || '';
+    const toEl = document.getElementById('proj-filter-to');
+    if (toEl) toEl.value = toDT || '';
   },
 
   buildQuery() {
     const parts = [];
     if (ProjectUsage.fromDate) parts.push('from=' + encodeURIComponent(ProjectUsage.fromDate));
     if (ProjectUsage.toDate) parts.push('to=' + encodeURIComponent(ProjectUsage.toDate));
+    if (ProjectUsage.fromTime) parts.push('fromTime=' + encodeURIComponent(ProjectUsage.fromTime));
+    if (ProjectUsage.toTime) parts.push('toTime=' + encodeURIComponent(ProjectUsage.toTime));
     return parts.length ? '?' + parts.join('&') : '';
   },
 
@@ -55,40 +79,19 @@ const ProjectUsage = {
   },
 
   setDatePreset(preset) {
-    ProjectUsage.datePreset = preset;
-    const now = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    const fmt = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-    if (preset === 'all') {
-      ProjectUsage.fromDate = null;
-      ProjectUsage.toDate = null;
-    } else if (preset === 'today') {
-      ProjectUsage.fromDate = fmt(now);
-      ProjectUsage.toDate = fmt(now);
-    } else if (preset === '7d') {
-      const from = new Date(now); from.setDate(from.getDate() - 6);
-      ProjectUsage.fromDate = fmt(from); ProjectUsage.toDate = fmt(now);
-    } else if (preset === '30d') {
-      const from = new Date(now); from.setDate(from.getDate() - 29);
-      ProjectUsage.fromDate = fmt(from); ProjectUsage.toDate = fmt(now);
-    } else if (preset === 'month') {
-      const from = new Date(now.getFullYear(), now.getMonth(), 1);
-      ProjectUsage.fromDate = fmt(from); ProjectUsage.toDate = fmt(now);
-    } else if (preset === 'year') {
-      const from = new Date(now.getFullYear(), 0, 1);
-      ProjectUsage.fromDate = fmt(from); ProjectUsage.toDate = fmt(now);
-    }
-    document.getElementById('proj-filter-from').value = ProjectUsage.fromDate || '';
-    document.getElementById('proj-filter-to').value = ProjectUsage.toDate || '';
-    if (preset !== 'custom') {
-      ProjectUsage.render();
-      if (typeof Sessions !== 'undefined') Sessions.rerenderWithFilter();
-    }
+    if (preset === 'custom') { ProjectUsage.datePreset = 'custom'; return; }
+    ProjectUsage.applyDatePresetState(preset);
+    ProjectUsage.render();
+    if (typeof Sessions !== 'undefined') Sessions.rerenderWithFilter();
   },
 
   applyCustomDates() {
-    ProjectUsage.fromDate = document.getElementById('proj-filter-from').value || null;
-    ProjectUsage.toDate = document.getElementById('proj-filter-to').value || null;
+    const f = document.getElementById('proj-filter-from').value || null;
+    const t = document.getElementById('proj-filter-to').value || null;
+    ProjectUsage.fromDate = f ? f.slice(0, 10) : null;
+    ProjectUsage.toDate = t ? t.slice(0, 10) : null;
+    ProjectUsage.fromTime = f && f.length > 10 ? f.slice(11, 16) : null;
+    ProjectUsage.toTime = t && t.length > 10 ? t.slice(11, 16) : null;
     ProjectUsage.datePreset = 'custom';
     document.getElementById('proj-filter-date-preset').value = 'custom';
     ProjectUsage.render();
@@ -96,12 +99,7 @@ const ProjectUsage = {
   },
 
   clearFilter() {
-    ProjectUsage.fromDate = null;
-    ProjectUsage.toDate = null;
-    ProjectUsage.datePreset = 'all';
-    document.getElementById('proj-filter-date-preset').value = 'all';
-    document.getElementById('proj-filter-from').value = '';
-    document.getElementById('proj-filter-to').value = '';
+    ProjectUsage.applyDatePresetState('today');
     ProjectUsage.render();
     if (typeof Sessions !== 'undefined') Sessions.rerenderWithFilter();
   }
@@ -582,3 +580,4 @@ const ProjectOutputStyles = {
     } catch (e) { toast('Delete failed: ' + e.message, 'error'); }
   }
 };
+

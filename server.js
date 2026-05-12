@@ -142,6 +142,8 @@ app.use('/api/output-styles', require('./routes/output-styles'));
 app.use('/api/plugins', require('./routes/plugins'));
 app.use('/api/project-settings', require('./routes/project-settings'));
 app.use('/api/usage', require('./routes/usage'));
+app.use('/api/plans', require('./routes/plans'));
+app.use('/api/file-history', require('./routes/file-history'));
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

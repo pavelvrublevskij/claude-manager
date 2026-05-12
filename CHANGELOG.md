@@ -1,3 +1,28 @@
+## v0.8.0
+
+### Session Detail — File Changes & Plans
+
+- New **File Changes / Conversation** tab bar in session detail view — File Changes is the default tab
+- If a session has no file history or plans, the view auto-switches to Conversation
+- **Files edited**: version filter pills (v1→v2, v2→v3, …) at the top; clicking filters the file list to only files changed in that version; clicking a file opens the diff modal
+- File list sortable: **Default** / **A→Z** / **Z→A**
+- **Plans**: sessions show any plan files whose mtime overlaps the session's time window (±30 min)
+- Clicking a plan opens it in a markdown modal
+- Session cards in the sessions list show a **plan** badge for sessions with associated plans
+
+### Code cleanup
+
+- Removed global Plans and File History sidebar views and project tabs — all functionality now lives in session detail
+- Dead code removed: `plans.js`, `ProjectPlans`, `ProjectFileHistory` (~400 lines)
+- `routes/file-history.js` and `routes/plans.js` trimmed to only the endpoints still in use
+
+### TODO
+
+- File Changes: show full file content for first snapshot (v1 — no previous version to diff against)
+- Plans: display plan name alongside session card badge (tooltip or inline)
+- File Changes: show timestamp per version so user knows when each edit happened
+- Session context: allow navigating to a related session directly from its plan row
+
 ## v0.7.3
 
 ### Token Usage

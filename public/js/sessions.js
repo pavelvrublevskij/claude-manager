@@ -21,12 +21,14 @@ const Sessions = {
 
   filterByDateRange(sessions) {
     const pu = (typeof ProjectUsage !== 'undefined') ? ProjectUsage : {};
-    const { fromDate, toDate } = pu;
+    const { fromDate, toDate, fromTime, toTime } = pu;
     if (!fromDate && !toDate) return sessions;
+    const from = fromDate ? fromDate + 'T' + (fromTime || '00:00') : null;
+    const to = toDate ? toDate + 'T' + (toTime || '23:59') : null;
     return sessions.filter(s => {
-      const date = (s.modified || '').slice(0, 10);
-      if (fromDate && date < fromDate) return false;
-      if (toDate && date > toDate) return false;
+      const dt = (s.modified || '').slice(0, 16);
+      if (from && dt < from) return false;
+      if (to && dt > to) return false;
       return true;
     });
   },
@@ -68,6 +70,7 @@ const Sessions = {
     }
     container.innerHTML = Sessions.renderSearchBar(slug) +
       sessions.map((s, i) => Sessions.renderCard(slug, s, i)).join('');
+    Sessions.annotatePlans(sessions);
   },
 
   renderCard(slug, s, i) {
@@ -127,6 +130,7 @@ const Sessions = {
         } else {
           container.innerHTML = Sessions.renderSearchBar(slug) +
             results.map((s, i) => Sessions.renderCard(slug, s, i)).join('');
+          Sessions.annotatePlans(results);
         }
         const newInput = document.getElementById('session-search-input');
         if (newInput) { newInput.value = value; newInput.focus(); newInput.selectionStart = newInput.selectionEnd = cursorPos; }
@@ -260,6 +264,12 @@ const Sessions = {
     if (searchInput) searchInput.value = '';
     const countEl = document.getElementById('session-detail-search-count');
     if (countEl) countEl.textContent = '';
+
+    // Start on File Changes tab; loadContext will switch to Conversation if empty
+    Sessions.switchTab('file-changes');
+    const ctxEl = document.getElementById('session-context');
+    if (ctxEl) { ctxEl.innerHTML = ''; }
+    Sessions.loadContext(sessionId, info);
 
     await Sessions.loadMore();
     Sessions.setupScroll();
@@ -808,6 +818,198 @@ const Sessions = {
     document.querySelectorAll(`.session-card[data-session-id="${sessionId}"] .action-menu-item[data-session="${sessionId}"]`).forEach(btn => {
       btn.dataset.title = title;
     });
+  },
+
+  switchTab(tab) {
+    const ctx = document.getElementById('session-context');
+    const msgs = document.getElementById('session-messages-wrap');
+    const fcBtn = document.getElementById('tab-btn-file-changes');
+    const cvBtn = document.getElementById('tab-btn-conversation');
+    if (!ctx || !msgs || !fcBtn || !cvBtn) return;
+    const isFC = tab === 'file-changes';
+    ctx.style.display = isFC ? 'block' : 'none';
+    msgs.style.display = isFC ? 'none' : '';
+    fcBtn.classList.toggle('active', isFC);
+    cvBtn.classList.toggle('active', !isFC);
+  },
+
+  async annotatePlans(sessions) {
+    if (!sessions.length) return;
+    try {
+      const plans = await api('/api/plans');
+      if (!plans.length) return;
+      const slack = 30 * 60 * 1000;
+      for (const s of sessions) {
+        if (!s.created || !s.modified) continue;
+        const from = new Date(s.created).getTime() - slack;
+        const to = new Date(s.modified).getTime() + slack;
+        const hasPlans = plans.some(p => {
+          const t = new Date(p.mtime).getTime();
+          return t >= from && t <= to;
+        });
+        if (!hasPlans) continue;
+        const card = document.querySelector(`.session-card[data-session-id="${s.sessionId}"]`);
+        if (!card) continue;
+        const meta = card.querySelector('.session-meta');
+        if (meta) meta.insertAdjacentHTML('afterbegin', '<span class="session-plan-badge" title="Plans were active during this session">plan</span>');
+      }
+    } catch (_) {}
+  },
+
+  async loadContext(sessionId, info) {
+    const el = document.getElementById('session-context');
+    if (!el) return;
+
+    const from = info && info.created ? new Date(info.created).toISOString() : '';
+    const to = info && info.modified ? new Date(info.modified).toISOString() : '';
+    const qs = from && to ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` : '';
+
+    try {
+      const data = await api(`/api/file-history/${encodeURIComponent(sessionId)}/context${qs}`);
+      Sessions.renderContext(el, sessionId, data);
+    } catch (_) {
+      Sessions.switchTab('conversation');
+    }
+  },
+
+  renderContext(el, sessionId, data) {
+    const hasFiles = data.files && data.files.length > 0;
+    const hasPlans = data.plans && data.plans.length > 0;
+    if (!hasFiles && !hasPlans) { Sessions.switchTab('conversation'); return; }
+
+    Sessions._ctx = { sessionId, files: data.files || [], sort: 'default' };
+
+    let html = '';
+
+    if (hasFiles) {
+      // Collect all unique version pairs across files that have 2+ versions
+      const pairSet = new Set();
+      for (const f of data.files) {
+        for (let i = 0; i < f.versions.length - 1; i++) {
+          pairSet.add(`${f.versions[i]},${f.versions[i + 1]}`);
+        }
+      }
+      const pairs = [...pairSet].map(p => p.split(',').map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const defaultPair = pairs.length ? pairs[pairs.length - 1] : null;
+      Sessions._ctx.pair = defaultPair;
+
+      const filterHtml = pairs.length > 1
+        ? `<div class="ctx-version-filter">${pairs.map(([f, t]) =>
+            `<button class="ctx-ver-btn${defaultPair && f === defaultPair[0] && t === defaultPair[1] ? ' active' : ''}"
+              onclick="Sessions.selectCtxVersion(${f},${t})">v${f}→v${t}</button>`
+          ).join('')}</div>`
+        : '';
+
+      const sortHtml = `<div class="ctx-sort-bar">
+        <span class="ctx-sort-label">Sort:</span>
+        <button class="ctx-sort-btn active" onclick="Sessions.sortCtxFiles('default')">Default</button>
+        <button class="ctx-sort-btn" onclick="Sessions.sortCtxFiles('asc')">A→Z</button>
+        <button class="ctx-sort-btn" onclick="Sessions.sortCtxFiles('desc')">Z→A</button>
+      </div>`;
+
+      html += `<div class="ctx-section" id="ctx-files-section">
+        <button class="ctx-toggle" onclick="Sessions.toggleCtx('ctx-files-section')">
+          <span class="ctx-arrow">&#9660;</span> Files edited (${data.files.length})
+        </button>
+        <div class="ctx-body">
+          ${filterHtml}
+          ${sortHtml}
+          <div id="ctx-file-list">${Sessions._renderCtxFileList()}</div>
+        </div>
+      </div>`;
+    }
+
+    if (hasPlans) {
+      const planRows = data.plans.map(p =>
+        `<div class="ctx-plan-row" onclick="Sessions.showPlan('${p.name}')">
+          <span class="ctx-plan-name">${escapeHtml(p.name)}</span>
+          <span class="ctx-plan-time">${timeAgo(p.mtime)}</span>
+        </div>`
+      ).join('');
+
+      html += `<div class="ctx-section" id="ctx-plans-section">
+        <button class="ctx-toggle" onclick="Sessions.toggleCtx('ctx-plans-section')">
+          <span class="ctx-arrow">&#9660;</span> Plans (${data.plans.length})
+        </button>
+        <div class="ctx-body">${planRows}</div>
+      </div>`;
+    }
+
+    el.innerHTML = html;
+    el.style.display = 'block';
+  },
+
+  _renderCtxFileList() {
+    const { sessionId, files, pair, sort } = Sessions._ctx;
+    const [from, to] = pair || [null, null];
+    let visible = from !== null
+      ? files.filter(f => f.versions.includes(from) && f.versions.includes(to))
+      : files.slice();
+    if (sort === 'asc') visible.sort((a, b) => a.path.split(/[\\/]/).pop().localeCompare(b.path.split(/[\\/]/).pop()));
+    else if (sort === 'desc') visible.sort((a, b) => b.path.split(/[\\/]/).pop().localeCompare(a.path.split(/[\\/]/).pop()));
+    if (!visible.length) return '<div class="ctx-empty">No files changed in this version</div>';
+    return visible.map(f => {
+      const name = f.path.replace(/\\/g, '/').split('/').pop();
+      return `<div class="ctx-file-item"
+        data-session="${escapeHtml(sessionId)}"
+        data-hash="${escapeHtml(f.hash)}"
+        data-from="${from}" data-to="${to}"
+        data-path="${escapeHtml(f.path)}"
+        title="${escapeHtml(f.path)}"
+        onclick="Sessions._openCtxDiff(this)">${escapeHtml(name)}</div>`;
+    }).join('');
+  },
+
+  sortCtxFiles(order) {
+    Sessions._ctx.sort = order;
+    document.querySelectorAll('.ctx-sort-btn').forEach(btn => {
+      const labels = { default: 'Default', asc: 'A→Z', desc: 'Z→A' };
+      btn.classList.toggle('active', btn.textContent.trim() === labels[order]);
+    });
+    const list = document.getElementById('ctx-file-list');
+    if (list) list.innerHTML = Sessions._renderCtxFileList();
+  },
+
+  selectCtxVersion(from, to) {
+    Sessions._ctx.pair = [from, to];
+    document.querySelectorAll('.ctx-ver-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.textContent.trim() === `v${from}→v${to}`);
+    });
+    const list = document.getElementById('ctx-file-list');
+    if (list) list.innerHTML = Sessions._renderCtxFileList();
+  },
+
+  _openCtxDiff(el) {
+    const { session, hash, from, to, path } = el.dataset;
+    FileHistory.showDiff(session, hash, parseInt(from, 10), parseInt(to, 10), path);
+  },
+
+  toggleCtx(sectionId) {
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+    const body = section.querySelector('.ctx-body');
+    const arrow = section.querySelector('.ctx-arrow');
+    const open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    arrow.innerHTML = open ? '&#9654;' : '&#9660;';
+  },
+
+
+  async showPlan(name) {
+    const overlay = openModal({
+      title: name,
+      width: 800,
+      body: '<div id="plan-modal-body"><div class="loading"><div class="spinner"></div>Loading…</div></div>',
+      buttons: []
+    });
+    try {
+      const plan = await api(`/api/plans/${encodeURIComponent(name)}`);
+      overlay.querySelector('#plan-modal-body').innerHTML =
+        `<div class="markdown-body">${renderMarkdown(plan.content)}</div>`;
+    } catch (e) {
+      overlay.querySelector('#plan-modal-body').innerHTML =
+        `<div class="empty-state"><p>${escapeHtml(e.message)}</p></div>`;
+    }
   },
 
 };

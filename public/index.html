@@ -418,7 +418,7 @@
               <label>Period</label>
               <select id="proj-filter-date-preset" onchange="ProjectUsage.setDatePreset(this.value)">
                 <option value="all">All time</option>
-                <option value="today">Today</option>
+                <option value="today" selected>Today</option>
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
                 <option value="month">This month</option>
@@ -428,11 +428,11 @@
             </div>
             <div class="filter-field">
               <label>From</label>
-              <input type="date" id="proj-filter-from" onchange="ProjectUsage.applyCustomDates()">
+              <input type="datetime-local" id="proj-filter-from" onchange="ProjectUsage.applyCustomDates()">
             </div>
             <div class="filter-field">
               <label>To</label>
-              <input type="date" id="proj-filter-to" onchange="ProjectUsage.applyCustomDates()">
+              <input type="datetime-local" id="proj-filter-to" onchange="ProjectUsage.applyCustomDates()">
             </div>
             <button class="btn btn-sm filter-clear-all" onclick="ProjectUsage.clearFilter()">Clear</button>
           </div>
@@ -489,6 +489,7 @@
           <div class="project-tab" id="tab-proj-output-styles">
             <div id="proj-output-styles-content"></div>
           </div>
+
           <div class="project-tab" id="tab-claude-md">
             <div id="project-claude-md-path" style="font-size:12px;color:var(--text-muted);margin-bottom:12px"></div>
             <div class="btn-group" style="margin-bottom: 12px">
@@ -532,7 +533,13 @@
           <div class="session-meta" id="session-detail-meta"></div>
         </div>
         <div class="view-body session-detail-body" id="session-detail-body">
-          <div class="session-messages-wrap" id="session-messages-wrap">
+          <div class="session-main-panel">
+            <div class="session-tab-bar">
+              <button class="session-tab-btn active" id="tab-btn-file-changes" onclick="Sessions.switchTab('file-changes')">File Changes</button>
+              <button class="session-tab-btn" id="tab-btn-conversation" onclick="Sessions.switchTab('conversation')">Conversation</button>
+            </div>
+            <div id="session-context" class="session-context" style="display:none"></div>
+            <div class="session-messages-wrap" id="session-messages-wrap" style="display:none">
             <div class="session-messages-header">
               <div class="subtitle" id="session-count" style="color:var(--text-muted)"></div>
               <div class="session-search-wrap" style="margin-top:8px;margin-bottom:0">
@@ -550,7 +557,8 @@
               <div id="session-messages" class="chat-container"></div>
             </div>
             <button class="scroll-to-top" id="scroll-to-top-btn" onclick="Sessions.scrollToTop()" aria-label="Scroll to top" title="Scroll to top">&#8593;</button>
-          </div>
+            </div><!-- end session-messages-wrap -->
+          </div><!-- end session-main-panel -->
           <div class="terminal-splitter" id="terminal-splitter" onmousedown="TerminalPanel.startDrag(event)"></div>
           <div class="terminal-pane" id="terminal-pane">
             <div class="terminal-pane-header">
@@ -676,6 +684,7 @@
   <script src="/js/usage-charts.js"></script>
   <script src="/js/terminal.js"></script>
   <script src="/js/manager-settings.js"></script>
+  <script src="/js/file-history.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>
