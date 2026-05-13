@@ -43,7 +43,8 @@ const Dashboard = {
       onclick: `App.navigate('session-detail', { slug: '${s.slug}', sessionId: '${s.sessionId}', sessionInfo: null })`,
       project: decodeName(s.slug),
       timeAgo: s.modified ? Dashboard.timeAgo(new Date(s.modified)) : '',
-      slug: s.slug
+      slug: s.slug,
+      dates: true
     })).join('');
     if (typeof Sessions !== 'undefined') Sessions.annotatePlans(sessions);
   },

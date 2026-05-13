@@ -12,6 +12,8 @@
   box-sizing: border-box;
 }
 
+[hidden] { display: none !important; }
+
 body {
   font-family: var(--font);
   background: var(--bg-primary);
@@ -1426,7 +1428,7 @@ mark.search-highlight {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 16px 44px 16px 16px;
   margin-bottom: 8px;
   transition: border-color 0.15s;
   position: relative;
