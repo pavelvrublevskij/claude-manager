@@ -3,7 +3,7 @@
 const SIDEBAR_COLLAPSED_KEY = 'claude-manager-sidebar-collapsed';
 
 const App = {
-  currentView: 'dashboard',
+  currentView: 'usage',
   currentProject: null,
 
   init() {
@@ -51,7 +51,7 @@ const App = {
   restoreRoute() {
     const hash = window.location.hash.slice(1); // remove #
     if (!hash) {
-      App.navigate('dashboard');
+      App.navigate('usage');
       return;
     }
     const parts = hash.split('/');

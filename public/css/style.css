@@ -111,15 +111,6 @@ body {
   overflow: hidden;
 }
 
-.app.sidebar-collapsed .sidebar-header {
-  justify-content: center;
-  padding: 14px 0;
-}
-
-.app.sidebar-collapsed .sidebar-header h1 {
-  flex: none;
-  gap: 0;
-}
 
 .sidebar-toggle {
   flex: 0 0 16px;
@@ -143,28 +134,8 @@ body {
   color: var(--text-primary);
 }
 
-.sidebar-header {
-  padding: 20px 16px 12px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.sidebar-header h1 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-.sidebar-header h1 .logo {
-  width: 20px;
+.logo {
+  width: 24px;
   height: 20px;
   background: var(--accent);
   border-radius: var(--radius-sm);
@@ -174,6 +145,7 @@ body {
   font-size: 12px;
   font-weight: 700;
   color: var(--bg-primary);
+  flex-shrink: 0;
 }
 
 .sidebar-nav {
@@ -201,6 +173,17 @@ body {
   border-color: var(--accent);
   color: var(--accent);
   background: var(--accent-bg);
+}
+
+.app-footer .theme-toggle {
+  width: auto;
+  height: 18px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  background: none;
+  padding: 0 6px;
+  border-radius: 3px;
+  gap: 4px;
 }
 
 .nav-section {

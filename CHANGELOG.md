@@ -9,6 +9,12 @@
 
 - Frontend and server code split into focused modules for reusability (`session-context.js`, `session-messages.js`, `session-search.js`, `usage-filters.js`, `crud-frontmatter.js`, `date-filter.js`, `project-mcp-tab.js`, `project-settings-tab.js`)
 
+### UI
+
+- **Footer**: theme toggle moved from sidebar header to footer — shows current theme name with `Theme:` label; cycles through all 4 themes on click
+- **Sidebar**: removed header block (logo + toggle); nav starts at top
+- **Token Usage**: now the default view and first item in sidebar nav
+
 ## v0.8.2
 
 ### Bug fixes

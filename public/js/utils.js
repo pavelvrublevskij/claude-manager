@@ -122,8 +122,10 @@ const Theme = {
     if (link) link.href = '/css/themes/' + theme + '.css';
     const icon = document.getElementById('theme-icon');
     if (icon) icon.innerHTML = Theme.icons[theme];
+    const label = document.getElementById('theme-label');
+    if (label) label.textContent = Theme.labels[theme];
     const btn = document.getElementById('theme-toggle');
-    if (btn) btn.title = Theme.labels[theme] + ' mode';
+    if (btn) btn.title = 'Theme: ' + Theme.labels[theme] + ' — click to cycle';
   }
 };
 
