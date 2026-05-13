@@ -14,6 +14,7 @@
 - **Footer**: theme toggle moved from sidebar header to footer — shows current theme name with `Theme:` label; cycles through all 4 themes on click
 - **Sidebar**: removed header block (logo + toggle); nav starts at top
 - **Token Usage**: now the default view and first item in sidebar nav
+- **Onboarding tour**: 6-step spotlight walkthrough on first load — covers navigation, usage summary, filters, table/charts toggle, and period breakdown; re-triggers automatically when the minor version increments; skippable at any step
 
 ## v0.8.2
 

@@ -173,6 +173,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (av) av.textContent = 'v' + data.version;
     const fv = document.getElementById('footer-version');
     if (fv) fv.textContent = 'v' + data.version;
+    const minor = parseInt((data.version || '0.0.0').split('.')[1], 10);
+    if (typeof Tour !== 'undefined' && Tour.shouldShow(minor)) setTimeout(() => Tour.start(minor), 400);
     if (data.updateAvailable) {
       const banner = document.getElementById('update-banner');
       banner.innerHTML = `New version <strong>v${escapeHtml(data.latest)}</strong> available! &nbsp;
