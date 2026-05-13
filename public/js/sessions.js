@@ -3,7 +3,6 @@
 const Sessions = {
   cache: {},
   _searchSlug: null,
-  _searchTimer: null,
 
   async load(slug) {
     Sessions._searchSlug = slug;
@@ -101,8 +100,7 @@ const Sessions = {
     return escaped.replace(re, '<mark>$1</mark>');
   },
 
-  onSearch(slug, value) {
-    clearTimeout(Sessions._searchTimer);
+  onSearch: debounce(async function(slug, value) {
     const q = value.trim();
     Sessions._lastQuery = q;
 
@@ -117,28 +115,26 @@ const Sessions = {
       return;
     }
 
-    Sessions._searchTimer = setTimeout(async () => {
-      try {
-        const results = await api(`/api/projects/${slug}/sessions/search?q=${encodeURIComponent(q)}`);
-        if (Sessions._lastQuery !== q) return;
-        const container = document.getElementById('sessions-list');
-        const searchInput = document.getElementById('session-search-input');
-        const cursorPos = searchInput?.selectionStart;
-        if (results.length === 0) {
-          container.innerHTML = Sessions.renderSearchBar(slug) +
-            '<div class="empty-state"><p>No sessions match your search</p></div>';
-        } else {
-          container.innerHTML = Sessions.renderSearchBar(slug) +
-            results.map((s, i) => Sessions.renderCard(slug, s, i)).join('');
-          Sessions.annotatePlans(results);
-        }
-        const newInput = document.getElementById('session-search-input');
-        if (newInput) { newInput.value = value; newInput.focus(); newInput.selectionStart = newInput.selectionEnd = cursorPos; }
-      } catch (e) {
-        toast('Search failed', 'error');
+    try {
+      const results = await api(`/api/projects/${slug}/sessions/search?q=${encodeURIComponent(q)}`);
+      if (Sessions._lastQuery !== q) return;
+      const container = document.getElementById('sessions-list');
+      const searchInput = document.getElementById('session-search-input');
+      const cursorPos = searchInput?.selectionStart;
+      if (results.length === 0) {
+        container.innerHTML = Sessions.renderSearchBar(slug) +
+          '<div class="empty-state"><p>No sessions match your search</p></div>';
+      } else {
+        container.innerHTML = Sessions.renderSearchBar(slug) +
+          results.map((s, i) => Sessions.renderCard(slug, s, i)).join('');
+        Sessions.annotatePlans(results);
       }
-    }, 300);
-  },
+      const newInput = document.getElementById('session-search-input');
+      if (newInput) { newInput.value = value; newInput.focus(); newInput.selectionStart = newInput.selectionEnd = cursorPos; }
+    } catch (e) {
+      toast('Search failed', 'error');
+    }
+  }, 300),
 
   open(slug, sessionId, index) {
     Sessions.stopAutoRefresh();
@@ -380,40 +376,6 @@ const Sessions = {
     Sessions.pollContext(slugAtStart, sessionAtStart);
   },
 
-  async pollContext(slug, sessionId) {
-    const el = document.getElementById('session-context');
-    if (!el) return;
-
-    const info = Sessions._detailInfo;
-    const from = info && info.created ? new Date(info.created).toISOString() : '';
-    const to = info && info.modified ? new Date(info.modified).toISOString() : '';
-    const qs = from && to ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` : '';
-
-    try {
-      const data = await api(`/api/file-history/${encodeURIComponent(sessionId)}/context${qs}`);
-      if (Sessions.detailState.sessionId !== sessionId) return;
-
-      const hasFiles = data.files && data.files.length > 0;
-      const hasPlans = data.plans && data.plans.length > 0;
-      if (!hasFiles && !hasPlans) return;
-
-      const ctx = Sessions._ctx;
-      const sameFiles = ctx && ctx.files.length === data.files.length;
-      const samePlans = ctx && ctx.plans.length === (data.plans ? data.plans.length : 0);
-      if (sameFiles && samePlans) return;
-
-      const savedPair = ctx && ctx.pair ? [...ctx.pair] : null;
-      const savedSort = ctx && ctx.sort || 'default';
-
-      Sessions.renderContext(el, sessionId, data);
-
-      if (savedSort !== 'default') Sessions.sortCtxFiles(savedSort);
-      if (savedPair && Sessions._ctx.files.some(f =>
-        f.versions.includes(savedPair[0]) && f.versions.includes(savedPair[1])
-      )) Sessions.selectCtxVersion(savedPair[0], savedPair[1]);
-    } catch (_) {}
-  },
-
   scrollContainer() {
     return document.getElementById('session-messages-pane')
       || document.querySelector('#view-session-detail .view-body');
@@ -504,262 +466,6 @@ const Sessions = {
     } finally {
       state.loading = false;
     }
-  },
-
-  renderMessage(msg) {
-    const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
-    let bodyHtml = '';
-    const hasText = msg.content.some(b => b.type === 'text' && b.text && b.text.trim());
-
-    for (const block of msg.content) {
-      if (block.type === 'text') {
-        bodyHtml += `<div class="chat-text">${renderMarkdown(block.text)}</div>`;
-      } else if (block.type === 'tool_use') {
-        const toolId = 'tool-' + Math.random().toString(36).slice(2, 8);
-        const { headerSuffix, bodyContent } = Sessions.formatToolUse(block.name, block.input);
-        bodyHtml += `
-          <div class="chat-tool">
-            <div class="chat-tool-header" onclick="document.getElementById('${toolId}').classList.toggle('open')">
-              &#9654; <span class="tool-name">${escapeHtml(block.name)}</span>${headerSuffix}
-            </div>
-            <div class="chat-tool-body" id="${toolId}">${bodyContent}</div>
-          </div>
-        `;
-      } else if (block.type === 'tool_result') {
-        if (block.text) {
-          const resId = 'res-' + Math.random().toString(36).slice(2, 8);
-          bodyHtml += `
-            <div class="chat-tool-result">
-              <div class="chat-tool-header" onclick="document.getElementById('${resId}').classList.toggle('open')">
-                &#9654; Result
-              </div>
-              <div class="chat-tool-body" id="${resId}">${escapeHtml(block.text)}</div>
-            </div>
-          `;
-        }
-      }
-    }
-
-    return `
-      <div class="chat-msg ${msg.role}${hasText ? '' : ' chat-msg-tools-only'}">
-        <div class="chat-role ${msg.role}">
-          <span class="chat-role-label">${msg.role === 'user' ? 'You' : 'Claude'}</span>
-          ${msg.model && msg.role === 'assistant' ? `<span class="chat-model">${escapeHtml(shortModel(msg.model))}</span>` : ''}
-          <span class="chat-time">${time}</span>
-        </div>
-        ${bodyHtml}
-      </div>
-    `;
-  },
-
-  _detailSearchTimer: null,
-  _detailSearchQuery: '',
-
-  onDetailSearch(value) {
-    clearTimeout(Sessions._detailSearchTimer);
-    const q = value.trim();
-    Sessions._detailSearchQuery = q;
-
-    Sessions._detailSearchTimer = setTimeout(async () => {
-      if (Sessions._detailSearchQuery !== q) return;
-
-      // Load all remaining messages so search covers the whole session
-      if (q && Sessions.detailState.hasMore) {
-        await Sessions.loadAllMessages();
-        if (Sessions._detailSearchQuery !== q) return;
-      }
-
-      Sessions.applyDetailFilter(q);
-    }, 250);
-  },
-
-  async loadAllMessages() {
-    while (Sessions.detailState.hasMore && !Sessions.detailState.loading) {
-      await Sessions.loadMore();
-    }
-  },
-
-  applyDetailFilter(query) {
-    const container = document.getElementById('session-messages');
-    const countEl = document.getElementById('session-detail-search-count');
-    const messages = container.querySelectorAll('.chat-msg');
-    const showTools = Sessions.showToolDetails();
-
-    // Remove any existing highlights
-    container.querySelectorAll('mark.search-highlight').forEach(m => {
-      const parent = m.parentNode;
-      parent.replaceChild(document.createTextNode(m.textContent), m);
-      parent.normalize();
-    });
-
-    if (!query) {
-      messages.forEach(msg => msg.style.display = '');
-      if (countEl) countEl.textContent = '';
-      return;
-    }
-
-    const qLower = query.toLowerCase();
-    let matchedMessages = 0;
-    let totalMatches = 0;
-
-    messages.forEach(msg => {
-      // When tools are hidden, tool-only messages are invisible — skip them.
-      if (!showTools && msg.classList.contains('chat-msg-tools-only')) {
-        msg.style.display = '';
-        return;
-      }
-      // When tools are hidden, search only the visible chat-text blocks.
-      let text;
-      if (showTools) {
-        text = msg.textContent.toLowerCase();
-      } else {
-        text = Array.from(msg.querySelectorAll('.chat-text'))
-          .map(n => n.textContent).join(' ').toLowerCase();
-      }
-      if (text.includes(qLower)) {
-        msg.style.display = '';
-        matchedMessages++;
-        const scope = showTools ? msg : msg.querySelectorAll('.chat-text');
-        if (showTools) {
-          totalMatches += Sessions.highlightInNode(msg, query);
-        } else {
-          scope.forEach(n => { totalMatches += Sessions.highlightInNode(n, query); });
-        }
-      } else {
-        msg.style.display = 'none';
-      }
-    });
-
-    if (countEl) {
-      countEl.textContent = matchedMessages
-        ? `${totalMatches} matches in ${matchedMessages} messages`
-        : 'No matches';
-    }
-  },
-
-  highlightInNode(root, query) {
-    const qLower = query.toLowerCase();
-    let count = 0;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-      acceptNode: n => n.parentNode.tagName === 'SCRIPT' || n.parentNode.tagName === 'STYLE'
-        ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
-    });
-    const textNodes = [];
-    let node;
-    while ((node = walker.nextNode())) textNodes.push(node);
-
-    for (const textNode of textNodes) {
-      const text = textNode.nodeValue;
-      const lower = text.toLowerCase();
-      let idx = lower.indexOf(qLower);
-      if (idx === -1) continue;
-
-      const frag = document.createDocumentFragment();
-      let last = 0;
-      while (idx !== -1) {
-        if (idx > last) frag.appendChild(document.createTextNode(text.slice(last, idx)));
-        const mark = document.createElement('mark');
-        mark.className = 'search-highlight';
-        mark.textContent = text.slice(idx, idx + query.length);
-        frag.appendChild(mark);
-        count++;
-        last = idx + query.length;
-        idx = lower.indexOf(qLower, last);
-      }
-      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
-      textNode.parentNode.replaceChild(frag, textNode);
-    }
-    return count;
-  },
-
-  formatToolUse(name, input) {
-    const basename = p => p ? escapeHtml(p.split(/[/\\]/).pop()) : '';
-    const param = html => `<span class="tool-param">${html}</span>`;
-
-    switch (name) {
-      case 'Edit': {
-        const file = basename(input.file_path || '');
-        return {
-          headerSuffix: file ? ` ${param(file)}` : '',
-          bodyContent: Sessions.renderEditDiff(input)
-        };
-      }
-      case 'Write': {
-        const file = basename(input.file_path || '');
-        const preview = (input.content || '').slice(0, 600);
-        return {
-          headerSuffix: file ? ` ${param(file)}` : '',
-          bodyContent: `<div class="tool-file-path">${escapeHtml(input.file_path || '')}</div><pre class="tool-code">${escapeHtml(preview)}${(input.content || '').length > 600 ? '\n…' : ''}</pre>`
-        };
-      }
-      case 'Read': {
-        const file = basename(input.file_path || '');
-        const extras = [input.offset ? `offset:${input.offset}` : '', input.limit ? `limit:${input.limit}` : ''].filter(Boolean).join('  ');
-        return {
-          headerSuffix: file ? ` ${param(file)}${extras ? ` <span class="tool-param-muted">${escapeHtml(extras)}</span>` : ''}` : '',
-          bodyContent: `<div class="tool-file-path">${escapeHtml(input.file_path || '')}</div>`
-        };
-      }
-      case 'Bash': {
-        const cmd = input.command || '';
-        const preview = cmd.slice(0, 80) + (cmd.length > 80 ? '…' : '');
-        return {
-          headerSuffix: cmd ? ` ${param(escapeHtml(preview))}` : '',
-          bodyContent: `<pre class="tool-code">${escapeHtml(cmd)}</pre>`
-        };
-      }
-      case 'Glob': {
-        return {
-          headerSuffix: input.pattern ? ` ${param(escapeHtml(input.pattern))}` : '',
-          bodyContent: escapeHtml(JSON.stringify(input, null, 2))
-        };
-      }
-      case 'Grep': {
-        return {
-          headerSuffix: input.pattern ? ` ${param(escapeHtml(input.pattern))}` : '',
-          bodyContent: escapeHtml(JSON.stringify(input, null, 2))
-        };
-      }
-      case 'Agent': {
-        const desc = input.description ? input.description.slice(0, 60) : '';
-        return {
-          headerSuffix: desc ? ` ${param(escapeHtml(desc))}` : '',
-          bodyContent: escapeHtml(JSON.stringify(input, null, 2))
-        };
-      }
-      case 'WebFetch': {
-        let host = '';
-        try { host = new URL(input.url || '').hostname; } catch (_) { host = (input.url || '').slice(0, 60); }
-        return {
-          headerSuffix: host ? ` ${param(escapeHtml(host))}` : '',
-          bodyContent: escapeHtml(JSON.stringify(input, null, 2))
-        };
-      }
-      case 'WebSearch': {
-        return {
-          headerSuffix: input.query ? ` ${param(escapeHtml(input.query.slice(0, 60)))}` : '',
-          bodyContent: escapeHtml(JSON.stringify(input, null, 2))
-        };
-      }
-      default:
-        return { headerSuffix: '', bodyContent: escapeHtml(JSON.stringify(input, null, 2)) };
-    }
-  },
-
-  renderEditDiff(input) {
-    const filePath = input.file_path ? `<div class="tool-file-path">${escapeHtml(input.file_path)}</div>` : '';
-    const replaceAll = input.replace_all ? `<div class="tool-replace-all">replace_all</div>` : '';
-    const oldStr = input.old_string != null ? `
-      <div class="tool-diff-section tool-diff-old">
-        <div class="tool-diff-label">Before</div>
-        <pre>${escapeHtml(input.old_string.trim())}</pre>
-      </div>` : '';
-    const newStr = input.new_string != null ? `
-      <div class="tool-diff-section tool-diff-new">
-        <div class="tool-diff-label">After</div>
-        <pre>${escapeHtml(input.new_string.trim())}</pre>
-      </div>` : '';
-    return `${filePath}${replaceAll}<div class="tool-diff">${oldStr}${newStr}</div>`;
   },
 
   async checkPricing() {
@@ -920,153 +626,6 @@ const Sessions = {
     msgs.style.display = isFC ? 'none' : '';
     fcBtn.classList.toggle('active', isFC);
     cvBtn.classList.toggle('active', !isFC);
-  },
-
-  async annotatePlans(sessions) {
-    if (!sessions.length) return;
-    try {
-      const plans = await api('/api/plans');
-      if (!plans.length) return;
-      const slack = 30 * 60 * 1000;
-      for (const s of sessions) {
-        if (!s.created || !s.modified) continue;
-        const from = new Date(s.created).getTime() - slack;
-        const to = new Date(s.modified).getTime() + slack;
-        const hasPlans = plans.some(p => {
-          const t = new Date(p.mtime).getTime();
-          return t >= from && t <= to;
-        });
-        if (!hasPlans) continue;
-        const card = document.querySelector(`.session-card[data-session-id="${s.sessionId}"]`);
-        if (!card) continue;
-        const meta = card.querySelector('.session-meta');
-        if (meta) meta.insertAdjacentHTML('afterbegin', '<span class="session-plan-badge" title="Plans were active during this session">plan</span>');
-      }
-    } catch (_) {}
-  },
-
-  async loadContext(sessionId, info) {
-    const el = document.getElementById('session-context');
-    if (!el) return;
-
-    const from = info && info.created ? new Date(info.created).toISOString() : '';
-    const to = info && info.modified ? new Date(info.modified).toISOString() : '';
-    const qs = from && to ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` : '';
-
-    try {
-      const data = await api(`/api/file-history/${encodeURIComponent(sessionId)}/context${qs}`);
-      Sessions.renderContext(el, sessionId, data);
-    } catch (_) {
-      Sessions.switchTab('conversation');
-    }
-  },
-
-  renderContext(el, sessionId, data) {
-    const hasFiles = data.files && data.files.length > 0;
-    const hasPlans = data.plans && data.plans.length > 0;
-    if (!hasFiles && !hasPlans) { Sessions.switchTab('conversation'); return; }
-
-    Sessions._ctx = { sessionId, projSlug: data.projSlug || '', files: data.files || [], plans: data.plans || [], sort: 'default' };
-
-    let html = '';
-
-    if (hasFiles) {
-      const sortHtml = `<div class="ctx-sort-bar">
-        <span class="ctx-sort-label">Sort:</span>
-        <button class="ctx-sort-btn active" onclick="Sessions.sortCtxFiles('default')">Default</button>
-        <button class="ctx-sort-btn" onclick="Sessions.sortCtxFiles('asc')">A→Z</button>
-        <button class="ctx-sort-btn" onclick="Sessions.sortCtxFiles('desc')">Z→A</button>
-      </div>`;
-
-      html += `<div class="ctx-section" id="ctx-files-section">
-        <button class="ctx-toggle" onclick="Sessions.toggleCtx('ctx-files-section')">
-          <span class="ctx-arrow">&#9660;</span> Files edited (${data.files.length})
-        </button>
-        <div class="ctx-body">
-          ${sortHtml}
-          <div id="ctx-file-list">${Sessions._renderCtxFileList()}</div>
-        </div>
-      </div>`;
-    }
-
-    if (hasPlans) {
-      const planRows = data.plans.map(p =>
-        `<div class="ctx-plan-row" onclick="Sessions.showPlan('${p.name}')">
-          <span class="ctx-plan-name">${escapeHtml(p.name)}</span>
-          <span class="ctx-plan-time">${timeAgo(p.mtime)}</span>
-        </div>`
-      ).join('');
-
-      html += `<div class="ctx-section" id="ctx-plans-section">
-        <button class="ctx-toggle" onclick="Sessions.toggleCtx('ctx-plans-section')">
-          <span class="ctx-arrow">&#9660;</span> Plans (${data.plans.length})
-        </button>
-        <div class="ctx-body">${planRows}</div>
-      </div>`;
-    }
-
-    el.innerHTML = html;
-  },
-
-  _renderCtxFileList() {
-    const { sessionId, files, sort } = Sessions._ctx;
-    let visible = files.slice();
-    if (sort === 'asc') visible.sort((a, b) => a.path.split(/[\\/]/).pop().localeCompare(b.path.split(/[\\/]/).pop()));
-    else if (sort === 'desc') visible.sort((a, b) => b.path.split(/[\\/]/).pop().localeCompare(a.path.split(/[\\/]/).pop()));
-    if (!visible.length) return '<div class="ctx-empty">No files changed</div>';
-    return visible.map(f => {
-      const name = f.path.replace(/\\/g, '/').split('/').pop();
-      return `<div class="ctx-file-item"
-        data-session="${escapeHtml(sessionId)}"
-        data-hash="${escapeHtml(f.hash)}"
-        data-from="${f.versions[0]}"
-        data-path="${escapeHtml(f.path)}"
-        title="${escapeHtml(f.path)}"
-        onclick="Sessions._openCtxDiff(this)">${escapeHtml(name)}</div>`;
-    }).join('');
-  },
-
-  sortCtxFiles(order) {
-    Sessions._ctx.sort = order;
-    document.querySelectorAll('.ctx-sort-btn').forEach(btn => {
-      const labels = { default: 'Default', asc: 'A→Z', desc: 'Z→A' };
-      btn.classList.toggle('active', btn.textContent.trim() === labels[order]);
-    });
-    const list = document.getElementById('ctx-file-list');
-    if (list) list.innerHTML = Sessions._renderCtxFileList();
-  },
-
-  _openCtxDiff(el) {
-    const { session, hash, from, path } = el.dataset;
-    FileHistory.showDiffCurrent(session, hash, parseInt(from, 10), Sessions._ctx.projSlug, path);
-  },
-
-  toggleCtx(sectionId) {
-    const section = document.getElementById(sectionId);
-    if (!section) return;
-    const body = section.querySelector('.ctx-body');
-    const arrow = section.querySelector('.ctx-arrow');
-    const open = body.style.display !== 'none';
-    body.style.display = open ? 'none' : 'block';
-    arrow.innerHTML = open ? '&#9654;' : '&#9660;';
-  },
-
-
-  async showPlan(name) {
-    const overlay = openModal({
-      title: name,
-      width: 800,
-      body: '<div id="plan-modal-body"><div class="loading"><div class="spinner"></div>Loading…</div></div>',
-      buttons: []
-    });
-    try {
-      const plan = await api(`/api/plans/${encodeURIComponent(name)}`);
-      overlay.querySelector('#plan-modal-body').innerHTML =
-        `<div class="markdown-body">${renderMarkdown(plan.content)}</div>`;
-    } catch (e) {
-      overlay.querySelector('#plan-modal-body').innerHTML =
-        `<div class="empty-state"><p>${escapeHtml(e.message)}</p></div>`;
-    }
   },
 
 };

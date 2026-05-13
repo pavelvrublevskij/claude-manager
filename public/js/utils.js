@@ -74,6 +74,22 @@ async function copyToClipboard(text, label = 'Copied') {
   }
 }
 
+function debounce(fn, ms) {
+  let timer;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
+
+function buildTable(cols, rows) {
+  const head = cols.map(c => `<th${c.cls ? ` class="${c.cls}"` : ''}>${c.label}</th>`).join('');
+  const body = rows.map(cells =>
+    `<tr>${cells.map((v, i) => `<td${cols[i]?.cls ? ` class="${cols[i].cls}"` : ''}>${v}</td>`).join('')}</tr>`
+  ).join('');
+  return `<table class="usage-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
 // --- Theme ---
 
 const Theme = {

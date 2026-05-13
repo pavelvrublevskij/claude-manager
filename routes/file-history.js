@@ -18,6 +18,7 @@ router.get('/:sessionId/context', wrapRoute((req, res) => {
 
   const histDir = path.join(FILE_HISTORY_DIR, sessionId);
   let files = [];
+  let sessionFrom = null, sessionTo = null;
 
   let projSlug = null;
   if (fs.existsSync(histDir)) {
@@ -37,10 +38,16 @@ router.get('/:sessionId/context', wrapRoute((req, res) => {
         if (!line.trim()) continue;
         try {
           const obj = JSON.parse(line);
+          if (obj.type === 'user' && obj.timestamp) {
+            const t = new Date(obj.timestamp).getTime();
+            if (!sessionFrom) sessionFrom = t;
+            sessionTo = t;
+          }
           if (obj.type !== 'file-history-snapshot' || !obj.isSnapshotUpdate) continue;
           const backups = obj.snapshot && obj.snapshot.trackedFileBackups;
           if (!backups) continue;
           for (const [filePath, info] of Object.entries(backups)) {
+            if (!info.backupFileName) continue;
             if (!fileMap[filePath]) fileMap[filePath] = { hash: info.backupFileName.split('@')[0], maxVersion: 0 };
             fileMap[filePath].maxVersion = Math.max(fileMap[filePath].maxVersion, info.version);
           }
@@ -61,8 +68,8 @@ router.get('/:sessionId/context', wrapRoute((req, res) => {
 
   // Plans active during this session time range
   let plans = [];
-  const from = req.query.from ? new Date(req.query.from).getTime() : null;
-  const to = req.query.to ? new Date(req.query.to).getTime() : null;
+  const from = req.query.from ? new Date(req.query.from).getTime() : sessionFrom;
+  const to = req.query.to ? new Date(req.query.to).getTime() : sessionTo;
   if (from && to && fs.existsSync(PLANS_DIR)) {
     const slack = 30 * 60 * 1000; // 30-min window either side
     plans = fs.readdirSync(PLANS_DIR)

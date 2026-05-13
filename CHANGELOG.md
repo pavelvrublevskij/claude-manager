@@ -1,3 +1,14 @@
+## v0.9.0
+
+### Bug fixes
+
+- **File Changes — files not shown**: `null.split('@')` threw on newly created files (no pre-existing backup), causing the entire snapshot entry to be skipped — fixed with a null guard
+- **File Changes — plans disappear on refresh**: plans were skipped when `?from`/`?to` params were absent (no session cache on page refresh) — server now falls back to timestamps extracted from the session JSONL
+
+### Refactor
+
+- Frontend and server code split into focused modules for reusability (`session-context.js`, `session-messages.js`, `session-search.js`, `usage-filters.js`, `crud-frontmatter.js`, `date-filter.js`, `project-mcp-tab.js`, `project-settings-tab.js`)
+
 ## v0.8.2
 
 ### Bug fixes

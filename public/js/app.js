@@ -175,8 +175,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (fv) fv.textContent = 'v' + data.version;
     if (data.updateAvailable) {
       const banner = document.getElementById('update-banner');
-      banner.innerHTML = `New version <strong>v${escapeHtml(data.latest)}</strong> available!
-        <a href="https://github.com/pavelvrublevskij/claude-manager" target="_blank">View on GitHub</a>`;
+      banner.innerHTML = `New version <strong>v${escapeHtml(data.latest)}</strong> available! &nbsp;
+        <a href="https://github.com/pavelvrublevskij/claude-manager" target="_blank">View on GitHub</a> &nbsp;&bull;&nbsp;
+        <a href="https://github.com/pavelvrublevskij/claude-manager/releases/tag/v${escapeHtml(data.latest)}" target="_blank">Download</a> &nbsp;&bull;&nbsp;
+        <a href="https://github.com/pavelvrublevskij/claude-manager/blob/main/CHANGELOG.md" target="_blank">Changelog</a>`;
       banner.style.display = 'block';
     }
   }).catch(() => {});
