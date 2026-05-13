@@ -29,12 +29,17 @@ function toast(message, type = 'success') {
   setTimeout(() => el.remove(), 3000);
 }
 
+function stripAnsi(text) {
+  return (text || '').replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+}
+
 /** Render markdown to HTML using the marked library. */
 function renderMarkdown(text) {
+  const clean = stripAnsi(text);
   if (typeof marked !== 'undefined') {
-    return marked.parse(text || '', { breaks: true });
+    return marked.parse(clean, { breaks: true });
   }
-  return (text || '').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+  return clean.replace(/</g, '&lt;').replace(/\n/g, '<br>');
 }
 
 /** Extract a human-readable short name from a project slug. */
