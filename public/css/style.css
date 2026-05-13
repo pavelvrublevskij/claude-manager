@@ -1943,6 +1943,10 @@ mark.search-highlight {
   background: transparent;
 }
 
+.tour-overlay-dim {
+  background: rgba(0, 0, 0, 0.55);
+}
+
 .tour-spotlight {
   position: fixed;
   z-index: 9001;

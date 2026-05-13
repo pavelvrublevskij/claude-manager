@@ -18,6 +18,12 @@ const Tour = {
       position: 'right'
     },
     {
+      element: '#theme-toggle',
+      title: 'Themes',
+      text: 'Cycle through 4 built-in themes — Dark, Light, Matrix, and Default. Click to switch.',
+      position: 'top'
+    },
+    {
       element: '#usage-summary',
       title: 'Usage Summary',
       text: 'Token Usage is your home view — total API consumption and cost across all projects and models at a glance.',
@@ -119,15 +125,19 @@ const Tour = {
       App.navigate(step.view);
     }
 
+    const overlay = document.getElementById('tour-overlay');
     const spotlight = document.getElementById('tour-spotlight');
     const card = document.getElementById('tour-card');
     if (!spotlight || !card) return;
 
     if (!step.element) {
       spotlight.style.display = 'none';
+      if (overlay) overlay.classList.add('tour-overlay-dim');
       Tour._renderCard(card, null, step, index);
       return;
     }
+
+    if (overlay) overlay.classList.remove('tour-overlay-dim');
 
     const el = document.querySelector(step.element);
     if (!el) {
