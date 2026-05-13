@@ -42,13 +42,13 @@ const Sessions = {
     return `<div class="session-search-wrap">
       <input type="text" class="session-search" id="session-search-input"
         placeholder="Search sessions..." oninput="Sessions.onSearch('${slug}', this.value)">
-      ${window.__docker ? '' : `<div class="action-menu">
+      <div class="action-menu">
         <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); Sessions.toggleActionMenu(this)">New Session &#9662;</button>
         <div class="action-menu-panel">
           <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.newSessionOS('${slug}')">In OS terminal</button>
           <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.newSessionBrowser('${slug}')">In browser terminal</button>
         </div>
-      </div>`}
+      </div>
     </div>`;
   },
 
@@ -153,6 +153,7 @@ const Sessions = {
   },
 
   detailState: { slug: null, sessionId: null, offset: 0, loading: false, hasMore: false, total: 0 },
+  _detailHasPlan: false,
   REFRESH_INTERVAL_KEY: 'claude-manager-conversation-refresh-ms',
   REFRESH_INTERVAL_DEFAULT_MS: 5000,
   REFRESH_INTERVAL_MIN_MS: 1000,
@@ -233,7 +234,10 @@ const Sessions = {
     const createdHtml = merged.created
       ? `<div class="meta-item">Created <span class="meta-value">${new Date(merged.created).toLocaleString()}</span></div>`
       : '';
-    meta.innerHTML = createdHtml + renderSessionBadges(merged, { sidechain: true, modelPricing: true });
+    const planBadge = Sessions._detailHasPlan
+      ? '<span class="session-plan-badge" title="Plans were active during this session">plan</span>'
+      : '';
+    meta.innerHTML = planBadge + createdHtml + renderSessionBadges(merged, { sidechain: true, modelPricing: true });
   },
 
   async loadDetail(slug, sessionId, info) {
@@ -244,7 +248,9 @@ const Sessions = {
     title.textContent = titleText;
     title.title = titleText;
     Sessions._detailInfo = info || {};
+    Sessions._detailHasPlan = false;
     Sessions.renderDetailMeta(null);
+    Sessions.annotateDetailPlan();
 
     const idValue = document.getElementById('session-detail-id-value');
     if (idValue) {

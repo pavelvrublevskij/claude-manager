@@ -133,7 +133,7 @@ const ManagerSettings = {
         <th>Input</th>
         <th>Output</th>
         <th>Cache Write</th>
-        <th>Cache Read</th>
+        <th>Cache Hits</th>
         <th></th>
       </tr></thead>
       <tbody>${models.map(([id, r], i) => `<tr>

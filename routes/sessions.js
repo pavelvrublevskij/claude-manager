@@ -375,8 +375,6 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
 }));
 
 router.post('/:slug/sessions/new', wrapRoute((req, res) => {
-  if (process.env.DOCKER) return res.status(400).json({ error: 'Terminal launch is not available when running in Docker' });
-
   const dir = safeSlug(req.params.slug);
   if (!dir) return res.status(400).json({ error: 'Invalid slug' });
 
@@ -390,7 +388,6 @@ router.post('/:slug/sessions/new', wrapRoute((req, res) => {
 }));
 
 router.post('/:slug/sessions/:sessionId/resume', wrapRoute((req, res) => {
-  if (process.env.DOCKER) return res.status(400).json({ error: 'Terminal launch is not available when running in Docker' });
 
   const dir = safeSlug(req.params.slug);
   if (!dir) return res.status(400).json({ error: 'Invalid slug' });

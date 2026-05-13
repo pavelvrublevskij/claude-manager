@@ -11,17 +11,10 @@ const Memory = {
     if (project) {
       document.getElementById('project-detail-title').textContent = decodeName(slug);
       const pathEl = document.getElementById('project-detail-path');
-      if (window.__docker) {
-        pathEl.textContent = project.path;
-        pathEl.onclick = null;
-        pathEl.classList.remove('clickable-path');
-        pathEl.removeAttribute('title');
-      } else {
-        pathEl.textContent = project.path;
-        pathEl.classList.add('clickable-path');
-        pathEl.title = 'Open folder in file explorer';
-        pathEl.onclick = () => Projects.openFolder(slug);
-      }
+      pathEl.textContent = project.path;
+      pathEl.classList.add('clickable-path');
+      pathEl.title = 'Open folder in file explorer';
+      pathEl.onclick = () => Projects.openFolder(slug);
     }
 
     try {

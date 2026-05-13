@@ -18,7 +18,14 @@ run.bat 1
 
 The script will install Node.js if missing, install dependencies, and open the app in your browser automatically.
 
-> **Run natively, not in Docker.** A Docker image is available, but running it hides key features: the in-page terminal, OS terminal launch, and open-in-explorer are all disabled inside a container. Use the run scripts above for the full experience.
+Available options:
+
+| Option | Action |
+|--------|--------|
+| `1` | Start — install deps, start server, open browser |
+| `2` | Stop — kill the running server |
+| `3` | Update (git) — `git pull` + reinstall deps |
+| `4` | Update (zip) — download latest release zip from GitHub |
 
 ## Requirements
 

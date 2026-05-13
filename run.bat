@@ -1,18 +1,15 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: Claude Manager — unified run script
+:: Claude Manager — run script
 ::
 :: Usage:
-::   run.bat           Show interactive menu
-::   run.bat <number>  Run option directly (e.g., run.bat 1)
+::   run.bat           Start the server
+::   run.bat 1         Same, non-interactive
 
 set PORT=3000
 set URL=http://127.0.0.1:%PORT%
-set DOCKER_URL=http://localhost:%PORT%
 set MIN_NODE=16
-set COMPOSE_FILE=%~dp0docker-compose.yml
-set DOCKER_SERVICE=app
 
 :: Header
 echo.
@@ -28,19 +25,10 @@ if not "%~1"=="" (
 )
 
 :: Menu
-echo   Local (Node.js)
-echo   1)  Start            Install deps, start server, open browser
-echo.
-echo   Docker
-echo   2)  Build ^& Start    Build image and start container
-echo   3)  Start            Start existing container
-echo   4)  Stop             Stop and remove container
-echo   5)  Restart          Restart container
-echo   6)  Rebuild          Full rebuild (no cache)
-echo   7)  Logs             Follow container logs
-echo   8)  Status           Show container status
-echo   9)  Shell            Open shell in container
-echo.
+echo   1)  Start       Install deps, start server, open browser
+echo   2)  Stop        Stop the running server
+echo   3)  Update git  Pull latest from GitHub (requires git)
+echo   4)  Update zip  Download latest release zip from GitHub
 echo   0)  Exit
 echo.
 set /p CHOICE="  Select option: "
@@ -48,22 +36,15 @@ echo.
 
 :run_choice
 if "%CHOICE%"=="1" goto :do_local_start
-if "%CHOICE%"=="2" goto :do_docker_build_start
-if "%CHOICE%"=="3" goto :do_docker_start
-if "%CHOICE%"=="4" goto :do_docker_stop
-if "%CHOICE%"=="5" goto :do_docker_restart
-if "%CHOICE%"=="6" goto :do_docker_rebuild
-if "%CHOICE%"=="7" goto :do_docker_logs
-if "%CHOICE%"=="8" goto :do_docker_status
-if "%CHOICE%"=="9" goto :do_docker_shell
+if "%CHOICE%"=="2" goto :do_stop
+if "%CHOICE%"=="3" goto :do_update_git
+if "%CHOICE%"=="4" goto :do_update_zip
 if "%CHOICE%"=="0" goto :do_exit
 echo Invalid option: %CHOICE%
 goto :eof
 
-:: ─── Local (Node.js) ───────────────────────────────────────────────
-
 :do_local_start
-echo [Local Start]
+echo [Start]
 echo.
 
 :: Check Node.js
@@ -103,170 +84,86 @@ echo   Starting server...
 powershell -command "Start-Process node -ArgumentList 'server.js' -WorkingDirectory '%~dp0' -WindowStyle Hidden"
 
 :: Wait for server
-call :wait_for_server_local
+call :wait_for_server
 if %errorlevel% equ 0 start "" %URL%
 
 echo.
 echo   Claude Manager is running at %URL%
-echo   To stop: close port %PORT% from Task Manager
+echo   To stop: run run.bat 2
 echo.
 goto :eof
 
-:: ─── Docker actions ────────────────────────────────────────────────
-
-:do_docker_build_start
-call :check_docker
-if %errorlevel% neq 0 goto :eof
-echo [Docker Build ^& Start]
+:do_stop
+echo [Stop]
 echo.
-echo   This will mount the following directory with read-write access:
-echo     ~/.claude — Claude Code configuration, sessions, and memory
-echo.
-echo   Read-write access is required to manage sessions, memory, backups, and other configuration.
-echo.
-set /p CONFIRM="  Continue? [y/N]: "
-if /i not "%CONFIRM%"=="y" (
-    echo.
-    echo   Aborted.
-    echo.
-    goto :eof
+set FOUND=0
+for /f "tokens=5" %%p in ('netstat -aon ^| findstr "127.0.0.1:%PORT% " ^| findstr "LISTENING"') do (
+    echo   Stopping server (PID %%p)...
+    taskkill /PID %%p /F >nul 2>&1
+    set FOUND=1
 )
-echo.
-echo   Building image and starting container...
-docker compose -f "%COMPOSE_FILE%" up --build -d
-echo.
-call :wait_for_server_docker
-if %errorlevel% equ 0 start "" %DOCKER_URL%
-echo.
-echo   Claude Manager is running at %DOCKER_URL%
+if "%FOUND%"=="0" echo   Server is not running.
 echo.
 goto :eof
 
-:do_docker_start
-call :check_docker
-if %errorlevel% neq 0 goto :eof
-echo [Docker Start]
+:do_update_git
+echo [Update - git]
 echo.
-docker compose -f "%COMPOSE_FILE%" ps --status running 2>nul | findstr /c:"claude-manager" >nul 2>&1
-if %errorlevel% equ 0 (
-    echo   Container is already running.
-    echo.
-    goto :eof
-)
-echo   Starting container...
-docker compose -f "%COMPOSE_FILE%" up -d
-echo.
-call :wait_for_server_docker
-if %errorlevel% equ 0 start "" %DOCKER_URL%
-echo.
-echo   Claude Manager is running at %DOCKER_URL%
-echo.
-goto :eof
-
-:do_docker_stop
-call :check_docker
-if %errorlevel% neq 0 goto :eof
-echo [Docker Stop]
-echo.
-echo   Stopping container...
-docker compose -f "%COMPOSE_FILE%" down
-echo.
-echo   Container stopped.
-echo.
-goto :eof
-
-:do_docker_restart
-call :check_docker
-if %errorlevel% neq 0 goto :eof
-echo [Docker Restart]
-echo.
-docker compose -f "%COMPOSE_FILE%" ps --status running 2>nul | findstr /c:"claude-manager" >nul 2>&1
+where git >nul 2>&1
 if %errorlevel% neq 0 (
-    echo   Container is not running. Use option 2 or 3 to start.
+    echo   git is not installed.
     echo.
     goto :eof
 )
-echo   Restarting container...
-docker compose -f "%COMPOSE_FILE%" restart
+cd /d "%~dp0"
+echo   Pulling latest changes...
+git pull
+echo   Updating dependencies...
+call npm install
 echo.
-call :wait_for_server_docker
-echo.
-echo   Container restarted.
-echo.
-goto :eof
-
-:do_docker_rebuild
-call :check_docker
-if %errorlevel% neq 0 goto :eof
-echo [Docker Rebuild - no cache]
-echo.
-echo   This will mount the following directory with read-write access:
-echo     ~/.claude — Claude Code configuration, sessions, and memory
-echo.
-echo   Read-write access is required to manage sessions, memory, backups, and other configuration.
-echo.
-set /p CONFIRM="  Continue? [y/N]: "
-if /i not "%CONFIRM%"=="y" (
-    echo.
-    echo   Aborted.
-    echo.
-    goto :eof
-)
-echo.
-echo   Rebuilding image from scratch...
-docker compose -f "%COMPOSE_FILE%" build --no-cache
-echo   Starting container...
-docker compose -f "%COMPOSE_FILE%" up -d
-echo.
-call :wait_for_server_docker
-if %errorlevel% equ 0 start "" %DOCKER_URL%
-echo.
-echo   Claude Manager rebuilt and running at %DOCKER_URL%
+echo   Update complete. Restart the server to apply changes.
 echo.
 goto :eof
 
-:do_docker_logs
-call :check_docker
-if %errorlevel% neq 0 goto :eof
-echo [Docker Logs] (Ctrl+C to exit)
+:do_update_zip
+echo [Update - Release Zip]
 echo.
-docker compose -f "%COMPOSE_FILE%" ps --status running 2>nul | findstr /c:"claude-manager" >nul 2>&1
+echo   Fetching latest release info...
+powershell -nologo -noprofile -command "try { (Invoke-RestMethod 'https://api.github.com/repos/pavelvrublevskij/claude-manager/releases/latest').zipball_url } catch { 'https://github.com/pavelvrublevskij/claude-manager/archive/refs/heads/main.zip' }" > "%TEMP%\cm_url.txt" 2>nul
+set /p ZIP_URL=<"%TEMP%\cm_url.txt"
+del "%TEMP%\cm_url.txt" >nul 2>&1
+
+set TMP_DIR=%TEMP%\claude-manager-update
+if exist "%TMP_DIR%" rmdir /s /q "%TMP_DIR%"
+mkdir "%TMP_DIR%"
+
+echo   Downloading...
+powershell -nologo -noprofile -command "Invoke-WebRequest -Uri '%ZIP_URL%' -OutFile '%TMP_DIR%\update.zip'"
 if %errorlevel% neq 0 (
-    echo   Container is not running.
-    echo.
+    echo   Download failed.
+    rmdir /s /q "%TMP_DIR%"
     goto :eof
 )
-docker compose -f "%COMPOSE_FILE%" logs -f
-goto :eof
 
-:do_docker_status
-call :check_docker
-if %errorlevel% neq 0 goto :eof
-echo [Docker Status]
-echo.
-docker compose -f "%COMPOSE_FILE%" ps -a
-echo.
-docker compose -f "%COMPOSE_FILE%" ps --status running 2>nul | findstr /c:"claude-manager" >nul 2>&1
-if %errorlevel% equ 0 (
-    echo   Running at %DOCKER_URL%
-) else (
-    echo   Not running
-)
-echo.
-goto :eof
-
-:do_docker_shell
-call :check_docker
-if %errorlevel% neq 0 goto :eof
-echo [Docker Shell]
-echo.
-docker compose -f "%COMPOSE_FILE%" ps --status running 2>nul | findstr /c:"claude-manager" >nul 2>&1
+echo   Extracting...
+powershell -nologo -noprofile -command "Expand-Archive -Path '%TMP_DIR%\update.zip' -DestinationPath '%TMP_DIR%\out' -Force"
 if %errorlevel% neq 0 (
-    echo   Container is not running. Use option 2 or 3 to start.
-    echo.
+    echo   Extraction failed.
+    rmdir /s /q "%TMP_DIR%"
     goto :eof
 )
-docker compose -f "%COMPOSE_FILE%" exec %DOCKER_SERVICE% sh
+
+echo   Copying files...
+powershell -nologo -noprofile -command "$src = (Get-ChildItem '%TMP_DIR%\out' -Directory | Select-Object -First 1).FullName; if ($src) { Get-ChildItem $src | ForEach-Object { Copy-Item $_.FullName '%~dp0' -Recurse -Force } }"
+
+rmdir /s /q "%TMP_DIR%"
+
+echo   Updating dependencies...
+cd /d "%~dp0"
+call npm install
+echo.
+echo   Update complete. Restart the server to apply changes.
+echo.
 goto :eof
 
 :do_exit
@@ -275,22 +172,9 @@ goto :eof
 
 :: ─── Helpers ────────────────────────────────────────────────────────
 
-:check_docker
-where docker >nul 2>&1
-if %errorlevel% neq 0 (
-    echo   Docker is not installed. Install: https://docs.docker.com/get-docker/
-    exit /b 1
-)
-docker info >nul 2>&1
-if %errorlevel% neq 0 (
-    echo   Docker daemon is not running. Start Docker Desktop.
-    exit /b 1
-)
-exit /b 0
-
-:wait_for_server_local
+:wait_for_server
 set /a ATTEMPTS=0
-:wait_loop_local
+:wait_loop
 set /a ATTEMPTS+=1
 if %ATTEMPTS% gtr 30 (
     echo   Server did not start within 30 seconds.
@@ -299,22 +183,6 @@ if %ATTEMPTS% gtr 30 (
 powershell -command "try { $null = Invoke-WebRequest -Uri '%URL%' -UseBasicParsing -TimeoutSec 2; exit 0 } catch { exit 1 }" >nul 2>&1
 if %errorlevel% neq 0 (
     timeout /t 1 /nobreak >nul
-    goto :wait_loop_local
-)
-exit /b 0
-
-:wait_for_server_docker
-set /a ATTEMPTS=0
-:wait_loop_docker
-set /a ATTEMPTS+=1
-if %ATTEMPTS% gtr 30 (
-    echo   Server did not start within 30 seconds.
-    echo   Run "run.bat 7" to check logs.
-    exit /b 1
-)
-powershell -command "try { $null = Invoke-WebRequest -Uri '%DOCKER_URL%' -UseBasicParsing -TimeoutSec 2; exit 0 } catch { exit 1 }" >nul 2>&1
-if %errorlevel% neq 0 (
-    timeout /t 1 /nobreak >nul
-    goto :wait_loop_docker
+    goto :wait_loop
 )
 exit /b 0

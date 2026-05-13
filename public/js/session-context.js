@@ -27,6 +27,26 @@ Object.assign(Sessions, {
     } catch (_) {}
   },
 
+  async annotateDetailPlan() {
+    const info = Sessions._detailInfo;
+    if (!info || !info.created || !info.modified) return;
+    try {
+      const plans = await api('/api/plans');
+      if (!plans.length) return;
+      const slack = 30 * 60 * 1000;
+      const from = new Date(info.created).getTime() - slack;
+      const to = new Date(info.modified).getTime() + slack;
+      const hasPlans = plans.some(p => {
+        const t = new Date(p.mtime).getTime();
+        return t >= from && t <= to;
+      });
+      if (hasPlans) {
+        Sessions._detailHasPlan = true;
+        Sessions.renderDetailMeta(null);
+      }
+    } catch (_) {}
+  },
+
   async annotatePlans(sessions) {
     if (!sessions.length) return;
     try {

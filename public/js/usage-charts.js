@@ -109,7 +109,7 @@ const UsageCharts = {
 
     const stacks = [
       { key: 'input_tokens',                label: 'Input',       color: p.input },
-      { key: 'cache_read_input_tokens',     label: 'Cache Read',  color: p.cacheRead },
+      { key: 'cache_read_input_tokens',     label: 'Cache Hits',  color: p.cacheRead },
       { key: 'cache_creation_input_tokens', label: 'Cache Write', color: p.cacheWrite },
       { key: 'output_tokens',               label: 'Output',      color: p.output },
     ];

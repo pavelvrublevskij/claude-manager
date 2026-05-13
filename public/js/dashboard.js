@@ -45,6 +45,7 @@ const Dashboard = {
       timeAgo: s.modified ? Dashboard.timeAgo(new Date(s.modified)) : '',
       slug: s.slug
     })).join('');
+    if (typeof Sessions !== 'undefined') Sessions.annotatePlans(sessions);
   },
 
   timeAgo(date) {
