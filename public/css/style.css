@@ -111,15 +111,6 @@ body {
   overflow: hidden;
 }
 
-.app.sidebar-collapsed .sidebar-header {
-  justify-content: center;
-  padding: 14px 0;
-}
-
-.app.sidebar-collapsed .sidebar-header h1 {
-  flex: none;
-  gap: 0;
-}
 
 .sidebar-toggle {
   flex: 0 0 16px;
@@ -143,28 +134,8 @@ body {
   color: var(--text-primary);
 }
 
-.sidebar-header {
-  padding: 20px 16px 12px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.sidebar-header h1 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-.sidebar-header h1 .logo {
-  width: 20px;
+.logo {
+  width: 24px;
   height: 20px;
   background: var(--accent);
   border-radius: var(--radius-sm);
@@ -174,6 +145,7 @@ body {
   font-size: 12px;
   font-weight: 700;
   color: var(--bg-primary);
+  flex-shrink: 0;
 }
 
 .sidebar-nav {
@@ -201,6 +173,17 @@ body {
   border-color: var(--accent);
   color: var(--accent);
   background: var(--accent-bg);
+}
+
+.app-footer .theme-toggle {
+  width: auto;
+  height: 18px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  background: none;
+  padding: 0 6px;
+  border-radius: 3px;
+  gap: 4px;
 }
 
 .nav-section {
@@ -733,21 +716,10 @@ select {
   font-family: var(--font);
   font-size: 14px;
   padding: 12px 14px;
+  position: relative;
   width: 100%;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-textarea,
-input[type="text"],
-input[type="password"],
-input[type="email"],
-input[type="number"],
-input[type="date"],
-input[type="datetime-local"],
-input[type="search"],
-select {
-  position: relative;
 }
 
 textarea:hover:not(:disabled),
@@ -1960,6 +1932,122 @@ mark.search-highlight {
 }
 .session-tool-toggle input { cursor: pointer; }
 .session-messages-header .session-search { flex: 1 1 auto; min-width: 0; width: auto; }
+
+/* --- Tour --- */
+
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: all;
+  background: transparent;
+}
+
+.tour-overlay-dim {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.tour-spotlight {
+  position: fixed;
+  z-index: 9001;
+  border-radius: 6px;
+  box-shadow: 0 0 0 3px var(--accent), 0 0 0 9999px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  transition: top 0.2s ease, left 0.2s ease, width 0.2s ease, height 0.2s ease;
+}
+
+.tour-card {
+  position: fixed;
+  z-index: 9002;
+  width: 300px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  pointer-events: all;
+}
+
+@keyframes tour-blink {
+  0%   { border-color: transparent; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+  20%  { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent), 0 8px 32px rgba(0,0,0,0.4); }
+  40%  { border-color: transparent; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+  65%  { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent), 0 8px 32px rgba(0,0,0,0.4); }
+  85%  { border-color: transparent; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+  100% { border-color: var(--accent); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+}
+
+.tour-card-blink {
+  animation: tour-blink 1.4s ease-out forwards;
+}
+
+.tour-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.tour-step-count {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.tour-skip {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tour-skip:hover { color: var(--text-primary); }
+
+.tour-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.tour-card-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin-bottom: 14px;
+}
+
+.tour-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tour-btn {
+  padding: 5px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  border: none;
+}
+
+.tour-btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.tour-btn-primary:hover { opacity: 0.85; }
+
+.tour-btn-secondary {
+  background: none;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.tour-btn-secondary:hover { color: var(--text-primary); }
 
 /* --- Toast --- */
 

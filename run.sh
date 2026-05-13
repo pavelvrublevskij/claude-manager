@@ -1,17 +1,14 @@
 #!/usr/bin/env bash
-# Claude Manager — unified run script
+# Claude Manager — run script
 #
 # Usage:
-#   ./run.sh           # Show interactive menu
-#   ./run.sh <number>  # Run option directly (e.g., ./run.sh 1)
+#   ./run.sh     # Start the server
+#   ./run.sh 1   # Same, non-interactive
 
 set -e
 
-# Colors (printf for macOS compatibility — echo -e is unreliable across shells)
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 RED='\033[0;31m'
 BOLD='\033[1m'
 DIM='\033[2m'
@@ -21,16 +18,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PORT=3000
 URL="http://127.0.0.1:$PORT"
 MIN_NODE=16
-COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
-DOCKER_SERVICE="app"
 
-# Detect OS
 IS_WINDOWS=false
 if printf '%s' "$OSTYPE" | grep -qE "msys|mingw|cygwin"; then
   IS_WINDOWS=true
 fi
-
-# ─── Helper functions ───────────────────────────────────────────────
 
 print_header() {
     printf "\n"
@@ -41,18 +33,10 @@ print_header() {
 }
 
 print_menu() {
-    printf "  ${BOLD}${GREEN}Local (Node.js)${NC}\n"
-    printf "  ${BOLD}1)${NC}  ${GREEN}Start${NC}            Install deps, start server, open browser\n"
-    printf "\n"
-    printf "  ${BOLD}${BLUE}Docker${NC}\n"
-    printf "  ${BOLD}2)${NC}  ${BLUE}Build & Start${NC}    Build image and start container\n"
-    printf "  ${BOLD}3)${NC}  ${BLUE}Start${NC}            Start existing container\n"
-    printf "  ${BOLD}4)${NC}  ${YELLOW}Stop${NC}             Stop and remove container\n"
-    printf "  ${BOLD}5)${NC}  ${YELLOW}Restart${NC}          Restart container\n"
-    printf "  ${BOLD}6)${NC}  ${BLUE}Rebuild${NC}          Full rebuild (no cache)\n"
-    printf "  ${BOLD}7)${NC}  ${BLUE}Logs${NC}             Follow container logs\n"
-    printf "  ${BOLD}8)${NC}  ${BLUE}Status${NC}           Show container status\n"
-    printf "  ${BOLD}9)${NC}  ${BLUE}Shell${NC}            Open shell in container\n"
+    printf "  ${BOLD}1)${NC}  ${GREEN}Start${NC}       Install deps, start server, open browser\n"
+    printf "  ${BOLD}2)${NC}  ${RED}Stop${NC}        Stop the running server\n"
+    printf "  ${BOLD}3)${NC}  ${CYAN}Update git${NC}  Pull latest from GitHub (requires git)\n"
+    printf "  ${BOLD}4)${NC}  ${CYAN}Update zip${NC}  Download latest release zip from GitHub\n"
     printf "\n"
     printf "  ${BOLD}0)${NC}  ${DIM}Exit${NC}\n"
     printf "\n"
@@ -60,7 +44,6 @@ print_menu() {
 
 open_browser() {
     if $IS_WINDOWS; then
-        # "start" needs an empty title ("") before the URL, otherwise // is parsed as a window title
         cmd.exe /c "start \"\" $1" >/dev/null 2>&1 &
     elif [ "$(uname)" = "Darwin" ]; then
         open "$1" 2>/dev/null || true
@@ -90,29 +73,9 @@ wait_for_url() {
     printf " ${GREEN}ready!${NC}\n"
 }
 
-check_docker() {
-    if ! command -v docker >/dev/null 2>&1; then
-        printf "${RED}Docker is not installed.${NC}\n"
-        printf "Install Docker: https://docs.docker.com/get-docker/\n"
-        return 1
-    fi
-    if ! docker info >/dev/null 2>&1; then
-        printf "${RED}Docker daemon is not running.${NC}\n"
-        printf "Please start Docker Desktop or the Docker service.\n"
-        return 1
-    fi
-}
-
-is_container_running() {
-    docker compose -f "$COMPOSE_FILE" ps --status running 2>/dev/null | grep -q "claude-manager"
-}
-
-# ─── Local (Node.js) ───────────────────────────────────────────────
-
 do_local_start() {
-    printf "${BOLD}${GREEN}▶ Local Start${NC}\n\n"
+    printf "${BOLD}${GREEN}▶ Start${NC}\n\n"
 
-    # Check Node.js
     if command -v node >/dev/null 2>&1; then
         NODE_VER=$(node -v | sed 's/v//' | cut -d. -f1)
         if [ "$NODE_VER" -lt "$MIN_NODE" ]; then
@@ -127,7 +90,6 @@ do_local_start() {
         return 1
     fi
 
-    # Kill existing instance on the same port
     local PID=""
     if $IS_WINDOWS; then
         PID=$(netstat.exe -aon 2>/dev/null | grep "127.0.0.1:$PORT " | grep LISTENING | awk '{print $NF}' | head -1 || true)
@@ -149,7 +111,6 @@ do_local_start() {
         sleep 1
     fi
 
-    # Install dependencies
     cd "$SCRIPT_DIR"
     if [ ! -d "node_modules" ]; then
         printf "  Installing dependencies...\n"
@@ -160,163 +121,120 @@ do_local_start() {
 
     printf "\n"
 
-    # Start server in background
     if $IS_WINDOWS; then
         powershell.exe -command "Start-Process node -ArgumentList 'server.js' -WorkingDirectory '$(pwd -W)' -WindowStyle Hidden"
     else
         nohup node server.js > /dev/null 2>&1 &
     fi
 
-    wait_for_url "$URL" && open_browser "$URL"
+    wait_for_url "$URL" && open_browser "$URL" || true
 
     printf "\n${GREEN}${BOLD}✓ Claude Manager is running at ${URL}${NC}\n"
-    printf "  To stop: kill the Node.js process on port $PORT\n\n"
+    printf "  To stop: run ./run.sh 2\n\n"
 }
 
-# ─── Docker actions ─────────────────────────────────────────────────
+do_stop() {
+    printf "${BOLD}${RED}▶ Stop${NC}\n\n"
 
-do_docker_build_start() {
-    check_docker || return 1
-    printf "${BOLD}${BLUE}▶ Docker Build & Start${NC}\n\n"
-
-    printf "${YELLOW}This will mount the following directory with read-write access:${NC}\n"
-    printf "  ${BOLD}~/.claude${NC} — Claude Code configuration, sessions, and memory\n\n"
-    printf "  Read-write access is required to manage sessions, memory, backups, and other configuration.\n\n"
-    printf "  ${BOLD}Continue? [y/N]:${NC} "
-    read -r CONFIRM
-    CONFIRM=$(printf '%s' "$CONFIRM" | tr -d '\r')
-    if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]; then
-        printf "\n${YELLOW}Aborted.${NC}\n\n"
-        return
+    local PID=""
+    if $IS_WINDOWS; then
+        PID=$(netstat.exe -aon 2>/dev/null | grep "127.0.0.1:$PORT " | grep LISTENING | awk '{print $NF}' | head -1 || true)
+        if [ -n "$PID" ]; then
+            printf "  Stopping server (PID $PID)...\n"
+            taskkill.exe //PID "$PID" //F >/dev/null 2>&1 || true
+        else
+            printf "  Server is not running.\n"
+        fi
+    elif command -v lsof >/dev/null 2>&1; then
+        PID=$(lsof -ti tcp:$PORT 2>/dev/null || true)
+    elif command -v ss >/dev/null 2>&1; then
+        PID=$(ss -tlnp "sport = :$PORT" 2>/dev/null | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1 || true)
+    elif command -v fuser >/dev/null 2>&1; then
+        PID=$(fuser $PORT/tcp 2>/dev/null || true)
     fi
-    printf "\n"
-
-    printf "${BLUE}▸${NC} Building image and starting container...\n"
-    docker compose -f "$COMPOSE_FILE" up --build -d
-
-    printf "\n"
-    wait_for_url "http://localhost:$PORT" || true
-    open_browser "http://localhost:$PORT"
-    printf "\n"
-    printf "  ${GREEN}${BOLD}✓ Claude Manager is running at http://localhost:${PORT}${NC}\n"
-    printf "\n"
-}
-
-do_docker_start() {
-    check_docker || return 1
-    printf "${BOLD}${BLUE}▶ Docker Start${NC}\n\n"
-
-    if is_container_running; then
-        printf "${YELLOW}Container is already running.${NC}\n\n"
-        return
-    fi
-
-    printf "${BLUE}▸${NC} Starting container...\n"
-    docker compose -f "$COMPOSE_FILE" up -d
-
-    printf "\n"
-    wait_for_url "http://localhost:$PORT" || true
-    open_browser "http://localhost:$PORT"
-    printf "\n"
-    printf "  ${GREEN}${BOLD}✓ Claude Manager is running at http://localhost:${PORT}${NC}\n"
-    printf "\n"
-}
-
-do_docker_stop() {
-    check_docker || return 1
-    printf "${BOLD}${YELLOW}▶ Docker Stop${NC}\n\n"
-
-    printf "${BLUE}▸${NC} Stopping container...\n"
-    docker compose -f "$COMPOSE_FILE" down
-
-    printf "\n${GREEN}${BOLD}✓ Container stopped.${NC}\n\n"
-}
-
-do_docker_restart() {
-    check_docker || return 1
-    printf "${BOLD}${YELLOW}▶ Docker Restart${NC}\n\n"
-
-    if ! is_container_running; then
-        printf "${RED}Container is not running. Use option 2 or 3 to start.${NC}\n\n"
-        return
-    fi
-
-    printf "${BLUE}▸${NC} Restarting container...\n"
-    docker compose -f "$COMPOSE_FILE" restart
-
-    printf "\n"
-    wait_for_url "http://localhost:$PORT" || true
-    printf "\n"
-    printf "  ${GREEN}${BOLD}✓ Container restarted.${NC}\n"
-    printf "\n"
-}
-
-do_docker_rebuild() {
-    check_docker || return 1
-    printf "${BOLD}${BLUE}▶ Docker Rebuild (no cache)${NC}\n\n"
-
-    printf "${YELLOW}This will mount the following directory with read-write access:${NC}\n"
-    printf "  ${BOLD}~/.claude${NC} — Claude Code configuration, sessions, and memory\n\n"
-    printf "  Read-write access is required to manage sessions, memory, backups, and other configuration.\n\n"
-    printf "  ${BOLD}Continue? [y/N]:${NC} "
-    read -r CONFIRM
-    CONFIRM=$(printf '%s' "$CONFIRM" | tr -d '\r')
-    if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]; then
-        printf "\n${YELLOW}Aborted.${NC}\n\n"
-        return
-    fi
-    printf "\n"
-
-    printf "${BLUE}▸${NC} Rebuilding image from scratch...\n"
-    docker compose -f "$COMPOSE_FILE" build --no-cache
-
-    printf "${BLUE}▸${NC} Starting container...\n"
-    docker compose -f "$COMPOSE_FILE" up -d
-
-    printf "\n"
-    wait_for_url "http://localhost:$PORT" || true
-    open_browser "http://localhost:$PORT"
-    printf "\n"
-    printf "  ${GREEN}${BOLD}✓ Claude Manager rebuilt and running at http://localhost:${PORT}${NC}\n"
-    printf "\n"
-}
-
-do_docker_logs() {
-    check_docker || return 1
-    printf "${BOLD}${BLUE}▶ Docker Logs${NC} ${DIM}(Ctrl+C to exit)${NC}\n\n"
-
-    if is_container_running; then
-        docker compose -f "$COMPOSE_FILE" logs -f
-    else
-        printf "${RED}Container is not running.${NC}\n\n"
-    fi
-}
-
-do_docker_status() {
-    check_docker || return 1
-    printf "${BOLD}${BLUE}▶ Docker Status${NC}\n\n"
-
-    docker compose -f "$COMPOSE_FILE" ps -a
-
-    printf "\n"
-    if is_container_running; then
-        printf "  ${GREEN}●${NC} Running at ${CYAN}http://localhost:${PORT}${NC}\n"
-    else
-        printf "  ${RED}●${NC} Not running\n"
+    if ! $IS_WINDOWS; then
+        if [ -n "$PID" ]; then
+            printf "  Stopping server (PID $PID)...\n"
+            kill "$PID" 2>/dev/null || true
+        else
+            printf "  Server is not running.\n"
+        fi
     fi
     printf "\n"
 }
 
-do_docker_shell() {
-    check_docker || return 1
-    printf "${BOLD}${BLUE}▶ Docker Shell${NC}\n\n"
+do_update_git() {
+    printf "${BOLD}${CYAN}▶ Update (git)${NC}\n\n"
 
-    if ! is_container_running; then
-        printf "${RED}Container is not running. Use option 2 or 3 to start.${NC}\n\n"
-        return
+    if ! command -v git >/dev/null 2>&1; then
+        printf "${RED}git is not installed.${NC}\n\n"
+        return 1
     fi
 
-    docker compose -f "$COMPOSE_FILE" exec "$DOCKER_SERVICE" sh
+    cd "$SCRIPT_DIR"
+    printf "  Pulling latest changes...\n"
+    git pull
+    printf "  Updating dependencies...\n"
+    npm install
+    printf "\n${GREEN}${BOLD}✓ Update complete. Restart the server to apply changes.${NC}\n\n"
+}
+
+do_update_zip() {
+    printf "${BOLD}${CYAN}▶ Update (release zip)${NC}\n\n"
+
+    if ! command -v curl >/dev/null 2>&1; then
+        printf "${RED}curl is not installed.${NC}\n\n"
+        return 1
+    fi
+    if ! command -v unzip >/dev/null 2>&1; then
+        printf "${RED}unzip is not installed.${NC}\n\n"
+        return 1
+    fi
+
+    local REPO="pavelvrublevskij/claude-manager"
+    printf "  Fetching latest release info...\n"
+    local ZIP_URL
+    ZIP_URL=$(curl -sf "https://api.github.com/repos/$REPO/releases/latest" \
+        | grep '"zipball_url"' | head -1 | cut -d'"' -f4 || true)
+
+    if [ -z "$ZIP_URL" ]; then
+        printf "  No release found, using main branch...\n"
+        ZIP_URL="https://github.com/$REPO/archive/refs/heads/main.zip"
+    fi
+
+    local TMP_DIR
+    TMP_DIR=$(mktemp -d)
+
+    printf "  Downloading...\n"
+    if ! curl -L -o "$TMP_DIR/update.zip" "$ZIP_URL" 2>/dev/null; then
+        printf "${RED}Download failed.${NC}\n\n"
+        rm -rf "$TMP_DIR"
+        return 1
+    fi
+
+    printf "  Extracting...\n"
+    if ! unzip -q "$TMP_DIR/update.zip" -d "$TMP_DIR/out"; then
+        printf "${RED}Extraction failed.${NC}\n\n"
+        rm -rf "$TMP_DIR"
+        return 1
+    fi
+
+    local EXTRACTED
+    EXTRACTED=$(find "$TMP_DIR/out" -maxdepth 1 -mindepth 1 -type d | head -1)
+    if [ -z "$EXTRACTED" ]; then
+        printf "${RED}Could not find extracted directory.${NC}\n\n"
+        rm -rf "$TMP_DIR"
+        return 1
+    fi
+
+    printf "  Copying files...\n"
+    cp -r "$EXTRACTED/." "$SCRIPT_DIR/"
+    rm -rf "$TMP_DIR"
+
+    cd "$SCRIPT_DIR"
+    printf "  Updating dependencies...\n"
+    npm install
+    printf "\n${GREEN}${BOLD}✓ Update complete. Restart the server to apply changes.${NC}\n\n"
 }
 
 # ─── Main ───────────────────────────────────────────────────────────
@@ -335,14 +253,9 @@ fi
 
 case "$CHOICE" in
     1) do_local_start ;;
-    2) do_docker_build_start ;;
-    3) do_docker_start ;;
-    4) do_docker_stop ;;
-    5) do_docker_restart ;;
-    6) do_docker_rebuild ;;
-    7) do_docker_logs ;;
-    8) do_docker_status ;;
-    9) do_docker_shell ;;
+    2) do_stop ;;
+    3) do_update_git ;;
+    4) do_update_zip ;;
     0) printf "Bye!\n" ;;
     *) printf "${RED}Invalid option: $CHOICE${NC}\n" ;;
 esac

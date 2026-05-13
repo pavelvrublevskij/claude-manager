@@ -8,6 +8,7 @@ const { decodeSlug } = require('../lib/slug');
 const { getCustomTitle } = require('../lib/session-title');
 const { collectBranches } = require('../lib/session-branches');
 const terminalServer = require('../lib/terminal-server');
+const { MAX_SNIPPETS, extractEntrySnippets, extractMetaSnippet } = require('../lib/session-search');
 
 const router = express.Router({ mergeParams: true });
 
@@ -163,8 +164,6 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
   if (q.length < 2) return res.json([]);
 
   const qLower = q.toLowerCase();
-  const MAX_SNIPPETS = 3;
-  const SNIPPET_RADIUS = 75;
 
   // Load index metadata if available
   const indexMeta = {};
@@ -226,46 +225,8 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
 
           if (snippets.length >= MAX_SNIPPETS) continue;
 
-          const content = entry.message?.content;
-          const role = entry.type;
-          const searchBlocks = [];
-
-          if (typeof content === 'string') {
-            searchBlocks.push({ text: content, label: '' });
-          } else if (Array.isArray(content)) {
-            for (const block of content) {
-              if (block.type === 'text') {
-                searchBlocks.push({ text: block.text, label: '' });
-              } else if (block.type === 'tool_use') {
-                const inputStr = typeof block.input === 'string'
-                  ? block.input
-                  : JSON.stringify(block.input);
-                searchBlocks.push({ text: inputStr, label: block.name || 'tool' });
-              } else if (block.type === 'tool_result') {
-                let resultText = '';
-                if (typeof block.content === 'string') {
-                  resultText = block.content;
-                } else if (Array.isArray(block.content)) {
-                  resultText = block.content
-                    .filter(c => c.type === 'text')
-                    .map(c => c.text)
-                    .join('\n');
-                }
-                if (resultText) searchBlocks.push({ text: resultText, label: 'result' });
-              }
-            }
-          }
-
-          for (const sb of searchBlocks) {
-            if (snippets.length >= MAX_SNIPPETS) break;
-            const idx = sb.text.toLowerCase().indexOf(qLower);
-            if (idx === -1) continue;
-            const start = Math.max(0, idx - SNIPPET_RADIUS);
-            const end = Math.min(sb.text.length, idx + q.length + SNIPPET_RADIUS);
-            let snippet = (start > 0 ? '...' : '') + sb.text.slice(start, end) + (end < sb.text.length ? '...' : '');
-            snippet = snippet.replace(/\n/g, ' ');
-            snippets.push({ text: snippet, role, label: sb.label });
-          }
+          const newSnippets = extractEntrySnippets(entry, q, qLower, snippets.length);
+          snippets.push(...newSnippets);
         } catch (_) {}
       }
     } catch (_) { continue; }
@@ -273,16 +234,8 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
     // Also check title/metadata fields (custom title, index summary, first prompt)
     const meta = indexMeta[sessionId];
     if (snippets.length === 0) {
-      const checkFields = [customTitle, meta?.summary, meta?.firstPrompt, firstPrompt].filter(Boolean);
-      for (const field of checkFields) {
-        if (field.toLowerCase().includes(qLower)) {
-          const idx = field.toLowerCase().indexOf(qLower);
-          const start = Math.max(0, idx - SNIPPET_RADIUS);
-          const end = Math.min(field.length, idx + q.length + SNIPPET_RADIUS);
-          snippets.push({ text: field.slice(start, end), role: 'meta', label: '' });
-          break;
-        }
-      }
+      const metaSnippet = extractMetaSnippet([customTitle, meta?.summary, meta?.firstPrompt, firstPrompt], q, qLower);
+      if (metaSnippet) snippets.push(metaSnippet);
     }
 
     if (snippets.length === 0) continue;
@@ -422,8 +375,6 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
 }));
 
 router.post('/:slug/sessions/new', wrapRoute((req, res) => {
-  if (process.env.DOCKER) return res.status(400).json({ error: 'Terminal launch is not available when running in Docker' });
-
   const dir = safeSlug(req.params.slug);
   if (!dir) return res.status(400).json({ error: 'Invalid slug' });
 
@@ -437,7 +388,6 @@ router.post('/:slug/sessions/new', wrapRoute((req, res) => {
 }));
 
 router.post('/:slug/sessions/:sessionId/resume', wrapRoute((req, res) => {
-  if (process.env.DOCKER) return res.status(400).json({ error: 'Terminal launch is not available when running in Docker' });
 
   const dir = safeSlug(req.params.slug);
   if (!dir) return res.status(400).json({ error: 'Invalid slug' });

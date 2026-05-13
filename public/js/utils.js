@@ -29,12 +29,17 @@ function toast(message, type = 'success') {
   setTimeout(() => el.remove(), 3000);
 }
 
+function stripAnsi(text) {
+  return (text || '').replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+}
+
 /** Render markdown to HTML using the marked library. */
 function renderMarkdown(text) {
+  const clean = stripAnsi(text);
   if (typeof marked !== 'undefined') {
-    return marked.parse(text || '', { breaks: true });
+    return marked.parse(clean, { breaks: true });
   }
-  return (text || '').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+  return clean.replace(/</g, '&lt;').replace(/\n/g, '<br>');
 }
 
 /** Extract a human-readable short name from a project slug. */
@@ -74,6 +79,22 @@ async function copyToClipboard(text, label = 'Copied') {
   }
 }
 
+function debounce(fn, ms) {
+  let timer;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
+
+function buildTable(cols, rows) {
+  const head = cols.map(c => `<th${c.cls ? ` class="${c.cls}"` : ''}>${c.label}</th>`).join('');
+  const body = rows.map(cells =>
+    `<tr>${cells.map((v, i) => `<td${cols[i]?.cls ? ` class="${cols[i].cls}"` : ''}>${v}</td>`).join('')}</tr>`
+  ).join('');
+  return `<table class="usage-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
 // --- Theme ---
 
 const Theme = {
@@ -101,8 +122,10 @@ const Theme = {
     if (link) link.href = '/css/themes/' + theme + '.css';
     const icon = document.getElementById('theme-icon');
     if (icon) icon.innerHTML = Theme.icons[theme];
+    const label = document.getElementById('theme-label');
+    if (label) label.textContent = Theme.labels[theme];
     const btn = document.getElementById('theme-toggle');
-    if (btn) btn.title = Theme.labels[theme] + ' mode';
+    if (btn) btn.title = 'Theme: ' + Theme.labels[theme] + ' — click to cycle';
   }
 };
 
@@ -249,8 +272,8 @@ function renderSessionCard(s, opts = {}) {
           <div class="action-menu">
             <button class="btn btn-sm action-menu-btn" onclick="event.stopPropagation(); Sessions.toggleActionMenu(this)" aria-label="More actions">&#8942;</button>
             <div class="action-menu-panel">
-              ${window.__docker ? '' : `<button class="action-menu-item" onclick="event.stopPropagation(); Sessions.resumeOS('${slug}', '${s.sessionId}')">Resume in OS terminal</button>
-              <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.resumeBrowser('${slug}', '${s.sessionId}')">Resume in browser terminal</button>`}
+              <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.resumeOS('${slug}', '${s.sessionId}')">Resume in OS terminal</button>
+              <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.resumeBrowser('${slug}', '${s.sessionId}')">Resume in browser terminal</button>
               <button class="action-menu-item" data-slug="${slug}" data-session="${s.sessionId}" data-title="${escapeHtml(s.summary || s.firstPrompt || '')}" onclick="event.stopPropagation(); Sessions.renameAction(this)">Rename</button>
               <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.copyIdAction('${s.sessionId}')">Copy session ID</button>
             </div>

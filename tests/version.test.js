@@ -10,6 +10,5 @@ test('GET /api/version returns local version and expected shape', async () => {
   assert.strictEqual(res.body.version, pkg.version);
   assert.ok('latest' in res.body);
   assert.ok('updateAvailable' in res.body);
-  assert.ok('docker' in res.body);
   assert.strictEqual(typeof res.body.updateAvailable, 'boolean');
 });

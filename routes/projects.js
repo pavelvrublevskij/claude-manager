@@ -78,7 +78,6 @@ router.get('/', wrapRoute((req, res) => {
 }));
 
 router.post('/:slug/open-folder', wrapRoute((req, res) => {
-  if (process.env.DOCKER) return res.status(400).json({ error: 'Disabled in Docker' });
   if (!safeSlug(req.params.slug)) return res.status(400).json({ error: 'Invalid slug' });
   const projectPath = decodeSlug(req.params.slug);
   if (!fs.existsSync(projectPath) || !fs.statSync(projectPath).isDirectory()) {

@@ -1,3 +1,39 @@
+## v0.9.0
+
+### Removed
+
+- **Docker support dropped** — Dockerfile, docker-compose.yml, and .dockerignore deleted; Docker-specific server guards and client conditionals removed
+
+### Run scripts
+
+- **Stop** option (2) — kills the running server process by port
+- **Update (git)** option (3) — `git pull` + `npm install`
+- **Update (zip)** option (4) — fetches the latest release zip from GitHub, extracts, copies files, and reinstalls deps
+
+### Auto-update from UI
+
+- Version update banner now includes an **Update now** link — downloads the latest release zip, applies it in-place, runs `npm install`, auto-restarts the server, and reloads the page; no manual restart needed
+- Update endpoint checks that the fetched version is actually newer before downloading anything
+
+### Bug fixes
+
+- **File Changes — files not shown**: `null.split('@')` threw on newly created files (no pre-existing backup), causing the entire snapshot entry to be skipped — fixed with a null guard
+- **File Changes — plans disappear on refresh**: plans were skipped when `?from`/`?to` params were absent (no session cache on page refresh) — server now falls back to timestamps extracted from the session JSONL
+- **Conversation ANSI codes**: ANSI escape sequences (e.g. `ESC[2m`) now stripped before markdown rendering — no more raw control characters in message output
+
+### Refactor
+
+- Frontend and server code split into focused modules for reusability (`session-context.js`, `session-messages.js`, `session-search.js`, `usage-filters.js`, `crud-frontmatter.js`, `date-filter.js`, `project-mcp-tab.js`, `project-settings-tab.js`)
+- Test coverage added: unit tests for lib utilities (`lib-utils.test.js`) and integration tests for file history and plans endpoints (`file-history.test.js`, `plans.test.js`)
+
+### UI
+
+- **Footer**: theme toggle moved from sidebar header to footer — shows current theme name with `Theme:` label; cycles through all 4 themes on click
+- **Sidebar**: removed header block (logo + toggle); nav starts at top
+- **Token Usage**: now the default view and first item in sidebar nav
+- **Onboarding tour**: 6-step spotlight walkthrough on first load — covers navigation, usage summary, filters, table/charts toggle, and period breakdown; re-triggers automatically when the minor version increments; skippable at any step
+- **Cache terminology**: "Cache Read" renamed to "Cache Hits & Refreshes" (stat card) / "Cache Hits" (table columns, charts, badges) to match Claude's official terminology
+
 ## v0.8.2
 
 ### Bug fixes

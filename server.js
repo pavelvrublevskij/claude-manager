@@ -49,7 +49,7 @@ function isNewer(remote, local) {
 app.get('/api/version', async (req, res) => {
   const latest = await checkLatestVersion();
   const updateAvailable = latest && latest !== version && isNewer(latest, version);
-  res.json({ version, latest, updateAvailable, docker: !!process.env.DOCKER });
+  res.json({ version, latest, updateAvailable });
 });
 
 const fs = require('fs');
@@ -57,6 +57,80 @@ app.get('/api/changelog', (req, res) => {
   const file = path.join(__dirname, 'CHANGELOG.md');
   if (!fs.existsSync(file)) return res.json({ content: 'No changelog found.' });
   res.json({ content: fs.readFileSync(file, 'utf-8') });
+});
+
+// Auto-update via release zip
+const { exec, spawn } = require('child_process');
+const os = require('os');
+const AdmZip = require('adm-zip');
+
+async function fetchReleaseInfo() {
+  try {
+    const r = await fetch('https://api.github.com/repos/pavelvrublevskij/claude-manager/releases/latest', {
+      headers: { 'User-Agent': 'claude-manager' }
+    });
+    if (r.ok) {
+      const data = await r.json();
+      if (data.zipball_url) {
+        return { zipUrl: data.zipball_url, latestVersion: data.tag_name?.replace(/^v/, '') };
+      }
+    }
+  } catch (_) {}
+  return { zipUrl: 'https://github.com/pavelvrublevskij/claude-manager/archive/refs/heads/main.zip', latestVersion: null };
+}
+
+function copyDirSync(src, dest) {
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      fs.mkdirSync(destPath, { recursive: true });
+      copyDirSync(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+app.post('/api/update/zip', async (req, res) => {
+  try {
+    const { zipUrl, latestVersion } = await fetchReleaseInfo();
+    if (latestVersion && !isNewer(latestVersion, version)) {
+      return res.status(400).json({ error: 'Already on the latest version' });
+    }
+    const r = await fetch(zipUrl, { headers: { 'User-Agent': 'claude-manager' }, redirect: 'follow' });
+    if (!r.ok) throw new Error(`Download failed: HTTP ${r.status}`);
+    const zipBuffer = Buffer.from(await r.arrayBuffer());
+
+    const zip = new AdmZip(zipBuffer);
+    const tmpDir = path.join(os.tmpdir(), 'claude-manager-update-' + Date.now());
+    fs.mkdirSync(tmpDir, { recursive: true });
+    zip.extractAllTo(tmpDir, true);
+
+    const entries = fs.readdirSync(tmpDir);
+    const srcDir = entries.length === 1 ? path.join(tmpDir, entries[0]) : tmpDir;
+    copyDirSync(srcDir, __dirname);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+
+    await new Promise((resolve, reject) => {
+      exec('npm install', { cwd: __dirname }, (err) => err ? reject(err) : resolve());
+    });
+
+    res.json({ ok: true });
+
+    setTimeout(() => {
+      const child = spawn(process.execPath, [path.join(__dirname, 'server.js')], {
+        detached: true,
+        stdio: 'ignore',
+        cwd: __dirname,
+        env: { ...process.env, RESTART_DELAY_MS: '800' }
+      });
+      child.unref();
+      process.exit(0);
+    }, 200);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Pricing endpoints
@@ -158,6 +232,9 @@ if (require.main === module) {
   process.on('uncaughtException', err => console.error('[uncaughtException]', err));
   process.on('unhandledRejection', reason => console.error('[unhandledRejection]', reason));
 
+  const startupDelay = parseInt(process.env.RESTART_DELAY_MS, 10) || 0;
+
+  const startServer = () => {
   const server = http.createServer(app);
   server.on('upgrade', (req, socket, head) => {
     if (!terminalServer.handleUpgrade(req, socket, head)) socket.destroy();
@@ -174,6 +251,10 @@ if (require.main === module) {
         .catch(e => console.log('Pricing fetch skipped:', e.message));
     }
   });
+  };
+
+  if (startupDelay) setTimeout(startServer, startupDelay);
+  else startServer();
 }
 
 module.exports = app;

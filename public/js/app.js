@@ -3,7 +3,7 @@
 const SIDEBAR_COLLAPSED_KEY = 'claude-manager-sidebar-collapsed';
 
 const App = {
-  currentView: 'dashboard',
+  currentView: 'usage',
   currentProject: null,
 
   init() {
@@ -51,7 +51,7 @@ const App = {
   restoreRoute() {
     const hash = window.location.hash.slice(1); // remove #
     if (!hash) {
-      App.navigate('dashboard');
+      App.navigate('usage');
       return;
     }
     const parts = hash.split('/');
@@ -158,6 +158,23 @@ const App = {
     if (!fromHash) {
       App.setHash(view, opts);
     }
+  },
+
+  async updateFromZip(e) {
+    e.preventDefault();
+    const banner = document.getElementById('update-banner');
+    banner.innerHTML = 'Downloading and applying update&hellip;';
+    try {
+      await api('/api/update/zip', { method: 'POST' });
+      banner.innerHTML = 'Restarting server&hellip;';
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        try { await fetch('/api/version'); location.reload(); return; } catch (_) {}
+      }
+      banner.innerHTML = 'Server did not come back up — please restart manually.';
+    } catch (err) {
+      banner.innerHTML = `Update failed: ${escapeHtml(err.message)} &nbsp;&bull;&nbsp; <a href="#" onclick="location.reload()">Retry</a>`;
+    }
   }
 };
 
@@ -168,15 +185,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const hostEl = document.getElementById('footer-host');
   if (hostEl) hostEl.textContent = location.host;
   api('/api/version').then(data => {
-    window.__docker = !!data.docker;
     const av = document.getElementById('app-version');
     if (av) av.textContent = 'v' + data.version;
     const fv = document.getElementById('footer-version');
     if (fv) fv.textContent = 'v' + data.version;
+    const minor = parseInt((data.version || '0.0.0').split('.')[1], 10);
+    if (typeof Tour !== 'undefined' && Tour.shouldShow(minor)) setTimeout(() => Tour.start(minor), 400);
     if (data.updateAvailable) {
       const banner = document.getElementById('update-banner');
-      banner.innerHTML = `New version <strong>v${escapeHtml(data.latest)}</strong> available!
-        <a href="https://github.com/pavelvrublevskij/claude-manager" target="_blank">View on GitHub</a>`;
+      banner.innerHTML = `New version <strong>v${escapeHtml(data.latest)}</strong> available! &nbsp;
+        <a href="#" id="update-now-link" onclick="App.updateFromZip(event)">Update now</a> &nbsp;&bull;&nbsp;
+        <a href="https://github.com/pavelvrublevskij/claude-manager" target="_blank">View on GitHub</a> &nbsp;&bull;&nbsp;
+        <a href="https://github.com/pavelvrublevskij/claude-manager/blob/main/CHANGELOG.md" target="_blank">Changelog</a>`;
       banner.style.display = 'block';
     }
   }).catch(() => {});
