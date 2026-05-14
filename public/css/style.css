@@ -2543,6 +2543,28 @@ mark.search-highlight {
 .filter-clear-all {
   margin-left: auto;
 }
+.filter-plan-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  padding-bottom: 8px;
+  padding-left: 16px;
+  position: relative;
+}
+.filter-plan-label::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 42px;
+  background: var(--border);
+}
 
 .multi-select {
   position: relative;

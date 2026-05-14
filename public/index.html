@@ -428,6 +428,10 @@
               <label>To</label>
               <input type="datetime-local" id="proj-filter-to" onchange="ProjectUsage.applyCustomDates()">
             </div>
+            <label class="filter-plan-label" for="filter-plan-only">
+              <input type="checkbox" id="filter-plan-only" onchange="Sessions.setPlanFilter(this.checked)">
+              With plan
+            </label>
             <button class="btn btn-sm filter-clear-all" onclick="ProjectUsage.clearFilter()">Clear</button>
           </div>
           <div id="project-detail-usage" class="project-usage-bar"></div>
