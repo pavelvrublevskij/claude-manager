@@ -122,7 +122,7 @@ body {
   border-left: 1px solid var(--border);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 12px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -222,7 +222,7 @@ body {
   border-radius: var(--radius);
   cursor: pointer;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 12px;
   transition: all 0.15s;
   user-select: none;
 }
@@ -264,7 +264,7 @@ body {
 }
 
 .project-list .nav-item {
-  font-size: 13px;
+  font-size: 12px;
   padding: 6px 12px 6px 20px;
   white-space: nowrap;
   overflow: hidden;
@@ -328,7 +328,7 @@ body {
 }
 
 .view-header .subtitle {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -395,7 +395,7 @@ body {
   padding: 8px 16px;
   cursor: pointer;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 12px;
   border-left: 2px solid transparent;
   user-select: none;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
@@ -540,7 +540,7 @@ body {
 .terminal-splitter::before {
   content: '\00AB';                  /* « — visible state, click to hide */
   font-family: 'Segoe UI', sans-serif;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: bold;
   color: var(--text-muted);
   pointer-events: none;
@@ -609,7 +609,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
@@ -637,7 +637,7 @@ body {
 .markdown-body p { margin: 8px 0; line-height: 1.6; color: var(--text-secondary); }
 .markdown-body ul, .markdown-body ol { margin: 8px 0; padding-left: 24px; color: var(--text-secondary); }
 .markdown-body li { margin: 4px 0; line-height: 1.6; }
-.markdown-body code { background: var(--bg-tertiary); padding: 2px 6px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 13px; }
+.markdown-body code { background: var(--bg-tertiary); padding: 2px 6px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 12px; }
 .markdown-body pre { background: var(--bg-tertiary); padding: 12px 16px; border-radius: var(--radius); margin: 12px 0; overflow-x: auto; }
 .markdown-body pre code { background: none; padding: 0; }
 .markdown-body a { color: var(--accent); text-decoration: none; }
@@ -656,7 +656,7 @@ body {
   border: 1px solid var(--border);
   background: var(--bg-tertiary);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
@@ -716,7 +716,7 @@ select {
   border-radius: var(--radius);
   color: var(--text-primary);
   font-family: var(--font);
-  font-size: 14px;
+  font-size: 12px;
   padding: 12px 14px;
   position: relative;
   width: 100%;
@@ -780,7 +780,7 @@ select:disabled {
 
 textarea {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12px;
   resize: vertical;
   line-height: 1.6;
   padding: 12px 14px;
@@ -911,7 +911,7 @@ input[type="radio"] + label {
   margin-left: 6px;
   text-transform: none;
   letter-spacing: normal;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 400;
   text-transform: none;
   cursor: pointer;
@@ -959,7 +959,7 @@ input[type="radio"] + label {
 }
 
 .project-card .project-name {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   margin-bottom: 4px;
   word-break: break-all;
@@ -1048,7 +1048,7 @@ input[type="radio"] + label {
   padding: 2px 6px;
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .preview-pane pre {
@@ -1116,7 +1116,7 @@ input[type="radio"] + label {
 }
 
 .memory-item .memory-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   margin-bottom: 2px;
 }
@@ -1153,7 +1153,7 @@ input[type="radio"] + label {
 .json-editor {
   min-height: 300px;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12px;
   tab-size: 2;
 }
 
@@ -1214,7 +1214,7 @@ input[type="radio"] + label {
 
 .prop-key {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--accent);
   min-width: 100px;
@@ -1238,7 +1238,7 @@ input[type="radio"] + label {
 .prop-value input,
 .prop-value select {
   padding: 6px 10px;
-  font-size: 13px;
+  font-size: 12px;
   border-radius: var(--radius-sm);
 }
 
@@ -1265,7 +1265,7 @@ input[type="radio"] + label {
   color: var(--text-muted);
   cursor: pointer;
   border-radius: var(--radius-sm);
-  font-size: 14px;
+  font-size: 12px;
   transition: all 0.15s;
 }
 
@@ -1302,7 +1302,7 @@ input[type="radio"] + label {
 .add-prop-row input,
 .add-prop-row select {
   padding: 6px 10px;
-  font-size: 13px;
+  font-size: 12px;
   border-radius: var(--radius-sm);
 }
 
@@ -1328,7 +1328,7 @@ input[type="radio"] + label {
   border-radius: var(--radius) var(--radius) 0 0;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   font-family: var(--font);
@@ -1370,7 +1370,7 @@ input[type="radio"] + label {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 12px;
   box-sizing: border-box;
 }
 
@@ -1439,13 +1439,13 @@ mark.search-highlight {
 }
 
 .session-summary {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   margin-bottom: 4px;
 }
 
 .session-prompt {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
   margin-bottom: 10px;
   display: -webkit-box;
@@ -1568,7 +1568,7 @@ mark.search-highlight {
 }
 
 .action-menu-btn {
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1;
   padding: 2px 8px;
   min-width: 0;
@@ -1600,7 +1600,7 @@ mark.search-highlight {
   border: none;
   color: var(--text-primary);
   padding: 6px 10px;
-  font-size: 13px;
+  font-size: 12px;
   border-radius: 4px;
   cursor: pointer;
 }
@@ -1721,7 +1721,7 @@ mark.search-highlight {
 }
 
 .chat-text {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--text-primary);
   word-break: break-word;
 }
@@ -1737,7 +1737,7 @@ mark.search-highlight {
 }
 .chat-text code {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12px;
 }
 .chat-text pre code { background: none; padding: 0; }
 .chat-text code {
@@ -2009,14 +2009,14 @@ mark.search-highlight {
 .tour-skip:hover { color: var(--text-primary); }
 
 .tour-card-title {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 6px;
 }
 
 .tour-card-text {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.55;
   margin-bottom: 14px;
@@ -2066,7 +2066,7 @@ mark.search-highlight {
 .toast {
   padding: 10px 16px;
   border-radius: var(--radius);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   animation: slideIn 0.2s ease-out;
   max-width: 360px;
@@ -2103,7 +2103,7 @@ mark.search-highlight {
 }
 
 .empty-state p {
-  font-size: 14px;
+  font-size: 12px;
 }
 
 /* --- Modal --- */
@@ -2176,7 +2176,7 @@ mark.search-highlight {
   background: rgba(63, 185, 80, 0.1);
   border-bottom: 1px solid var(--success);
   color: var(--success);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   text-align: center;
   flex-shrink: 0;
@@ -2255,7 +2255,7 @@ mark.search-highlight {
   border: 1px solid var(--info-border);
   border-radius: var(--radius);
   padding: 12px 16px;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.6;
   color: var(--text-secondary);
   margin-bottom: 16px;
@@ -2537,7 +2537,7 @@ mark.search-highlight {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 12px;
   font-family: inherit;
 }
 .filter-clear-all {
@@ -2558,7 +2558,7 @@ mark.search-highlight {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 12px;
   font-family: inherit;
   cursor: pointer;
   text-align: left;
@@ -2590,7 +2590,7 @@ mark.search-highlight {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 12px;
   margin-bottom: 6px;
   box-sizing: border-box;
 }
@@ -2605,7 +2605,7 @@ mark.search-highlight {
   padding: 6px 8px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-primary);
 }
 .multi-select-option:hover {
@@ -2656,7 +2656,7 @@ mark.search-highlight {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 .view-toggle-icon {
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1;
 }
 
@@ -2706,7 +2706,7 @@ mark.search-highlight {
 }
 .chart-card-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: 0.2px;
@@ -2733,7 +2733,7 @@ mark.search-highlight {
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 12px;
   pointer-events: none;
 }
 .chart-card .chart-canvas-wrap[hidden] + .chart-empty,

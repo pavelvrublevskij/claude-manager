@@ -74,7 +74,7 @@ const UsageCharts = {
   setEmpty(idSuffix, isEmpty) {
     const wrap = document.querySelector(`#chart-${idSuffix}`).closest('.chart-canvas-wrap');
     const empty = document.getElementById(`chart-${idSuffix}-empty`);
-    if (wrap) wrap.style.visibility = isEmpty ? 'hidden' : 'visible';
+    if (wrap) wrap.style.display = isEmpty ? 'none' : '';
     if (empty) empty.hidden = !isEmpty;
   },
 

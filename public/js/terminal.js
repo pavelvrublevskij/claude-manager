@@ -71,7 +71,7 @@ const TerminalPanel = {
     const term = new XtermCls({
       cursorBlink: true,
       fontFamily: 'Menlo, Consolas, "DejaVu Sans Mono", monospace',
-      fontSize: 13,
+      fontSize: 12,
       theme: { background: '#000000', foreground: '#e6edf3' },
       scrollback: 5000,
       convertEol: false,
