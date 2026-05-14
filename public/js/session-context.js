@@ -48,11 +48,18 @@ Object.assign(Sessions, {
   },
 
   async annotatePlans(sessions) {
-    if (!sessions.length) return;
+    if (!sessions.length) {
+      Sessions._planSessionIds = new Set();
+      return;
+    }
     try {
       const plans = await api('/api/plans');
-      if (!plans.length) return;
+      if (!plans.length) {
+        Sessions._planSessionIds = new Set();
+        return;
+      }
       const slack = 30 * 60 * 1000;
+      const ids = new Set();
       for (const s of sessions) {
         if (!s.created || !s.modified) continue;
         const from = new Date(s.created).getTime() - slack;
@@ -62,12 +69,16 @@ Object.assign(Sessions, {
           return t >= from && t <= to;
         });
         if (!hasPlans) continue;
+        ids.add(s.sessionId);
         const card = document.querySelector(`.session-card[data-session-id="${s.sessionId}"]`);
         if (!card) continue;
         const meta = card.querySelector('.session-meta');
         if (meta) meta.insertAdjacentHTML('afterbegin', '<span class="session-plan-badge" title="Plans were active during this session">plan</span>');
       }
-    } catch (_) {}
+      Sessions._planSessionIds = ids;
+    } catch (_) {
+      Sessions._planSessionIds = new Set();
+    }
   },
 
   async loadContext(sessionId, info) {

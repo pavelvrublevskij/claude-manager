@@ -1,3 +1,12 @@
+## v0.9.1
+
+### Bug fixes
+
+- **Usage charts empty state**: "No data / No model usage / No project usage" messages were visible even when data was present — author CSS `display: flex` on `.chart-empty` overrode the HTML `hidden` attribute; fixed by adding `[hidden] { display: none !important; }` to the global stylesheet
+- **Usage charts timezone**: period grouping (day/hour labels) was bucketed in UTC instead of local time, causing data to appear shifted by the UTC offset; index now uses local time methods and reindexes automatically
+- **Dashboard session cards**: created/modified dates were not shown on dashboard session cards
+- **Dashboard session cards**: "just now" time label was obscured by the `⋮` action menu button; fixed by increasing session card right padding to clear the absolutely-positioned button
+
 ## v0.9.0
 
 ### Removed

@@ -3,8 +3,16 @@
 const Sessions = {
   cache: {},
   _searchSlug: null,
+  _planFilter: false,
+  _planSessionIds: null,
 
   async load(slug) {
+    if (Sessions._searchSlug !== slug) {
+      Sessions._planFilter = false;
+      Sessions._planSessionIds = null;
+      const cb = document.getElementById('filter-plan-only');
+      if (cb) cb.checked = false;
+    }
     Sessions._searchSlug = slug;
     const container = document.getElementById('sessions-list');
     showLoading(container, 'Loading sessions...');
@@ -12,7 +20,7 @@ const Sessions = {
     try {
       const sessions = await api(`/api/projects/${slug}/sessions`);
       Sessions.cache[slug] = sessions;
-      Sessions.renderList(slug, Sessions.filterByDateRange(sessions));
+      Sessions.renderList(slug, Sessions.applyFilters(sessions));
     } catch (e) {
       container.innerHTML = `<div class="empty-state"><p>Could not load sessions</p></div>`;
     }
@@ -32,10 +40,26 @@ const Sessions = {
     });
   },
 
+  applyFilters(sessions) {
+    let result = Sessions.filterByDateRange(sessions);
+    if (Sessions._planFilter && Sessions._planSessionIds) {
+      result = result.filter(s => Sessions._planSessionIds.has(s.sessionId));
+    }
+    return result;
+  },
+
   rerenderWithFilter() {
     const slug = Sessions._searchSlug;
     if (!slug || !Sessions.cache[slug]) return;
-    Sessions.renderList(slug, Sessions.filterByDateRange(Sessions.cache[slug]));
+    Sessions.renderList(slug, Sessions.applyFilters(Sessions.cache[slug]));
+  },
+
+  setPlanFilter(checked) {
+    Sessions._planFilter = checked;
+    Sessions._lastQuery = '';
+    const cb = document.getElementById('filter-plan-only');
+    if (cb) cb.checked = checked;
+    Sessions.rerenderWithFilter();
   },
 
   renderSearchBar(slug) {
@@ -116,8 +140,11 @@ const Sessions = {
     }
 
     try {
-      const results = await api(`/api/projects/${slug}/sessions/search?q=${encodeURIComponent(q)}`);
+      let results = await api(`/api/projects/${slug}/sessions/search?q=${encodeURIComponent(q)}`);
       if (Sessions._lastQuery !== q) return;
+      if (Sessions._planFilter && Sessions._planSessionIds) {
+        results = results.filter(s => Sessions._planSessionIds.has(s.sessionId));
+      }
       const container = document.getElementById('sessions-list');
       const searchInput = document.getElementById('session-search-input');
       const cursorPos = searchInput?.selectionStart;
