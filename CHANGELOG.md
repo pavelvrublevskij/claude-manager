@@ -1,3 +1,19 @@
+## v1.0.2
+
+### Session grouping
+
+- Sessions that share a ticket reference (e.g. `PROJ-123`), a non-main feature branch, or were started within 30 minutes of each other on the same branch are now shown as a collapsible group with a labeled header
+- Day-gap indicators appear between sessions in a group when there is time between them
+- Collapse state is persisted in localStorage per group
+- Groups and ungrouped sessions are interleaved in a single descending-by-date list, so overall sort order is preserved
+
+### Bug fixes
+
+- **Ticket detection in skill invocations**: ticket references passed as command arguments (e.g. `/specify PROJ-123`) were stripped by `normalizePrompt`; they are now included in `firstPrompt` so grouping works correctly
+- **Sort order lost after grouping**: groups were previously rendered before ungrouped sessions regardless of timestamps; now all items are sorted together by most-recent activity
+- **Search wiped by plan annotation**: typing in the search box triggered `annotatePlans`, whose async completion called `rerenderWithFilter` and overwrote the search results; guarded by `_lastQuery` check
+- **Within-group sort direction**: sessions inside a group are now shown newest-first
+
 ## v1.0.1
 
 ### Bug fixes
