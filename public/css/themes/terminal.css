@@ -1,0 +1,30 @@
+[data-theme="terminal"] {
+  color-scheme: dark;
+  --bg-primary: #1a0a00;
+  --bg-secondary: #221100;
+  --bg-tertiary: #2e1700;
+  --bg-hover: #3a1f00;
+  --border: #5c2e00;
+  --border-light: #804000;
+  --text-primary: #ffb000;
+  --text-secondary: #cc8800;
+  --text-muted: #996600;
+  --accent: #ff8800;
+  --accent-hover: #ffaa33;
+  --accent-bg: rgba(255, 136, 0, 0.1);
+  --danger: #ff3300;
+  --danger-hover: #cc0000;
+  --success: #ffcc00;
+  --warning: #ffdd66;
+  --scrollbar-thumb: #5c2e00;
+  --scrollbar-hover: #804000;
+  --info-bg: rgba(255, 176, 0, 0.05);
+  --info-border: rgba(255, 176, 0, 0.2);
+  --project-badge-bg: rgba(255, 136, 0, 0.12);
+  --project-badge-color: #ffaa33;
+  --token-input: #ffb000;
+  --token-output: #ff8800;
+  --token-cache-write: #ffdd66;
+  --token-cache-read: #ffcc00;
+  --token-cost: #ff3300;
+}

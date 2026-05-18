@@ -172,11 +172,8 @@ const Sessions = {
 
   goBack() {
     Sessions.stopAutoRefresh();
-    if (typeof TerminalPanel !== 'undefined' && TerminalPanel.isOpen()) TerminalPanel.close();
     const slug = App.currentProject;
     App.navigate('project-detail', { slug });
-    const btn = document.getElementById('sessions-tab-btn');
-    if (btn) btn.click();
   },
 
   detailState: { slug: null, sessionId: null, offset: 0, loading: false, hasMore: false, total: 0 },
@@ -264,7 +261,30 @@ const Sessions = {
     const planBadge = Sessions._detailHasPlan
       ? '<span class="session-plan-badge" title="Plans were active during this session">plan</span>'
       : '';
-    meta.innerHTML = planBadge + createdHtml + renderSessionBadges(merged, { sidechain: true, modelPricing: true });
+    meta.innerHTML = planBadge + createdHtml + renderSessionBadges(merged, { sidechain: true, modelPricing: true, skipBranches: true });
+
+    Sessions.renderDetailBranches(merged);
+  },
+
+  renderDetailBranches(s) {
+    const el = document.getElementById('session-detail-branches');
+    if (!el) return;
+    let branches = Array.isArray(s.gitBranches) ? s.gitBranches.filter(Boolean) : [];
+    if (!branches.length) {
+      branches = Array.from(new Set([s.gitBranch, s.lastGitBranch].filter(Boolean)));
+    }
+    if (!branches.length) {
+      el.innerHTML = '';
+      el.style.display = 'none';
+      return;
+    }
+    const parts = [];
+    branches.forEach((b, i) => {
+      if (i > 0) parts.push('<span class="session-branch-arrow">&#8594;</span>');
+      parts.push(`<span class="session-branch">${escapeHtml(b)}</span>`);
+    });
+    el.innerHTML = parts.join('');
+    el.style.display = '';
   },
 
   async loadDetail(slug, sessionId, info) {
@@ -363,6 +383,7 @@ const Sessions = {
   _onSessionDiscovered(session) {
     const state = Sessions.detailState;
     state.sessionId = session.sessionId;
+    if (typeof TerminalPanel !== 'undefined') TerminalPanel.notifySessionId(session.sessionId);
     const idValue = document.getElementById('session-detail-id-value');
     if (idValue) { idValue.textContent = session.sessionId; idValue.style.display = 'inline-block'; }
     App.setHash('session-detail', { slug: state.slug, sessionId: session.sessionId });

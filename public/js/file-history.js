@@ -1,15 +1,22 @@
 // --- File History diff rendering ---
 
 const FileHistory = {
-  async showDiffCurrent(sessionId, hash, version, projSlug, filePath) {
+  async showDiffCurrent(sessionId, hash, version, projSlug, filePath, opts = {}) {
+    const isNew = !!opts.isNew;
+    const isDeleted = !!opts.isDeleted;
+    const label = isNew ? '(new file)' : isDeleted ? '(deleted)' : `v${version} → current`;
     const overlay = openModal({
-      title: `Diff: ${filePath} v${version} → current`,
+      title: `Diff: ${filePath} ${label}`,
       width: 860,
       body: '<div id="fh-diff-body"><div class="loading"><div class="spinner"></div>Computing diff…</div></div>',
       buttons: []
     });
     try {
-      const result = await api(`/api/file-history/${encodeURIComponent(sessionId)}/${encodeURIComponent(hash)}/diff-current?version=${version}&projSlug=${encodeURIComponent(projSlug)}&filePath=${encodeURIComponent(filePath)}`);
+      const params = new URLSearchParams({ projSlug, filePath });
+      if (isNew) { params.set('isNew', 'true'); }
+      else { params.set('version', String(version)); }
+      const hashSeg = isNew ? 'none' : encodeURIComponent(hash);
+      const result = await api(`/api/file-history/${encodeURIComponent(sessionId)}/${hashSeg}/diff-current?${params.toString()}`);
       FileHistory.renderDiff(overlay.querySelector('#fh-diff-body'), result);
     } catch (e) {
       overlay.querySelector('#fh-diff-body').innerHTML =
@@ -18,7 +25,7 @@ const FileHistory = {
   },
 
   renderDiff(container, result) {
-    if (result.tooLarge) { container.innerHTML = '<div class="empty-state"><p>File too large to diff (&gt;3000 lines)</p></div>'; return; }
+    if (result.tooLarge) { container.innerHTML = '<div class="empty-state"><p>File too large to diff (&gt;5000 lines)</p></div>'; return; }
     if (!result.hunks.length) { container.innerHTML = '<div class="empty-state"><p>No differences found</p></div>'; return; }
 
     const stats = `<div class="diff-stats">

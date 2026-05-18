@@ -259,6 +259,17 @@ body {
   color: var(--accent);
 }
 
+.nav-item .badge.badge-active {
+  background: rgba(46, 160, 67, 0.18);
+  color: #2ea043;
+  margin-left: 6px;
+}
+
+.nav-item.active .badge.badge-active {
+  background: rgba(46, 160, 67, 0.28);
+  color: #2ea043;
+}
+
 .project-list {
   padding-left: 8px;
 }
@@ -327,7 +338,7 @@ body {
   flex-shrink: 0;
 }
 
-.view-header .subtitle {
+.subtitle {
   font-size: 12px;
   color: var(--text-secondary);
 }
@@ -416,7 +427,7 @@ body {
   padding: 24px 32px;
   overflow-y: auto;
 }
-.settings-panel { display: none; }
+.settings-panel { display: none; font-size: 12px; }
 .settings-panel.active { display: block; }
 .settings-panel h3 { margin: 0 0 8px; font-size: 16px; }
 
@@ -630,9 +641,10 @@ body {
   .session-detail-body .terminal-splitter { display: none; }
 }
 
-.markdown-body h1 { font-size: 24px; margin: 32px 0 16px; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-.markdown-body h2 { font-size: 20px; margin: 28px 0 12px; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
-.markdown-body h3 { font-size: 16px; margin: 20px 0 8px; color: var(--text-primary); }
+.markdown-body { font-size: 12px; }
+.markdown-body h1 { font-size: 20px; margin: 32px 0 16px; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.markdown-body h2 { font-size: 16px; margin: 28px 0 12px; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.markdown-body h3 { font-size: 14px; margin: 20px 0 8px; color: var(--text-primary); }
 .markdown-body h1:first-child { margin-top: 0; }
 .markdown-body p { margin: 8px 0; line-height: 1.6; color: var(--text-secondary); }
 .markdown-body ul, .markdown-body ol { margin: 8px 0; padding-left: 24px; color: var(--text-secondary); }
@@ -1444,6 +1456,51 @@ mark.search-highlight {
   margin-bottom: 4px;
 }
 
+.session-active-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  animation: session-dot-pulse 2s ease-in-out infinite;
+}
+
+.session-active-dot--browser {
+  background: #2ea043;
+  box-shadow: 0 0 0 0 rgba(46, 160, 67, 0.6);
+}
+
+.session-active-dot--os {
+  background: transparent;
+  border: 1.5px solid #2ea043;
+  box-shadow: 0 0 0 0 rgba(46, 160, 67, 0.4);
+}
+
+@keyframes session-dot-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(46, 160, 67, 0.6); }
+  70%  { box-shadow: 0 0 0 6px rgba(46, 160, 67, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(46, 160, 67, 0); }
+}
+
+.session-remote-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  vertical-align: middle;
+  color: var(--text-muted);
+  opacity: 0.9;
+  position: relative;
+  top: -1px;
+}
+
+.session-remote-icon svg {
+  display: block;
+}
+
 .session-prompt {
   font-size: 12px;
   color: var(--text-secondary);
@@ -1481,6 +1538,13 @@ mark.search-highlight {
   flex-wrap: wrap;
   align-items: center;
   gap: 2px;
+}
+.session-detail-branches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
 }
 .session-branch {
   font-family: var(--font-mono);
@@ -2871,10 +2935,51 @@ mark.search-highlight {
   cursor: pointer;
   border-radius: 4px;
   transition: background 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .ctx-file-item:hover {
   background: var(--bg-hover);
+}
+
+.ctx-file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctx-file-badge {
+  font-size: 10px;
+  font-family: var(--font-sans, inherit);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.ctx-file-badge-new {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+}
+
+.ctx-file-badge-deleted {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+}
+
+.ctx-file-badge-edited {
+  background: rgba(56, 139, 253, 0.15);
+  color: #58a6ff;
+}
+
+.ctx-file-deleted .ctx-file-name {
+  text-decoration: line-through;
+  color: var(--text-muted);
 }
 
 .ctx-empty {
