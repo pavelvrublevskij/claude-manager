@@ -7,6 +7,14 @@ const { decodeSlug } = require('../lib/slug');
 const { buildIndex, calcCostMultiModel } = require('../lib/usage-index');
 const { getCustomTitle } = require('../lib/session-title');
 const { collectBranches } = require('../lib/session-branches');
+const { stampActive, listAllActiveSessions } = require('../lib/session-status');
+
+router.get('/active-count', wrapRoute((req, res) => {
+  const all = listAllActiveSessions();
+  const byProject = {};
+  for (const s of all) byProject[s.slug] = (byProject[s.slug] || 0) + 1;
+  res.json({ total: all.length, byProject });
+}));
 
 /** Gather dashboard stats and recent sessions across all projects. */
 router.get('/', wrapRoute(async (req, res) => {
@@ -124,6 +132,10 @@ router.get('/', wrapRoute(async (req, res) => {
   // Sort by modified desc, take top 10
   recentSessions.sort((a, b) => new Date(b.modified || 0) - new Date(a.modified || 0));
 
+  // Stamp active/activeKind so the green dot renders on dashboard cards.
+  // Pass null for the project slug — getActiveKind reads per-session `s.slug` since this is cross-project.
+  stampActive(null, recentSessions);
+
   // Count other resources
   const mcpData = readJson(MCP_FILE, { servers: {} });
   const mcpCount = Object.keys(mcpData.servers || {}).length;
@@ -138,6 +150,9 @@ router.get('/', wrapRoute(async (req, res) => {
   const kbData = readJson(KEYBINDINGS_FILE, { bindings: [] });
   const kbCount = (kbData.bindings || []).reduce((sum, ctx) => sum + Object.keys(ctx.bindings || {}).length, 0);
 
+  const activeOnly = recentSessions.filter(s => s.active);
+  const nonActiveRecent = recentSessions.filter(s => !s.active).slice(0, 10);
+
   res.json({
     stats: {
       projects: dirs.length,
@@ -148,7 +163,8 @@ router.get('/', wrapRoute(async (req, res) => {
       outputStyles: stylesCount,
       keybindings: kbCount
     },
-    recentSessions: recentSessions.slice(0, 10)
+    activeSessions: activeOnly,
+    recentSessions: nonActiveRecent
   });
 }));
 

@@ -64,13 +64,29 @@ test('context: returns 200 with files and plans arrays', async () => {
   assert.ok(Array.isArray(res.body.plans));
 });
 
-test('context: files with null backupFileName are excluded (Bug 1 regression)', async () => {
+test('context: files with null backupFileName appear flagged as isNew', async () => {
   const res = await request(app).get(`/api/file-history/${SESSION_ID}/context`);
   assert.strictEqual(res.status, 200);
-  const filePaths = res.body.files.map(f => f.path);
-  assert.ok(!filePaths.includes('/projects/myapp/src/new-file.js'),
-    'null-backup (newly created) file must not appear');
-  assert.ok(filePaths.includes(TRACKED_FILE), 'file with valid hash must appear');
+  const newFile = res.body.files.find(f => f.path === '/projects/myapp/src/new-file.js');
+  assert.ok(newFile, 'newly created file must appear in changes list');
+  assert.strictEqual(newFile.isNew, true, 'must be flagged isNew');
+  assert.strictEqual(newFile.hash, null, 'no hash for files with no backup');
+  assert.deepStrictEqual(newFile.versions, [], 'no versions for files with no backup');
+});
+
+test('context: edited files have isNew=false', async () => {
+  const res = await request(app).get(`/api/file-history/${SESSION_ID}/context`);
+  const file = res.body.files.find(f => f.path === TRACKED_FILE);
+  assert.ok(file);
+  assert.strictEqual(file.isNew, false);
+});
+
+test('context: files removed from disk are flagged isDeleted', async () => {
+  const res = await request(app).get(`/api/file-history/${SESSION_ID}/context`);
+  const file = res.body.files.find(f => f.path === TRACKED_FILE);
+  assert.ok(file);
+  assert.strictEqual(file.isDeleted, true,
+    'TRACKED_FILE path does not exist under the project dir, so it must be marked deleted');
 });
 
 test('context: versions array reflects files present on disk', async () => {
@@ -158,4 +174,25 @@ test('diff: path traversal in hash returns 400', async () => {
     .get(`/api/file-history/${SESSION_ID}/..badhash/diff`)
     .query({ from: 1, to: 2 });
   assert.strictEqual(res.status, 400);
+});
+
+// ── /diff-current with isNew ─────────────────────────────────────────────────
+
+test('diff-current: isNew=true skips snapshot read and returns 200 even with bogus hash', async () => {
+  // When isNew is true, we don't read a snapshot — so a non-existent hash is fine
+  const res = await request(app)
+    .get(`/api/file-history/${SESSION_ID}/none/diff-current`)
+    .query({ isNew: 'true', projSlug: PROJ_SLUG, filePath: 'nonexistent.js' });
+  assert.strictEqual(res.status, 200);
+  // current file doesn't exist either, so both sides empty → no hunks
+  assert.deepStrictEqual(res.body.hunks, []);
+  assert.strictEqual(res.body.stats.added, 0);
+  assert.strictEqual(res.body.stats.removed, 0);
+});
+
+test('diff-current: without isNew, missing version still returns 404', async () => {
+  const res = await request(app)
+    .get(`/api/file-history/${SESSION_ID}/${HASH}/diff-current`)
+    .query({ version: 99, projSlug: PROJ_SLUG, filePath: 'created.js' });
+  assert.strictEqual(res.status, 404);
 });

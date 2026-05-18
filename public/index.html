@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Claude Manager</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/css/themes/dark.css" id="theme-stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
@@ -27,6 +28,7 @@
           </div>
           <div class="nav-item" data-view="dashboard" title="Dashboard">
             <span class="icon">&#9673;</span><span class="nav-label"> Dashboard</span>
+            <span class="badge badge-active" id="nav-dashboard-active" style="display:none"></span>
           </div>
         </div>
         <div class="nav-section">
@@ -91,6 +93,10 @@
         </div>
         <div class="view-body">
           <div class="dashboard-stats" id="dashboard-stats"></div>
+          <div id="dashboard-active-wrap" style="display:none">
+            <h3 style="margin:24px 0 12px">Active Sessions</h3>
+            <div id="dashboard-active-sessions"></div>
+          </div>
           <h3 style="margin:24px 0 12px">Recent Sessions</h3>
           <div id="dashboard-recent-sessions"></div>
         </div>
@@ -516,6 +522,7 @@
               <button class="btn btn-sm" onclick="Sessions.goBack()">&#8592; Back</button>
               <h2 id="session-detail-title">Session</h2>
               <code class="session-id-value" id="session-detail-id-value" style="display:none"></code>
+              <div class="session-detail-branches" id="session-detail-branches" style="display:none"></div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
               <div class="action-menu">
@@ -592,7 +599,13 @@
           <div class="settings-content">
 
             <section class="settings-panel active" data-section="general">
-              <h3>Conversation Refresh Rate</h3>
+              <h3>Theme</h3>
+              <div class="subtitle" style="margin:0 0 12px">Choose a color scheme for the UI.</div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <select id="theme-select" onchange="ManagerSettings.onThemeChange(this.value)"></select>
+              </div>
+
+              <h3 style="margin-top:24px">Conversation Refresh Rate</h3>
               <div class="subtitle" style="margin:0 0 12px">How often the open session view polls for new messages. Minimum 1 second.</div>
               <div style="display:flex;gap:8px;align-items:center">
                 <input type="number" id="conversation-refresh-rate" min="1" step="1" style="width:120px">
@@ -649,7 +662,7 @@
 
   <footer class="app-footer">
     <div class="app-footer-left">
-      <span class="logo"> CM </span>
+      <img src="/favicon.svg" alt="CM" style="width: 24px; height: 20px;">
       <span>Claude Manager <span id="footer-version"></span></span>
       <a href="https://github.com/pavelvrublevskij/claude-manager/issues/new" target="_blank" rel="noopener" class="app-footer-issue-link" title="Raise an issue on GitHub">&#9888; Raise Issue</a>
     </div>

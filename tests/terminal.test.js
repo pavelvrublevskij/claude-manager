@@ -83,3 +83,97 @@ test('disconnectFor / hasActiveTerminal are no-ops when nothing is registered', 
   assert.strictEqual(hasActiveTerminal(SLUG, ''), false);
   assert.strictEqual(disconnectFor(SLUG, '', 'reason'), false);
 });
+
+test('getActiveTerminals / isAttached: empty when nothing registered', () => {
+  const { getActiveTerminals, isAttached, _clearAll } = require('../lib/terminal-server');
+  _clearAll();
+  assert.deepStrictEqual(getActiveTerminals(), []);
+  assert.strictEqual(isAttached(SLUG, SESSION_ID), false);
+});
+
+test('detached entry: hasActiveTerminal=true but isAttached=false', () => {
+  const { hasActiveTerminal, isAttached, getActiveTerminals, _injectFakeEntry, _clearAll } = require('../lib/terminal-server');
+  _clearAll();
+  _injectFakeEntry(SLUG, SESSION_ID, { ws: null, detachedAt: Date.now() });
+  assert.strictEqual(hasActiveTerminal(SLUG, SESSION_ID), true);
+  assert.strictEqual(isAttached(SLUG, SESSION_ID), false);
+  const list = getActiveTerminals();
+  assert.strictEqual(list.length, 1);
+  assert.strictEqual(list[0].sessionId, SESSION_ID);
+  assert.strictEqual(list[0].attached, false);
+  _clearAll();
+});
+
+test('attached entry: isAttached=true', () => {
+  const { isAttached, getActiveTerminals, _injectFakeEntry, _clearAll } = require('../lib/terminal-server');
+  _clearAll();
+  _injectFakeEntry(SLUG, SESSION_ID, { ws: { readyState: 1 } });
+  assert.strictEqual(isAttached(SLUG, SESSION_ID), true);
+  assert.strictEqual(getActiveTerminals()[0].attached, true);
+  _clearAll();
+});
+
+test('disconnectFor terminates the entry and removes it from the registry', () => {
+  const { disconnectFor, hasActiveTerminal, _injectFakeEntry, _clearAll } = require('../lib/terminal-server');
+  _clearAll();
+  let killed = false;
+  _injectFakeEntry(SLUG, SESSION_ID, { term: { kill() { killed = true; }, pid: process.pid } });
+  assert.strictEqual(disconnectFor(SLUG, SESSION_ID, 'bye'), true);
+  assert.strictEqual(killed, true);
+  assert.strictEqual(hasActiveTerminal(SLUG, SESSION_ID), false);
+});
+
+test('gcSweep removes entries whose pty PID is dead', () => {
+  const { gcSweep, hasActiveTerminal, _injectFakeEntry, _clearAll } = require('../lib/terminal-server');
+  _clearAll();
+  // PID 0 is special on Windows and POSIX; process.kill(0, 0) on POSIX targets the process group
+  // (rejected as permission/usable). To force "dead pid", use a very high number that cannot exist.
+  const deadPid = 2 ** 31 - 1;
+  _injectFakeEntry(SLUG, SESSION_ID, { term: { kill() {}, pid: deadPid } });
+  gcSweep();
+  assert.strictEqual(hasActiveTerminal(SLUG, SESSION_ID), false);
+});
+
+test('gcSweep removes already-terminated entries', () => {
+  const { gcSweep, hasActiveTerminal, _injectFakeEntry, _clearAll } = require('../lib/terminal-server');
+  _clearAll();
+  _injectFakeEntry(SLUG, SESSION_ID, { terminated: true });
+  gcSweep();
+  assert.strictEqual(hasActiveTerminal(SLUG, SESSION_ID), false);
+});
+
+test('_bindSessionId re-keys a temp entry under the discovered sessionId', () => {
+  const { hasActiveTerminal, _injectFakeEntry, _bindSessionId, _clearAll } = require('../lib/terminal-server');
+  _clearAll();
+  // Inject as a "real" entry then mutate it to simulate a temp-keyed new-session entry.
+  const entry = _injectFakeEntry(SLUG, SESSION_ID, { sessionId: '', key: `${SLUG}|@new-test` });
+  // Move it under a temp key in the map to mirror the production code path.
+  // _injectFakeEntry placed it under activeKey(slug, SESSION_ID), so remove that placement first.
+  const ts = require('../lib/terminal-server');
+  ts._clearAll();
+  // Build a fresh fake entry under temp key manually by reusing _injectFakeEntry's shape:
+  // injection requires sessionId, so we put a placeholder, then have _bindSessionId reroute it.
+  // Use a placeholder sessionId for keying, then verify rebinding to a NEW id succeeds when no entry exists under the new key.
+  const TEMP_SESSION = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const REAL_SESSION = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  const placeholder = _injectFakeEntry(SLUG, TEMP_SESSION);
+  // Simulate the temp-key state: clear sessionId on the entry (it's just discovered to be unknown)
+  placeholder.sessionId = '';
+  _bindSessionId(placeholder, REAL_SESSION);
+  assert.strictEqual(hasActiveTerminal(SLUG, REAL_SESSION), true);
+  // The placeholder key is now stale; _bindSessionId removed it.
+  assert.strictEqual(hasActiveTerminal(SLUG, TEMP_SESSION), false);
+  _clearAll();
+});
+
+test('_bindSessionId is a no-op when entry already has a sessionId', () => {
+  const { hasActiveTerminal, _injectFakeEntry, _bindSessionId, _clearAll } = require('../lib/terminal-server');
+  _clearAll();
+  const SESSION_X = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+  const SESSION_Y = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+  const entry = _injectFakeEntry(SLUG, SESSION_X);
+  _bindSessionId(entry, SESSION_Y);
+  assert.strictEqual(hasActiveTerminal(SLUG, SESSION_X), true);
+  assert.strictEqual(hasActiveTerminal(SLUG, SESSION_Y), false);
+  _clearAll();
+});

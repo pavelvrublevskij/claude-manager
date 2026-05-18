@@ -7,7 +7,10 @@ const { getProjectUsageMap, getSessionUsage, calcCost } = require('../lib/usage-
 const { decodeSlug } = require('../lib/slug');
 const { getCustomTitle } = require('../lib/session-title');
 const { collectBranches } = require('../lib/session-branches');
+const { hasBridgeSession } = require('../lib/session-flags');
 const terminalServer = require('../lib/terminal-server');
+const activeSessions = require('../lib/active-sessions');
+const { stampActive } = require('../lib/session-status');
 const { MAX_SNIPPETS, extractEntrySnippets, extractMetaSnippet } = require('../lib/session-search');
 
 const router = express.Router({ mergeParams: true });
@@ -76,6 +79,7 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
           if (!s.gitBranch) s.gitBranch = s.gitBranches[0];
           s.lastGitBranch = s.gitBranches[s.gitBranches.length - 1];
         }
+        s.remoteControlled = hasBridgeSession(filePath);
       });
       const usageMap = getProjectUsageMap(req.params.slug);
       sessions.forEach(s => {
@@ -83,6 +87,7 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
         if (u) { s.tokens = u.totals; s.cost = u.cost; s.models = Object.keys(u.byModel || {}); }
       });
       sessions.sort((a, b) => new Date(b.modified || 0) - new Date(a.modified || 0));
+      stampActive(req.params.slug, sessions);
       return res.json(sessions);
     } catch (_) { /* malformed index, fall through to JSONL parsing */ }
   }
@@ -102,7 +107,8 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
       gitBranch: '',
       lastGitBranch: '',
       gitBranches: [],
-      isSidechain: false
+      isSidechain: false,
+      remoteControlled: false
     };
 
     try {
@@ -114,6 +120,8 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
           const entry = JSON.parse(line);
           if (entry.type === 'custom-title' && entry.customTitle) {
             session.summary = entry.customTitle;
+          } else if (entry.type === 'bridge-session') {
+            session.remoteControlled = true;
           } else if (entry.type === 'user') {
             userMessages++;
             if (userMessages === 1) {
@@ -153,6 +161,7 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
     if (u) { s.tokens = u.totals; s.cost = u.cost; s.models = Object.keys(u.byModel || {}); }
   });
   filtered.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+  stampActive(req.params.slug, filtered);
   res.json(filtered);
 }));
 
@@ -381,6 +390,7 @@ router.post('/:slug/sessions/new', wrapRoute((req, res) => {
   const projectPath = decodeSlug(req.params.slug);
   try {
     launchTerminal(projectPath, 'claude');
+    activeSessions.registerPendingNew(req.params.slug);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Failed to open terminal: ' + e.message });
@@ -404,6 +414,7 @@ router.post('/:slug/sessions/:sessionId/resume', wrapRoute((req, res) => {
   try {
     terminalServer.disconnectFor(req.params.slug, sessionId, 'Resumed in OS terminal.');
     launchTerminal(projectPath, `claude --resume "${sessionId}"`);
+    activeSessions.register(req.params.slug, sessionId, 'os-terminal');
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Failed to open terminal: ' + e.message });

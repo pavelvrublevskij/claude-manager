@@ -43,3 +43,80 @@ test('GET /api/dashboard picks up seeded project and session fallback', async ()
   assert.strictEqual(recent.slug, slug);
   assert.strictEqual(recent.messageCount, 1);
 });
+
+test('GET /api/dashboard/active-count returns total + byProject (empty)', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  const terminalServer = require('../lib/terminal-server');
+  activeSessions._reset();
+  terminalServer._clearAll();
+  const res = await request(app).get('/api/dashboard/active-count');
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.body.total, 0);
+  assert.deepStrictEqual(res.body.byProject, {});
+});
+
+test('GET /api/dashboard/active-count counts browser ptys and OS launches without double-counting', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  const terminalServer = require('../lib/terminal-server');
+  activeSessions._reset();
+  terminalServer._clearAll();
+
+  // Browser pty (would also self-register in active-sessions under real spawn; do both for dedup test)
+  const SLUG_A = 'dash-active-a';
+  const SLUG_B = 'dash-active-b';
+  const SID_A1 = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const SID_A2 = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  const SID_B1 = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+
+  fs.mkdirSync(path.join(paths.PROJECTS_DIR, SLUG_A), { recursive: true });
+  fs.mkdirSync(path.join(paths.PROJECTS_DIR, SLUG_B), { recursive: true });
+  for (const [slug, sid] of [[SLUG_A, SID_A1], [SLUG_A, SID_A2], [SLUG_B, SID_B1]]) {
+    fs.writeFileSync(path.join(paths.PROJECTS_DIR, slug, sid + '.jsonl'), '{"type":"user","message":{"content":"x"}}\n');
+  }
+
+  terminalServer._injectFakeEntry(SLUG_A, SID_A1, { ws: null });
+  activeSessions.register(SLUG_A, SID_A1, 'browser-terminal'); // dedup test: same session in both sources
+  activeSessions.register(SLUG_A, SID_A2, 'os-terminal');
+  activeSessions.register(SLUG_B, SID_B1, 'os-terminal');
+
+  const res = await request(app).get('/api/dashboard/active-count');
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.body.total, 3);
+  assert.strictEqual(res.body.byProject[SLUG_A], 2);
+  assert.strictEqual(res.body.byProject[SLUG_B], 1);
+
+  activeSessions._reset();
+  terminalServer._clearAll();
+});
+
+test('GET /api/dashboard returns activeSessions array (empty when nothing is active)', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  const terminalServer = require('../lib/terminal-server');
+  activeSessions._reset();
+  terminalServer._clearAll();
+  const res = await request(app).get('/api/dashboard');
+  assert.strictEqual(res.status, 200);
+  assert.ok(Array.isArray(res.body.activeSessions), 'activeSessions array');
+  assert.strictEqual(res.body.activeSessions.length, 0);
+});
+
+test('GET /api/dashboard splits active vs recent: active sessions removed from recent list', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  const terminalServer = require('../lib/terminal-server');
+  activeSessions._reset();
+  terminalServer._clearAll();
+
+  // Mark the seeded sess-xyz as active via the OS-terminal registry
+  activeSessions.register('dash-proj-beta', 'sess-xyz', 'os-terminal');
+
+  const res = await request(app).get('/api/dashboard');
+  assert.strictEqual(res.status, 200);
+  const inActive = res.body.activeSessions.find(s => s.sessionId === 'sess-xyz');
+  const inRecent = res.body.recentSessions.find(s => s.sessionId === 'sess-xyz');
+  assert.ok(inActive, 'sess-xyz should appear in activeSessions');
+  assert.strictEqual(inActive.active, true);
+  assert.strictEqual(inActive.activeKind, 'os');
+  assert.strictEqual(inRecent, undefined, 'sess-xyz should NOT also appear in recentSessions');
+
+  activeSessions._reset();
+});

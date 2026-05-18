@@ -1,3 +1,28 @@
+## v1.0.0
+
+### Browser terminals run in background
+
+- Leaving a session no longer kills the browser terminal pty — it keeps running. Returning to the session reattaches and replays the last 256 KB of output
+- A modal on leaving a session lets you choose **Run in background** or **Close session**
+- New browser sessions with no input yet are closed immediately on leave (no orphan ptys)
+
+### Active-session indicators
+
+- Green pulsing dot on session cards marks sessions that are still running — **solid** for browser-terminal ptys, **outlined** for recent OS-terminal launches
+- **Active count badges** on the Dashboard nav item and each project in the sidebar; updates every 15s
+- Sessions list refreshes automatically when navigating back so dots reflect current state
+- **Remote-controlled marker** — a phone icon appears on session cards that were ever driven via the mobile/web bridge
+
+### Themes
+
+- Three new themes: **Terminal** (amber CRT), **Dracula** (purple/pink dark), **Sepia** (warm paper light)
+- Theme picker added to **Manager Settings → General** as a dropdown — alongside the existing footer toggle that cycles all 7 themes
+
+### UX
+
+- Navigating back from a session lands on the **Sessions** tab instead of resetting to Memory
+- Favicon added — replaces the "CM" text in the footer
+
 ## v0.9.1
 
 ### Bug fixes

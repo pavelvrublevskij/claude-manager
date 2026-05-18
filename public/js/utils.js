@@ -98,9 +98,9 @@ function buildTable(cols, rows) {
 // --- Theme ---
 
 const Theme = {
-  themes: ['dark', 'light', 'matrix', 'default'],
-  icons: { dark: '&#9790;', light: '&#9728;', matrix: '&#9783;', default: '&#9681;' },
-  labels: { dark: 'Dark', light: 'Light', matrix: 'Matrix', default: 'Default' },
+  themes: ['dark', 'light', 'matrix', 'default', 'terminal', 'dracula', 'sepia'],
+  icons: { dark: '&#9790;', light: '&#9728;', matrix: '&#9783;', default: '&#9681;', terminal: '&#9608;', dracula: '&#9760;', sepia: '&#10086;' },
+  labels: { dark: 'Dark', light: 'Light', matrix: 'Matrix', default: 'Default', terminal: 'Terminal', dracula: 'Dracula', sepia: 'Sepia' },
 
   init() {
     const saved = localStorage.getItem('claude-manager-theme') || 'dark';
@@ -131,6 +131,41 @@ const Theme = {
 
 // Apply theme immediately (before DOMContentLoaded) to avoid flash
 Theme.init();
+
+const ActiveCount = {
+  POLL_MS: 15000,
+  _timer: null,
+  _data: { total: 0, byProject: {} },
+
+  start() {
+    ActiveCount.refresh();
+    if (ActiveCount._timer) return;
+    ActiveCount._timer = setInterval(ActiveCount.refresh, ActiveCount.POLL_MS);
+  },
+
+  async refresh() {
+    try {
+      const data = await api('/api/dashboard/active-count');
+      ActiveCount._data = data;
+      ActiveCount._apply();
+    } catch (_) { /* silent — count is non-critical */ }
+  },
+
+  _apply() {
+    const { total, byProject } = ActiveCount._data;
+    const dash = document.getElementById('nav-dashboard-active');
+    if (dash) {
+      if (total > 0) { dash.textContent = total; dash.style.display = ''; }
+      else dash.style.display = 'none';
+    }
+    document.querySelectorAll('.nav-active-badge').forEach(el => {
+      const slug = el.dataset.slug;
+      const count = (byProject && byProject[slug]) || 0;
+      if (count > 0) { el.textContent = count; el.style.display = ''; }
+      else el.style.display = 'none';
+    });
+  }
+};
 
 const Changelog = {
   async load() {
@@ -223,7 +258,7 @@ function renderSessionBadges(s, opts = {}) {
     const fallback = [s.gitBranch, s.lastGitBranch].filter(Boolean);
     branches = Array.from(new Set(fallback));
   }
-  if (branches.length) {
+  if (branches.length && !opts.skipBranches) {
     const branchParts = [];
     branches.forEach((b, i) => {
       if (i > 0) branchParts.push('<span class="session-branch-arrow">&#8594;</span>');
@@ -240,14 +275,28 @@ function renderSessionBadges(s, opts = {}) {
 function renderSessionCard(s, opts = {}) {
   const slug = opts.slug || s.slug;
 
+  const dotHtml = s.active
+    ? `<span class="session-active-dot session-active-dot--${s.activeKind || 'os'}" title="${s.activeKind === 'browser' ? 'Browser terminal active — click to reconnect' : 'OS terminal launched recently'}"></span>`
+    : '';
+  const remoteIcon = s.remoteControlled
+    ? `<span class="session-remote-icon" title="Remote-controlled session (used mobile/web bridge)" aria-label="remote-controlled">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3.5 5.5a5 5 0 0 1 9 0"/>
+          <path d="M5.5 7.5a2.5 2.5 0 0 1 5 0"/>
+          <circle cx="8" cy="9.5" r="0.9" fill="currentColor" stroke="none"/>
+        </svg>
+      </span>`
+    : '';
+  const summaryText = escapeHtml(s.summary || s.firstPrompt || 'Untitled session');
+
   let headerHtml;
   if (opts.timeAgo) {
     headerHtml = `<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">
-      <div class="session-summary">${escapeHtml(s.summary || s.firstPrompt || 'Untitled session')}</div>
+      <div class="session-summary">${dotHtml}${remoteIcon}${summaryText}</div>
       <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;margin-left:12px">${escapeHtml(opts.timeAgo)}</span>
     </div>`;
   } else {
-    headerHtml = `<div class="session-summary">${escapeHtml(s.summary || s.firstPrompt || 'Untitled session')}</div>`;
+    headerHtml = `<div class="session-summary">${dotHtml}${remoteIcon}${summaryText}</div>`;
     if (s.firstPrompt && s.summary) {
       headerHtml += `<div class="session-prompt">${escapeHtml(s.firstPrompt)}</div>`;
     }

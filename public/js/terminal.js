@@ -45,8 +45,50 @@ const TerminalPanel = {
   },
 
   closeFromUser() {
-    this.setAutoOpen(false);
-    this.close();
+    this.confirmLeave(() => {
+      this.setAutoOpen(false);
+      this.close();
+    });
+  },
+
+  hasAttachedPty() {
+    const ws = this.state && this.state.ws;
+    return !!(ws && ws.readyState === WebSocket.OPEN);
+  },
+
+  // Decide whether to prompt, kill silently, or just continue when the user wants to leave the
+  // session view. Fires `onProceed(choice)` after the decision (choice: 'background' | 'close' |
+  // 'none'). Cancel from the modal short-circuits — no callback fires.
+  confirmLeave(onProceed) {
+    const done = (choice) => {
+      onProceed && onProceed(choice);
+      if (typeof ActiveCount !== 'undefined') setTimeout(() => ActiveCount.refresh(), 300);
+    };
+    if (!this.hasAttachedPty()) { done('none'); return; }
+    if (!this.state.sessionId) {
+      // New-session pty with no ID yet — nothing to keep, close without asking.
+      this.killSession();
+      done('close');
+      return;
+    }
+    App._promptTerminalLeave(choice => {
+      if (choice === 'close') this.killSession();
+      done(choice);
+    });
+  },
+
+  killSession()       { this._sendWs({ t: 'close' }); },
+  notifySessionId(id) {
+    if (!id) return;
+    this._sendWs({ t: 'session', id });
+    if (this.state) this.state.sessionId = id;
+  },
+
+  _sendWs(payload) {
+    const ws = this.state && this.state.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    try { ws.send(JSON.stringify(payload)); return true; }
+    catch (_) { return false; }
   },
 
   open(slug, sessionId) {
@@ -112,7 +154,11 @@ const TerminalPanel = {
     }
     this.state.ws = ws;
 
-    ws.onopen = () => { this._setStatus('connected', 'connected'); this._sendResize(); };
+    ws.onopen = () => {
+      this._setStatus('connected', 'connected');
+      this._sendResize();
+      if (typeof ActiveCount !== 'undefined') ActiveCount.refresh();
+    };
     ws.onmessage = ev => { term.write(typeof ev.data === 'string' ? ev.data : ''); };
     ws.onclose = () => { this._setStatus('disconnected', 'error'); };
     ws.onerror = () => { this._setStatus('error', 'error'); };

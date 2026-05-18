@@ -152,13 +152,17 @@ Object.assign(Sessions, {
     if (!visible.length) return '<div class="ctx-empty">No files changed</div>';
     return visible.map(f => {
       const name = f.path.replace(/\\/g, '/').split('/').pop();
-      return `<div class="ctx-file-item"
+      const status = f.isNew ? 'new' : (f.isDeleted ? 'deleted' : 'edited');
+      const badge = `<span class="ctx-file-badge ctx-file-badge-${status}">${status}</span>`;
+      return `<div class="ctx-file-item ctx-file-${status}"
         data-session="${escapeHtml(sessionId)}"
-        data-hash="${escapeHtml(f.hash)}"
-        data-from="${f.versions[0]}"
+        data-hash="${escapeHtml(f.hash || '')}"
+        data-from="${f.versions[0] || ''}"
         data-path="${escapeHtml(f.path)}"
+        data-is-new="${f.isNew ? '1' : ''}"
+        data-is-deleted="${f.isDeleted ? '1' : ''}"
         title="${escapeHtml(f.path)}"
-        onclick="Sessions._openCtxDiff(this)">${escapeHtml(name)}</div>`;
+        onclick="Sessions._openCtxDiff(this)">${badge}<span class="ctx-file-name">${escapeHtml(name)}</span></div>`;
     }).join('');
   },
 
@@ -173,8 +177,11 @@ Object.assign(Sessions, {
   },
 
   _openCtxDiff(el) {
-    const { session, hash, from, path } = el.dataset;
-    FileHistory.showDiffCurrent(session, hash, parseInt(from, 10), Sessions._ctx.projSlug, path);
+    const { session, hash, from, path, isNew, isDeleted } = el.dataset;
+    FileHistory.showDiffCurrent(session, hash, parseInt(from, 10), Sessions._ctx.projSlug, path, {
+      isNew: isNew === '1',
+      isDeleted: isDeleted === '1'
+    });
   },
 
   toggleCtx(sectionId) {

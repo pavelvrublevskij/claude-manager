@@ -5,10 +5,35 @@ const Dashboard = {
     try {
       const data = await api('/api/dashboard');
       Dashboard.renderStats(data.stats);
+      Dashboard.renderActiveSessions(data.activeSessions || []);
       Dashboard.renderRecentSessions(data.recentSessions);
     } catch (e) {
       toast('Could not load dashboard: ' + e.message, 'error');
     }
+  },
+
+  renderActiveSessions(sessions) {
+    const wrap = document.getElementById('dashboard-active-wrap');
+    const container = document.getElementById('dashboard-active-sessions');
+    if (!wrap || !container) return;
+    if (!sessions.length) {
+      wrap.style.display = 'none';
+      container.innerHTML = '';
+      return;
+    }
+    wrap.style.display = '';
+    Dashboard._renderCards(container, sessions);
+  },
+
+  _renderCards(container, sessions) {
+    container.innerHTML = sessions.map(s => renderSessionCard(s, {
+      onclick: `App.navigate('session-detail', { slug: '${s.slug}', sessionId: '${s.sessionId}', sessionInfo: null })`,
+      project: decodeName(s.slug),
+      timeAgo: s.modified ? Dashboard.timeAgo(new Date(s.modified)) : '',
+      slug: s.slug,
+      dates: true
+    })).join('');
+    if (typeof Sessions !== 'undefined') Sessions.annotatePlans(sessions);
   },
 
   renderStats(stats) {
@@ -34,19 +59,11 @@ const Dashboard = {
 
   renderRecentSessions(sessions) {
     const container = document.getElementById('dashboard-recent-sessions');
-    if (sessions.length === 0) {
+    if (!sessions.length) {
       container.innerHTML = '<div class="empty-state"><p>No recent sessions</p></div>';
       return;
     }
-
-    container.innerHTML = sessions.map(s => renderSessionCard(s, {
-      onclick: `App.navigate('session-detail', { slug: '${s.slug}', sessionId: '${s.sessionId}', sessionInfo: null })`,
-      project: decodeName(s.slug),
-      timeAgo: s.modified ? Dashboard.timeAgo(new Date(s.modified)) : '',
-      slug: s.slug,
-      dates: true
-    })).join('');
-    if (typeof Sessions !== 'undefined') Sessions.annotatePlans(sessions);
+    Dashboard._renderCards(container, sessions);
   },
 
   timeAgo(date) {

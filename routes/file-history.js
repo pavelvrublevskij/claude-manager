@@ -47,22 +47,32 @@ router.get('/:sessionId/context', wrapRoute((req, res) => {
           const backups = obj.snapshot && obj.snapshot.trackedFileBackups;
           if (!backups) continue;
           for (const [filePath, info] of Object.entries(backups)) {
-            if (!info.backupFileName) continue;
-            if (!fileMap[filePath]) fileMap[filePath] = { hash: info.backupFileName.split('@')[0], maxVersion: 0 };
+            if (!fileMap[filePath]) fileMap[filePath] = { hash: null, maxVersion: 0, isNew: false };
+            if (!info.backupFileName) {
+              fileMap[filePath].isNew = true;
+              continue;
+            }
+            if (!fileMap[filePath].hash) fileMap[filePath].hash = info.backupFileName.split('@')[0];
             fileMap[filePath].maxVersion = Math.max(fileMap[filePath].maxVersion, info.version);
           }
         } catch (_) {}
       }
 
+      const projectDir = projSlug ? decodeSlug(projSlug) : null;
       const histFiles = fs.readdirSync(histDir);
       files = Object.entries(fileMap).map(([filePath, info]) => {
-        const versions = histFiles
+        const versions = info.hash ? histFiles
           .filter(f => f.startsWith(info.hash + '@v'))
           .map(f => parseInt(f.split('@v')[1], 10))
           .filter(v => !isNaN(v))
-          .sort((a, b) => a - b);
-        return { path: filePath, hash: info.hash, versions };
-      }).filter(f => f.versions.length > 0);
+          .sort((a, b) => a - b) : [];
+        let isDeleted = false;
+        if (projectDir) {
+          const currentFile = path.resolve(projectDir, filePath);
+          isDeleted = !fs.existsSync(currentFile);
+        }
+        return { path: filePath, hash: info.hash, versions, isNew: info.isNew, isDeleted };
+      }).filter(f => f.versions.length > 0 || f.isNew);
     }
   }
 
@@ -115,32 +125,37 @@ router.get('/:sessionId/:hash/diff-current', wrapRoute((req, res) => {
   const { sessionId, hash } = req.params;
   const version = parseInt(req.query.version, 10);
   const { projSlug, filePath } = req.query;
+  const isNew = req.query.isNew === 'true';
 
-  for (const p of [sessionId, hash]) {
-    if (p.includes('..') || p.includes('/') || p.includes('\\')) {
-      return res.status(400).json({ error: 'Invalid parameters' });
-    }
+  if (sessionId.includes('..') || sessionId.includes('/') || sessionId.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid parameters' });
+  }
+  if (!isNew && (hash.includes('..') || hash.includes('/') || hash.includes('\\'))) {
+    return res.status(400).json({ error: 'Invalid parameters' });
   }
   if (!projSlug || projSlug.includes('..') || projSlug.includes('/') || projSlug.includes('\\')) {
     return res.status(400).json({ error: 'Invalid projSlug' });
   }
-
-  const histDir = path.join(FILE_HISTORY_DIR, sessionId);
-  const fromFile = path.join(histDir, `${hash}@v${version}`);
-  if (!fs.existsSync(fromFile)) return res.status(404).json({ error: 'Version not found' });
 
   const projectDir = decodeSlug(projSlug);
   if (!projectDir) return res.status(404).json({ error: 'Project not found' });
 
   const currentFile = path.resolve(projectDir, filePath);
   const rel = path.relative(path.resolve(projectDir), currentFile);
-  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+  if (rel.startsWith('..')) {
     return res.status(400).json({ error: 'Invalid file path' });
   }
-  if (!fs.existsSync(currentFile)) return res.status(404).json({ error: 'Current file not found' });
+  const currentExists = fs.existsSync(currentFile);
 
-  const oldText = fs.readFileSync(fromFile, 'utf-8');
-  const newText = fs.readFileSync(currentFile, 'utf-8');
+  let oldText = '';
+  if (!isNew) {
+    const histDir = path.join(FILE_HISTORY_DIR, sessionId);
+    const fromFile = path.join(histDir, `${hash}@v${version}`);
+    if (!fs.existsSync(fromFile)) return res.status(404).json({ error: 'Version not found' });
+    oldText = fs.readFileSync(fromFile, 'utf-8');
+  }
+
+  const newText = currentExists ? fs.readFileSync(currentFile, 'utf-8') : '';
   res.json(computeDiff(oldText, newText));
 }));
 
@@ -149,7 +164,7 @@ function computeDiff(oldText, newText) {
   const b = newText.split('\n');
   const m = a.length, n = b.length;
 
-  if (m > 3000 || n > 3000) {
+  if (m > 5000 || n > 5000) {
     return { hunks: [], stats: { added: 0, removed: 0 }, tooLarge: true };
   }
 

@@ -167,6 +167,51 @@ test('GET /api/projects/:slug/sessions/search returns empty for short query', as
   assert.deepStrictEqual(res.body, []);
 });
 
+test('GET /api/projects/:slug/sessions stamps active=false when nothing is registered', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  const terminalServer = require('../lib/terminal-server');
+  activeSessions._reset();
+  terminalServer._clearAll();
+  const res = await request(app).get(`/api/projects/${SLUG}/sessions`);
+  assert.strictEqual(res.status, 200);
+  for (const s of res.body) {
+    assert.strictEqual(s.active, false);
+    assert.strictEqual(s.activeKind, null);
+  }
+});
+
+test('GET /api/projects/:slug/sessions stamps active=true, activeKind=os for OS-registered sessions', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  const terminalServer = require('../lib/terminal-server');
+  activeSessions._reset();
+  terminalServer._clearAll();
+  activeSessions.register(SLUG, SESSION_A, 'os-terminal');
+  const res = await request(app).get(`/api/projects/${SLUG}/sessions`);
+  assert.strictEqual(res.status, 200);
+  const a = res.body.find(s => s.sessionId === SESSION_A);
+  assert.strictEqual(a.active, true);
+  assert.strictEqual(a.activeKind, 'os');
+  const b = res.body.find(s => s.sessionId === SESSION_B);
+  assert.strictEqual(b.active, false);
+  activeSessions._reset();
+});
+
+test('GET /api/projects/:slug/sessions: browser-terminal beats OS in activeKind', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  const terminalServer = require('../lib/terminal-server');
+  activeSessions._reset();
+  terminalServer._clearAll();
+  activeSessions.register(SLUG, SESSION_A, 'os-terminal');
+  terminalServer._injectFakeEntry(SLUG, SESSION_A, { ws: null });
+  const res = await request(app).get(`/api/projects/${SLUG}/sessions`);
+  assert.strictEqual(res.status, 200);
+  const a = res.body.find(s => s.sessionId === SESSION_A);
+  assert.strictEqual(a.active, true);
+  assert.strictEqual(a.activeKind, 'browser');
+  terminalServer._clearAll();
+  activeSessions._reset();
+});
+
 test('GET /api/projects/:slug/sessions/search returns empty when no match', async () => {
   const res = await request(app).get(`/api/projects/${SLUG}/sessions/search`).query({ q: 'zzznonexistentzzz' });
   assert.strictEqual(res.status, 200);
@@ -257,3 +302,50 @@ test('POST /api/projects/:slug/sessions/:sessionId/rename returns 404 for unknow
 test('POST /api/projects/:slug/sessions/new is skipped (spawns terminal)', { skip: 'Endpoint launches an OS terminal via child_process; testing would open a real window on the runner.' }, () => {});
 
 test('POST /api/projects/:slug/sessions/:sessionId/resume is skipped (spawns terminal)', { skip: 'Endpoint launches an OS terminal via child_process; testing would open a real window on the runner.' }, () => {});
+
+test('hasBridgeSession: returns true for jsonl with bridge-session entry, false otherwise', () => {
+  const { hasBridgeSession } = require('../lib/session-flags');
+  const tmpSlug = 'bridge-flag-helper';
+  const dir = path.join(paths.PROJECTS_DIR, tmpSlug);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+
+  const withBridge = path.join(dir, 'with.jsonl');
+  writeJsonl(withBridge, [
+    { type: 'user', uuid: 'u', timestamp: '2026-01-01T00:00:00Z', message: { content: 'hi' } },
+    { type: 'bridge-session', sessionId: 'sid', bridgeSessionId: 'cse_test', lastSequenceNum: 0 }
+  ]);
+  const withoutBridge = path.join(dir, 'without.jsonl');
+  writeJsonl(withoutBridge, [
+    { type: 'user', uuid: 'u', timestamp: '2026-01-01T00:00:00Z', message: { content: 'hi' } }
+  ]);
+
+  assert.strictEqual(hasBridgeSession(withBridge), true);
+  assert.strictEqual(hasBridgeSession(withoutBridge), false);
+  assert.strictEqual(hasBridgeSession(path.join(dir, 'missing.jsonl')), false);
+});
+
+test('GET /api/projects/:slug/sessions stamps remoteControlled=true for sessions with bridge-session entries', async () => {
+  const tmpSlug = 'bridge-flag-list';
+  const dir = path.join(paths.PROJECTS_DIR, tmpSlug);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+
+  const REMOTE_SID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const LOCAL_SID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+
+  writeJsonl(path.join(dir, REMOTE_SID + '.jsonl'), [
+    { type: 'user', uuid: 'u', timestamp: '2026-01-02T00:00:00Z', gitBranch: 'main', message: { content: 'remote-controlled' } },
+    { type: 'bridge-session', sessionId: REMOTE_SID, bridgeSessionId: 'cse_test', lastSequenceNum: 0 }
+  ]);
+  writeJsonl(path.join(dir, LOCAL_SID + '.jsonl'), [
+    { type: 'user', uuid: 'u', timestamp: '2026-01-01T00:00:00Z', gitBranch: 'main', message: { content: 'local only' } }
+  ]);
+
+  const res = await request(app).get(`/api/projects/${tmpSlug}/sessions`);
+  assert.strictEqual(res.status, 200);
+  const remote = res.body.find(s => s.sessionId === REMOTE_SID);
+  const local = res.body.find(s => s.sessionId === LOCAL_SID);
+  assert.strictEqual(remote.remoteControlled, true);
+  assert.strictEqual(local.remoteControlled, false);
+});

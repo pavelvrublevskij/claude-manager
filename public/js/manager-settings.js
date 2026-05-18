@@ -8,6 +8,7 @@ const ManagerSettings = {
   async load() {
     ManagerSettings.bindNav();
     ManagerSettings.restoreSection();
+    ManagerSettings.renderThemePicker();
     try {
       const [config, pricingData, history] = await Promise.all([
         api('/api/pricing/config'),
@@ -24,6 +25,21 @@ const ManagerSettings = {
     } catch (e) {
       toast('Failed to load manager settings: ' + e.message, 'error');
     }
+  },
+
+  renderThemePicker() {
+    const sel = document.getElementById('theme-select');
+    if (!sel || typeof Theme === 'undefined') return;
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    sel.innerHTML = Theme.themes.map(t =>
+      `<option value="${t}"${t === current ? ' selected' : ''}>${Theme.labels[t]}</option>`
+    ).join('');
+  },
+
+  onThemeChange(name) {
+    if (typeof Theme === 'undefined' || !Theme.themes.includes(name)) return;
+    Theme.apply(name);
+    try { localStorage.setItem('claude-manager-theme', name); } catch (_) {}
   },
 
   bindNav() {
