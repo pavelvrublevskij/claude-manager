@@ -32,6 +32,14 @@ before(() => {
       }
     },
     { type: 'user', timestamp: '2026-01-01T11:00:00.000Z', message: { content: 'end' } },
+    {
+      type: 'assistant',
+      message: {
+        content: [
+          { type: 'tool_use', id: 'toolu_1', name: 'ExitPlanMode', input: { plan: '# In-range Plan\n\nContent.', planFilePath: `${paths.CLAUDE_DIR}/plans/fh-in-range-plan.md` } }
+        ]
+      }
+    }
   ];
   fs.writeFileSync(
     path.join(projDir, SESSION_ID + '.jsonl'),
@@ -101,22 +109,19 @@ test('context: projSlug is returned', async () => {
   assert.strictEqual(res.body.projSlug, PROJ_SLUG);
 });
 
-test('context: plans visible via explicit ?from/?to params', async () => {
-  const res = await request(app)
-    .get(`/api/file-history/${SESSION_ID}/context`)
-    .query({ from: '2026-01-01T10:00:00.000Z', to: '2026-01-01T11:00:00.000Z' });
-  assert.strictEqual(res.status, 200);
-  const names = res.body.plans.map(p => p.name);
-  assert.ok(names.includes('fh-in-range-plan'), 'in-range plan must appear');
-  assert.ok(!names.includes('fh-old-plan'), 'out-of-range plan must not appear');
-});
-
-test('context: plans visible without query params via JSONL timestamp fallback (Bug 2 regression)', async () => {
+test('context: plans linked via ExitPlanMode planFilePath appear', async () => {
   const res = await request(app).get(`/api/file-history/${SESSION_ID}/context`);
   assert.strictEqual(res.status, 200);
   const names = res.body.plans.map(p => p.name);
-  assert.ok(names.includes('fh-in-range-plan'), 'in-range plan must appear without query params');
-  assert.ok(!names.includes('fh-old-plan'), 'out-of-range plan must not appear');
+  assert.ok(names.includes('fh-in-range-plan'), 'plan referenced in ExitPlanMode must appear');
+  assert.ok(!names.includes('fh-old-plan'), 'plan not referenced must not appear');
+});
+
+test('context: plans not linked via ExitPlanMode are excluded even if mtime overlaps', async () => {
+  const res = await request(app).get(`/api/file-history/${SESSION_ID}/context`);
+  assert.strictEqual(res.status, 200);
+  const names = res.body.plans.map(p => p.name);
+  assert.ok(!names.includes('fh-old-plan'), 'unreferenced plan must not appear regardless of mtime');
 });
 
 test('context: invalid sessionId returns 400', async () => {

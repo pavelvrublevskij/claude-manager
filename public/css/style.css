@@ -103,6 +103,20 @@ body {
 .app.sidebar-collapsed .nav-item {
   justify-content: center;
   padding: 9px 0;
+  position: relative;
+}
+
+.app.sidebar-collapsed .nav-item .badge.badge-active {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  margin: 0;
+  border-radius: 50%;
+  font-size: 0;
+  min-width: unset;
 }
 
 .app.sidebar-collapsed .nav-section-title {
@@ -1715,6 +1729,17 @@ mark.search-highlight {
   border-radius: 10px;
 }
 
+.session-skill {
+  display: inline-block;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  background: rgba(56, 189, 148, 0.12);
+  color: #3dba93;
+  padding: 1px 7px;
+  border-radius: 10px;
+  margin-right: 4px;
+}
+
 /* --- Chat / Session Messages --- */
 
 .chat-container {
@@ -3028,6 +3053,29 @@ mark.search-highlight {
   vertical-align: middle;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.session-project-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  margin-right: 8px;
+  vertical-align: middle;
+  cursor: pointer;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-project-chip:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
 }
 
 /* --- Diff View --- */

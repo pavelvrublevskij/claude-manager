@@ -1,13 +1,60 @@
 const router = require('express').Router();
 const fs = require('fs');
 const path = require('path');
-const { PROJECTS_DIR, SKILLS_DIR, OUTPUT_STYLES_DIR, MCP_FILE, KEYBINDINGS_FILE } = require('../lib/paths');
+const { PROJECTS_DIR, SKILLS_DIR, OUTPUT_STYLES_DIR, MCP_FILE, KEYBINDINGS_FILE, CLAUDE_DIR } = require('../lib/paths');
 const { readJson, wrapRoute } = require('../lib/file-helpers');
 const { decodeSlug } = require('../lib/slug');
 const { buildIndex, calcCostMultiModel } = require('../lib/usage-index');
 const { getCustomTitle } = require('../lib/session-title');
 const { collectBranches } = require('../lib/session-branches');
 const { stampActive, listAllActiveSessions } = require('../lib/session-status');
+const planCache = require('../lib/plan-cache');
+
+const PLANS_DIR = path.join(CLAUDE_DIR, 'plans');
+
+function loadPlanStems() {
+  if (!fs.existsSync(PLANS_DIR)) return [];
+  try { return fs.readdirSync(PLANS_DIR).filter(f => f.endsWith('.md')).map(f => f.slice(0, -3)); }
+  catch (_) { return []; }
+}
+
+function fileHasPlan(sessionId, filePath, planStems) {
+  const cached = planCache.get(sessionId);
+  if (cached !== undefined) return cached;
+  if (!planStems.length) { planCache.set(sessionId, false); return false; }
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const hasPlan = planStems.some(stem => content.includes(stem));
+    planCache.set(sessionId, hasPlan);
+    return hasPlan;
+  } catch (_) { return false; }
+}
+
+function normalizePrompt(text) {
+  const m = (text || '').match(/<command-name>(\/[\w-]+)<\/command-name>/);
+  return m ? m[1] : (text || '');
+}
+
+function isSkippablePrompt(text) {
+  const t = (text || '').trim();
+  if (t.includes('Caveat: The messages below were generated')) return true;
+  return normalizePrompt(t) === '/clear';
+}
+
+function findFirstMeaningfulPrompt(filePath) {
+  try {
+    const lines = fs.readFileSync(filePath, 'utf-8').split('\n').filter(Boolean);
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line);
+        if (entry.type !== 'user') continue;
+        const raw = typeof entry.message?.content === 'string' ? entry.message.content : '';
+        if (raw && !isSkippablePrompt(raw)) return normalizePrompt(raw).slice(0, 200);
+      } catch (_) {}
+    }
+  } catch (_) {}
+  return '';
+}
 
 router.get('/active-count', wrapRoute((req, res) => {
   const all = listAllActiveSessions();
@@ -20,6 +67,7 @@ router.get('/active-count', wrapRoute((req, res) => {
 router.get('/', wrapRoute(async (req, res) => {
   const dirs = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true }).filter(d => d.isDirectory());
 
+  const planStems = loadPlanStems();
   let totalSessions = 0;
   let totalMemory = 0;
   const recentSessions = [];
@@ -51,13 +99,14 @@ router.get('/', wrapRoute(async (req, res) => {
             projectName: decodedPath,
             sessionId: e.sessionId,
             summary: custom || e.summary || '',
-            firstPrompt: e.firstPrompt || '',
+            firstPrompt: isSkippablePrompt(e.firstPrompt) ? findFirstMeaningfulPrompt(filePath) : (e.firstPrompt || ''),
             messageCount: e.messageCount || 0,
             created: e.created || null,
             modified: e.modified || null,
             gitBranch: e.gitBranch || (gitBranches[0] || ''),
             lastGitBranch: gitBranches[gitBranches.length - 1] || '',
-            gitBranches
+            gitBranches,
+            hasPlan: fileHasPlan(e.sessionId, filePath, planStems)
           });
         }
       } catch (_) { /* malformed index */ }
@@ -83,9 +132,12 @@ router.get('/', wrapRoute(async (req, res) => {
                 } else if (entry.type === 'user') {
                   msgCount++;
                   if (msgCount === 1) {
-                    firstPrompt = typeof entry.message?.content === 'string' ? entry.message.content.slice(0, 200) : '';
                     created = entry.timestamp || stat.birthtime.toISOString();
                     gitBranch = entry.gitBranch || '';
+                  }
+                  if (!firstPrompt) {
+                    const raw = typeof entry.message?.content === 'string' ? entry.message.content : '';
+                    if (!isSkippablePrompt(raw)) firstPrompt = normalizePrompt(raw).slice(0, 200);
                   }
                   if (entry.gitBranch) {
                     lastGitBranch = entry.gitBranch;
@@ -109,7 +161,8 @@ router.get('/', wrapRoute(async (req, res) => {
                 modified: stat.mtime.toISOString(),
                 gitBranch,
                 lastGitBranch,
-                gitBranches
+                gitBranches,
+                hasPlan: fileHasPlan(f.replace('.jsonl', ''), filePath, planStems)
               });
             }
           } catch (_) { /* unreadable file */ }

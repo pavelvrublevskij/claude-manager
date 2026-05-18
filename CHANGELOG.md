@@ -1,3 +1,14 @@
+## v1.0.1
+
+### Bug fixes
+
+- **Plan detection false positives**: replaced the ±30-minute mtime overlap heuristic with exact content matching — plans are now linked to sessions via the `ExitPlanMode` tool call's `planFilePath`; unrelated plan files no longer appear under a session
+- **Session titles show `/clear` or system caveat text**: sessions that start with a `/clear` command or the "Caveat: The messages below were generated…" system message now skip those entries and surface the first real user message as the title
+- **Skill invocations shown with raw XML**: session cards whose first prompt was a skill call (e.g. `/review`) were rendering the raw `<command-name>` XML wrapper; they now show a styled `/skill` badge
+- **Active-session badge hidden in collapsed sidebar**: the green count badge was clipped by overflow in icon-only sidebar mode; fixed with absolute positioning
+- **Plan badge duplicated on session cards**: plan annotation could fire from two code paths, inserting the badge twice; refactored to use the server-provided `hasPlan` flag with a single `_rerenderPlans()` pass
+- **Session detail missing project context**: added a clickable project chip in the session detail header so you can navigate back to the project without using the browser back button
+
 ## v1.0.0
 
 ### Browser terminals run in background

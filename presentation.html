@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Manager — Project Presentation</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --accent: #da7756;
+    --accent2: #58a6ff;
+    --accent3: #3fb950;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --danger: #f85149;
+    --warn: #d29922;
+    --slide-w: 1100px;
+    --slide-h: 620px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+    gap: 2.5rem;
+    line-height: 1.5;
+  }
+
+  h1.deck-title {
+    color: var(--muted);
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .nav {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 0.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2rem;
+    padding: 0.4rem 0.75rem;
+    z-index: 100;
+  }
+  .nav button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 1rem;
+    transition: color 0.15s, background 0.15s;
+  }
+  .nav button:hover { color: var(--text); background: var(--border); }
+  .nav span { color: var(--muted); font-size: 0.8rem; line-height: 2rem; padding: 0 0.25rem; }
+
+  .slide {
+    width: var(--slide-w);
+    min-height: var(--slide-h);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 3rem 3.5rem;
+    display: none;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+  .slide.active { display: flex; }
+
+  .slide-num {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.5rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .slide-tag {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 0.6rem;
+  }
+
+  h2 { font-size: 2rem; font-weight: 700; color: var(--text); margin-bottom: 0.5rem; }
+  h3 { font-size: 1.1rem; font-weight: 600; color: var(--text); margin-bottom: 0.4rem; }
+  p { color: var(--muted); font-size: 0.95rem; }
+
+  /* ── SLIDE 1 — TITLE ── */
+  .slide-title {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 1.2rem;
+  }
+  .slide-title .logo {
+    font-size: 3.5rem;
+    margin-bottom: 0.25rem;
+  }
+  .slide-title h1 {
+    font-size: 2.8rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .slide-title .subtitle {
+    font-size: 1.15rem;
+    color: var(--muted);
+    max-width: 500px;
+  }
+  .slide-title .badge-row {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 0.5rem;
+  }
+  .badge {
+    background: #21262d;
+    border: 1px solid var(--border);
+    border-radius: 2rem;
+    padding: 0.3rem 0.85rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .badge.green { color: var(--accent3); border-color: #238636; background: #0f2b0f; }
+  .badge.blue  { color: var(--accent2); border-color: #1f6feb; background: #0c1f3a; }
+
+  /* ── GRID LAYOUT ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; flex: 1; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem; margin-top: 1.5rem; flex: 1; }
+
+  .card {
+    background: #21262d;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem 1.4rem;
+  }
+  .card h3 { font-size: 0.92rem; }
+  .card p  { font-size: 0.82rem; margin-top: 0.35rem; }
+
+  .card.accent-left { border-left: 3px solid var(--accent); }
+  .card.blue-left   { border-left: 3px solid var(--accent2); }
+  .card.green-left  { border-left: 3px solid var(--accent3); }
+  .card.red-left    { border-left: 3px solid var(--danger); }
+  .card.warn-left   { border-left: 3px solid var(--warn); }
+
+  /* ── LIST ── */
+  ul.feat { list-style: none; margin-top: 1rem; display: flex; flex-direction: column; gap: 0.55rem; }
+  ul.feat li { display: flex; gap: 0.6rem; font-size: 0.88rem; color: var(--muted); align-items: flex-start; }
+  ul.feat li .icon { color: var(--accent3); font-size: 0.9rem; flex-shrink: 0; margin-top: 0.05rem; }
+  ul.feat li .icon.red { color: var(--danger); }
+  ul.feat li .icon.yellow { color: var(--warn); }
+  ul.feat li strong { color: var(--text); }
+
+  /* ── ARCH DIAGRAM ── */
+  .arch { display: flex; gap: 2.5rem; margin-top: 1.5rem; flex: 1; align-items: flex-start; }
+  .arch-col { flex: 1; display: flex; flex-direction: column; gap: 0.75rem; }
+  .arch-col h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.25rem; }
+  .arch-item {
+    background: #21262d;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .arch-item strong { color: var(--text); display: block; font-size: 0.85rem; margin-bottom: 0.1rem; }
+  .arch-arrow { display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--border); padding-top: 3rem; }
+
+  /* ── PRO/CON ── */
+  .procon { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1.5rem; flex: 1; }
+  .procon-col h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.75rem; }
+  .procon-col.pro h3 { color: var(--accent3); }
+  .procon-col.con h3 { color: var(--danger); }
+
+  /* ── STAT ROW ── */
+  .stats { display: flex; gap: 1.5rem; margin-top: 1.5rem; }
+  .stat-box {
+    flex: 1;
+    background: #21262d;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.1rem 1.3rem;
+    text-align: center;
+  }
+  .stat-box .val { font-size: 2rem; font-weight: 700; }
+  .stat-box .lbl { font-size: 0.75rem; color: var(--muted); margin-top: 0.2rem; }
+  .stat-box.orange .val { color: var(--accent); }
+  .stat-box.blue .val   { color: var(--accent2); }
+  .stat-box.green .val  { color: var(--accent3); }
+
+  /* ── CODE ── */
+  code {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.82rem;
+    color: var(--accent2);
+  }
+
+  /* ── SECTION DIVIDER ── */
+  .slide-section {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .slide-section .big-icon { font-size: 4rem; margin-bottom: 1rem; }
+  .slide-section h2 { font-size: 2.4rem; }
+
+  /* responsive */
+  @media (max-width: 1140px) {
+    .slide { width: 96vw; padding: 2rem 2rem; }
+    .grid-2, .procon { grid-template-columns: 1fr; }
+    .arch { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<h1 class="deck-title">Claude Manager — Project Presentation</h1>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 1 — TITLE
+══════════════════════════════════════════════════ -->
+<div class="slide slide-title active" id="s1">
+  <span class="slide-num">1 / 10</span>
+  <div class="logo">⚙️</div>
+  <h1>Claude Manager</h1>
+  <p class="subtitle">A local web UI for managing Claude Code configuration, sessions, memory, and usage — entirely on your machine.</p>
+  <div class="badge-row">
+    <span class="badge green">v1.0.0</span>
+    <span class="badge blue">Node.js 18+</span>
+    <span class="badge">Vanilla JS</span>
+    <span class="badge">localhost only</span>
+    <span class="badge">Cross-platform</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 2 — WHAT IS IT
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s2">
+  <span class="slide-num">2 / 10</span>
+  <div class="slide-tag">Overview</div>
+  <h2>What is Claude Manager?</h2>
+  <p>A desktop-local web app that replaces manual editing of <code>~/.claude/</code> config files with a visual UI.</p>
+
+  <div class="grid-2">
+    <div class="card accent-left">
+      <h3>The Problem It Solves</h3>
+      <p>Claude Code stores all its config in <code>~/.claude/</code> — JSON settings, Markdown memory files, JSONL sessions, MCP server definitions. Editing these by hand is error-prone and time-consuming.</p>
+    </div>
+    <div class="card blue-left">
+      <h3>The Solution</h3>
+      <p>A single-page web app served at <code>localhost:3000</code> that reads, validates, backs up, and writes those files through a clean UI — with zero cloud dependency.</p>
+    </div>
+    <div class="card green-left">
+      <h3>Primary Users</h3>
+      <p>Developers who use Claude Code daily and want visibility into token costs, session history, and configuration without leaving the browser.</p>
+    </div>
+    <div class="card warn-left">
+      <h3>Core Principle</h3>
+      <p>Your data never leaves your machine. The server binds only to <code>127.0.0.1</code> and all writes are backed up automatically before any change.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 3 — ARCHITECTURE
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s3">
+  <span class="slide-num">3 / 10</span>
+  <div class="slide-tag">Architecture</div>
+  <h2>Architecture Overview</h2>
+  <p>Thin Express server + vanilla JS SPA. No build step, no framework dependencies.</p>
+
+  <div class="arch">
+    <div class="arch-col">
+      <h3>Backend (Node.js / Express)</h3>
+      <div class="arch-item"><strong>server.js</strong>30-line entry point — mounts route modules, versioning, pricing endpoints</div>
+      <div class="arch-item"><strong>routes/ (15 modules)</strong>dashboard, settings, projects, sessions, memory, MCP, keybindings, skills, agents, terminal, usage, plans, plugins, output-styles, file-history</div>
+      <div class="arch-item"><strong>lib/ (helpers)</strong>path constants, file I/O, slug decoding, frontmatter parsing, usage indexing</div>
+      <div class="arch-item"><strong>node-pty + WebSocket</strong>Embedded terminal emulation via xterm.js</div>
+    </div>
+
+    <div class="arch-arrow">⇄</div>
+
+    <div class="arch-col">
+      <h3>Frontend (Vanilla JS SPA)</h3>
+      <div class="arch-item"><strong>index.html</strong>Single shell — hash-based routing, no page reloads</div>
+      <div class="arch-item"><strong>utils.js → modal.js → features</strong>Load order enforced via script tags. Each feature is a singleton object on <code>window</code></div>
+      <div class="arch-item"><strong>style.css</strong>Dark / Light / Matrix / Catppuccin themes via CSS custom properties</div>
+      <div class="arch-item"><strong>chart.js + xterm.js</strong>Token charts and embedded terminal (CDN, no bundler)</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 4 — FEATURES PART 1
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s4">
+  <span class="slide-num">4 / 10</span>
+  <div class="slide-tag">Features — Part 1</div>
+  <h2>Core Features</h2>
+  <p>Configuration management, memory, and extension authoring.</p>
+
+  <div class="grid-3">
+    <div class="card accent-left">
+      <h3>Settings Editor</h3>
+      <p>Visual tree editor for <code>settings.json</code> — permissions, hooks, env vars, API keys. Project-level and user-level scopes.</p>
+    </div>
+    <div class="card accent-left">
+      <h3>Memory Manager</h3>
+      <p>Create, edit, and delete <code>~/.claude/memory/</code> Markdown files with frontmatter. Typed (user / feedback / project / reference).</p>
+    </div>
+    <div class="card accent-left">
+      <h3>CLAUDE.md Editor</h3>
+      <p>Edit global and per-project instruction files with a Markdown editor. Changes take effect on next Claude Code session.</p>
+    </div>
+    <div class="card blue-left">
+      <h3>MCP Server Manager</h3>
+      <p>Add, edit, enable/disable MCP servers across user, project, and local scopes. Supports SSE and stdio transports.</p>
+    </div>
+    <div class="card blue-left">
+      <h3>Skills (Slash Commands)</h3>
+      <p>Author and manage custom <code>/skill</code> Markdown files. Previews rendered inline.</p>
+    </div>
+    <div class="card blue-left">
+      <h3>Output Styles & Agents</h3>
+      <p>Define reusable response presets and project-level agent personas stored as Markdown.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 5 — FEATURES PART 2
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s5">
+  <span class="slide-num">5 / 10</span>
+  <div class="slide-tag">Features — Part 2</div>
+  <h2>Session & Terminal Features</h2>
+  <p>Deep visibility into past conversations and an in-browser shell.</p>
+
+  <div class="grid-2">
+    <div class="card green-left">
+      <h3>Session Browser</h3>
+      <p>Browse all Claude Code sessions organized by project. Search messages, view tool-use results (Edit, Bash, Read, Write rendered structurally), rename sessions, and paginate large histories.</p>
+    </div>
+    <div class="card green-left">
+      <h3>Embedded Terminal</h3>
+      <p>Full xterm.js terminal inside the session view, backed by <code>node-pty</code> over WebSocket. Clipboard shortcuts, resizable, state persists across view switches.</p>
+    </div>
+    <div class="card warn-left">
+      <h3>Plans Viewer</h3>
+      <p>Browse and read plan files generated during sessions. Filterable by project.</p>
+    </div>
+    <div class="card warn-left">
+      <h3>File History</h3>
+      <p>View automatic backups created before each write operation. Restore or diff previous versions of config files.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 6 — TOKEN USAGE & ANALYTICS
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s6">
+  <span class="slide-num">6 / 10</span>
+  <div class="slide-tag">Analytics</div>
+  <h2>Token Usage &amp; Cost Tracking</h2>
+  <p>Aggregated stats from local JSONL session files — no API calls, no telemetry.</p>
+
+  <div class="stats">
+    <div class="stat-box orange">
+      <div class="val">14</div>
+      <div class="lbl">Claude models tracked</div>
+    </div>
+    <div class="stat-box blue">
+      <div class="val">3</div>
+      <div class="lbl">Chart views (daily / model / project)</div>
+    </div>
+    <div class="stat-box green">
+      <div class="val">1h</div>
+      <div class="lbl">Pricing cache TTL</div>
+    </div>
+  </div>
+
+  <div class="grid-3" style="margin-top:1rem">
+    <div class="card accent-left">
+      <h3>Cost Breakdown</h3>
+      <p>Input, output, and cache tokens separately priced. Pricing auto-fetched from Anthropic's public list with 1-hour cache.</p>
+    </div>
+    <div class="card blue-left">
+      <h3>Trend Charts</h3>
+      <p>Daily token spend over time using Chart.js. Toggle between cost and token count views.</p>
+    </div>
+    <div class="card green-left">
+      <h3>Top Projects</h3>
+      <p>Leaderboard of highest-cost projects to identify where AI spend is concentrated.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 7 — SECURITY & SAFETY
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s7">
+  <span class="slide-num">7 / 10</span>
+  <div class="slide-tag">Security</div>
+  <h2>Security &amp; Safety Design</h2>
+  <p>The app manages sensitive config — these safeguards are built into every write path.</p>
+
+  <ul class="feat" style="margin-top:1.5rem">
+    <li><span class="icon">✓</span><div><strong>Localhost only</strong> — server binds to <code>127.0.0.1</code>, never <code>0.0.0.0</code>. Unreachable from network.</div></li>
+    <li><span class="icon">✓</span><div><strong>Automatic backups</strong> — every write calls <code>backup()</code> first, storing a timestamped copy in <code>~/.claude/backups/</code>.</div></li>
+    <li><span class="icon">✓</span><div><strong>Path traversal prevention</strong> — <code>safeSlug()</code> and <code>safeMemoryFile()</code> validate all user-supplied paths before I/O.</div></li>
+    <li><span class="icon">✓</span><div><strong>Read-only credentials</strong> — <code>.credentials.json</code> is displayed but never written by the app.</div></li>
+    <li><span class="icon">✓</span><div><strong>No telemetry</strong> — zero outbound data. Pricing fetch is the only external HTTP call (public endpoint, no auth).</div></li>
+    <li><span class="icon">✓</span><div><strong>No auth required</strong> — acceptable because the server is localhost-only and the machine's OS access controls apply.</div></li>
+    <li><span class="icon">✓</span><div><strong>Standardized error handling</strong> — all route handlers wrapped in <code>wrapRoute()</code> — no unhandled rejections silently corrupting files.</div></li>
+  </ul>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 8 — TECH STACK
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s8">
+  <span class="slide-num">8 / 10</span>
+  <div class="slide-tag">Tech Stack</div>
+  <h2>Technology Choices</h2>
+  <p>Deliberately minimal — 5 production npm packages, zero build tooling.</p>
+
+  <div class="grid-2" style="margin-top:1.2rem">
+    <div>
+      <h3 style="color:var(--accent);font-size:0.82rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.75rem">Backend</h3>
+      <ul class="feat">
+        <li><span class="icon">▸</span><div><strong>Express 4.21</strong> — routing, static files, JSON middleware</div></li>
+        <li><span class="icon">▸</span><div><strong>node-pty</strong> — pseudoterminal for embedded shell</div></li>
+        <li><span class="icon">▸</span><div><strong>ws</strong> — WebSocket server for terminal I/O</div></li>
+        <li><span class="icon">▸</span><div><strong>gray-matter</strong> — YAML frontmatter parsing for memory/skills</div></li>
+        <li><span class="icon">▸</span><div><strong>adm-zip</strong> — ZIP extraction for auto-update</div></li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="color:var(--accent2);font-size:0.82rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.75rem">Frontend</h3>
+      <ul class="feat">
+        <li><span class="icon">▸</span><div><strong>Vanilla JS</strong> — no framework, no bundler, no build step</div></li>
+        <li><span class="icon">▸</span><div><strong>Chart.js</strong> — token usage charts (CDN)</div></li>
+        <li><span class="icon">▸</span><div><strong>xterm.js</strong> — VT100 terminal emulator in-browser (CDN)</div></li>
+        <li><span class="icon">▸</span><div><strong>marked.js</strong> — Markdown rendering (CDN)</div></li>
+        <li><span class="icon">▸</span><div><strong>CSS custom properties</strong> — theming without preprocessors</div></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="stats" style="margin-top:1.2rem">
+    <div class="stat-box orange"><div class="val">5</div><div class="lbl">prod dependencies</div></div>
+    <div class="stat-box blue"><div class="val">0</div><div class="lbl">build steps</div></div>
+    <div class="stat-box green"><div class="val">3</div><div class="lbl">OS platforms</div></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 9 — PROS
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s9">
+  <span class="slide-num">9 / 10</span>
+  <div class="slide-tag">Evaluation</div>
+  <h2>Pros</h2>
+  <p>What the project does well.</p>
+
+  <ul class="feat" style="margin-top:1.25rem">
+    <li><span class="icon">✓</span><div><strong>Zero external dependencies at runtime</strong> — works fully offline; only npm packages needed, no cloud account.</div></li>
+    <li><span class="icon">✓</span><div><strong>Extremely low barrier to entry</strong> — <code>npm start</code> and open a browser. No Docker, no database, no config.</div></li>
+    <li><span class="icon">✓</span><div><strong>Single source of truth</strong> — reads directly from the real <code>~/.claude/</code> files Claude Code uses; no sync issues.</div></li>
+    <li><span class="icon">✓</span><div><strong>Safety-first writes</strong> — automatic backups and path validation mean accidental damage is easy to undo.</div></li>
+    <li><span class="icon">✓</span><div><strong>Cost visibility</strong> — token usage dashboard fills a real gap; Claude Code itself has no billing UI.</div></li>
+    <li><span class="icon">✓</span><div><strong>Cross-platform</strong> — works on Windows, macOS, and Linux with platform-specific code paths where needed.</div></li>
+    <li><span class="icon">✓</span><div><strong>No build step</strong> — contributors can edit a JS file and refresh the browser. Fast iteration cycle.</div></li>
+    <li><span class="icon">✓</span><div><strong>Auto-update</strong> — one-click update from GitHub release ZIP without breaking local config.</div></li>
+  </ul>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SLIDE 10 — CONS
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s10">
+  <span class="slide-num">10 / 10</span>
+  <div class="slide-tag">Evaluation</div>
+  <h2>Cons &amp; Limitations</h2>
+  <p>Trade-offs and areas for future improvement.</p>
+
+  <ul class="feat" style="margin-top:1.25rem">
+    <li><span class="icon red">✗</span><div><strong>Tightly coupled to Claude Code internals</strong> — file formats (<code>~/.claude/</code> structure, JSONL schema) are undocumented and may change between Claude Code versions without notice.</div></li>
+    <li><span class="icon red">✗</span><div><strong>Global JS scope pollution</strong> — all modules are singletons on <code>window</code>. Naming collisions are a latent risk as the codebase grows.</div></li>
+    <li><span class="icon red">✗</span><div><strong>No TypeScript / type safety</strong> — the deliberate "no build step" constraint means runtime errors replace compile-time ones.</div></li>
+    <li><span class="icon red">✗</span><div><strong>node-pty native build</strong> — requires a native module compile on install, which can fail on machines without build tools (Python, MSBuild on Windows).</div></li>
+    <li><span class="icon yellow">⚠</span><div><strong>Large session files can be slow</strong> — JSONL parsing is done per request with no caching layer; very large conversation histories may cause noticeable latency.</div></li>
+    <li><span class="icon yellow">⚠</span><div><strong>No cross-session search</strong> — message search is per-session only; finding a specific snippet across all projects requires opening each session manually.</div></li>
+    <li><span class="icon yellow">⚠</span><div><strong>Manual startup required</strong> — the server must be launched explicitly each time; no background service or system tray integration.</div></li>
+    <li><span class="icon yellow">⚠</span><div><strong>Requires Node.js 18+ installed</strong> — a non-trivial prerequisite for users who only use Claude Code and don't otherwise develop in Node.</div></li>
+  </ul>
+</div>
+
+<!-- ══ NAVIGATION ══ -->
+<div class="nav">
+  <button onclick="go(-1)">← Prev</button>
+  <span id="nav-label">1 / 10</span>
+  <button onclick="go(1)">Next →</button>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let cur = 0;
+
+  function go(dir) {
+    slides[cur].classList.remove('active');
+    cur = Math.max(0, Math.min(slides.length - 1, cur + dir));
+    slides[cur].classList.add('active');
+    document.getElementById('nav-label').textContent = (cur + 1) + ' / ' + slides.length;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') go(1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   go(-1);
+  });
+</script>
+</body>
+</html>

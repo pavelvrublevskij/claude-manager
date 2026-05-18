@@ -27,55 +27,21 @@ Object.assign(Sessions, {
     } catch (_) {}
   },
 
-  async annotateDetailPlan() {
-    const info = Sessions._detailInfo;
-    if (!info || !info.created || !info.modified) return;
-    try {
-      const plans = await api('/api/plans');
-      if (!plans.length) return;
-      const slack = 30 * 60 * 1000;
-      const from = new Date(info.created).getTime() - slack;
-      const to = new Date(info.modified).getTime() + slack;
-      const hasPlans = plans.some(p => {
-        const t = new Date(p.mtime).getTime();
-        return t >= from && t <= to;
-      });
-      if (hasPlans) {
-        Sessions._detailHasPlan = true;
-        Sessions.renderDetailMeta(null);
-      }
-    } catch (_) {}
+  annotateDetailPlan(stats) {
+    if (stats && stats.hasPlan) {
+      Sessions._detailHasPlan = true;
+      Sessions.renderDetailMeta(null);
+    }
   },
 
   async annotatePlans(sessions) {
-    if (!sessions.length) {
-      Sessions._planSessionIds = new Set();
-      return;
-    }
+    if (!sessions.length) { Sessions._planSessionIds = new Set(); return; }
+    const slug = Sessions._searchSlug;
+    if (!slug) { Sessions._planSessionIds = new Set(); return; }
     try {
-      const plans = await api('/api/plans');
-      if (!plans.length) {
-        Sessions._planSessionIds = new Set();
-        return;
-      }
-      const slack = 30 * 60 * 1000;
-      const ids = new Set();
-      for (const s of sessions) {
-        if (!s.created || !s.modified) continue;
-        const from = new Date(s.created).getTime() - slack;
-        const to = new Date(s.modified).getTime() + slack;
-        const hasPlans = plans.some(p => {
-          const t = new Date(p.mtime).getTime();
-          return t >= from && t <= to;
-        });
-        if (!hasPlans) continue;
-        ids.add(s.sessionId);
-        const card = document.querySelector(`.session-card[data-session-id="${s.sessionId}"]`);
-        if (!card) continue;
-        const meta = card.querySelector('.session-meta');
-        if (meta) meta.insertAdjacentHTML('afterbegin', '<span class="session-plan-badge" title="Plans were active during this session">plan</span>');
-      }
-      Sessions._planSessionIds = ids;
+      const ids = await api(`/api/projects/${encodeURIComponent(slug)}/sessions/with-plans`);
+      Sessions._planSessionIds = new Set(ids);
+      Sessions._rerenderPlans();
     } catch (_) {
       Sessions._planSessionIds = new Set();
     }

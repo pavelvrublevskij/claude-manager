@@ -106,6 +106,7 @@ before(() => {
       message: { model: 'claude-3-5-sonnet', content: 'Gadget reply' }
     }
   ]);
+
 });
 
 test('GET /api/projects/:slug/sessions returns array with expected fields', async () => {
@@ -348,4 +349,77 @@ test('GET /api/projects/:slug/sessions stamps remoteControlled=true for sessions
   const local = res.body.find(s => s.sessionId === LOCAL_SID);
   assert.strictEqual(remote.remoteControlled, true);
   assert.strictEqual(local.remoteControlled, false);
+});
+
+test('GET /api/projects/:slug/sessions/with-plans returns session IDs whose JSONL references a plan file', async () => {
+  const tmpSlug = 'with-plans-test';
+  const dir = path.join(paths.PROJECTS_DIR, tmpSlug);
+  const plansDir = path.join(paths.CLAUDE_DIR, 'plans');
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(plansDir, { recursive: true });
+
+  const PLAN_STEM = 'test-wiggly-unique-plan-alpha';
+  const PLAN_STEM2 = 'test-wiggly-unique-plan-beta';
+  fs.writeFileSync(path.join(plansDir, PLAN_STEM + '.md'), '# Plan: Alpha plan\n\nsome content');
+  fs.writeFileSync(path.join(plansDir, PLAN_STEM2 + '.md'), '# Plan: Beta plan\n\nsome content');
+
+  const WITH_PLAN = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+  const WITHOUT_PLAN = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+  const WITH_PLAN2 = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+
+  // Session that references plan via planFilePath (as ExitPlanMode would store it)
+  writeJsonl(path.join(dir, WITH_PLAN + '.jsonl'), [
+    { type: 'user', uuid: 'u1', timestamp: '2026-01-01T10:00:00Z', message: { content: 'do a plan' } },
+    { type: 'assistant', uuid: 'a1', timestamp: '2026-01-01T10:00:05Z', message: { content: [{ type: 'tool_use', id: 't1', name: 'ExitPlanMode', input: { plan: '# Plan: Alpha plan', planFilePath: `C:\\Users\\test\\.claude\\plans\\${PLAN_STEM}.md` } }] } }
+  ]);
+  // Session with no plan reference
+  writeJsonl(path.join(dir, WITHOUT_PLAN + '.jsonl'), [
+    { type: 'user', uuid: 'u2', timestamp: '2026-01-01T11:00:00Z', message: { content: 'regular session' } },
+    { type: 'assistant', uuid: 'a2', timestamp: '2026-01-01T11:00:05Z', message: { content: 'just a reply' } }
+  ]);
+  // Session referencing the second plan
+  writeJsonl(path.join(dir, WITH_PLAN2 + '.jsonl'), [
+    { type: 'user', uuid: 'u3', timestamp: '2026-01-01T12:00:00Z', message: { content: 'another plan session' } },
+    { type: 'assistant', uuid: 'a3', timestamp: '2026-01-01T12:00:05Z', message: { content: [{ type: 'tool_use', id: 't2', name: 'ExitPlanMode', input: { plan: '# Plan: Beta plan', planFilePath: `C:\\Users\\test\\.claude\\plans\\${PLAN_STEM2}.md` } }] } }
+  ]);
+
+  const res = await request(app).get(`/api/projects/${tmpSlug}/sessions/with-plans`);
+  assert.strictEqual(res.status, 200);
+  assert.ok(Array.isArray(res.body));
+  const ids = res.body.sort();
+  assert.ok(ids.includes(WITH_PLAN), 'should include session referencing plan alpha');
+  assert.ok(ids.includes(WITH_PLAN2), 'should include session referencing plan beta');
+  assert.ok(!ids.includes(WITHOUT_PLAN), 'should not include session without plan reference');
+});
+
+test('GET /api/projects/:slug/sessions/with-plans returns empty array when no plans directory exists', async () => {
+  const tmpSlug = 'no-plans-test';
+  const dir = path.join(paths.PROJECTS_DIR, tmpSlug);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+
+  writeJsonl(path.join(dir, 'aaaabbbb-1111-1111-1111-aaaaaaaabbbb.jsonl'), [
+    { type: 'user', uuid: 'u1', timestamp: '2026-01-01T10:00:00Z', message: { content: 'hello' } }
+  ]);
+
+  // Temporarily hide plans dir if it exists
+  const plansDir = path.join(paths.CLAUDE_DIR, 'plans');
+  const plansDirTmp = plansDir + '_hidden_tmp';
+  const existed = fs.existsSync(plansDir);
+  if (existed) fs.renameSync(plansDir, plansDirTmp);
+
+  try {
+    const res = await request(app).get(`/api/projects/${tmpSlug}/sessions/with-plans`);
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(res.body, []);
+  } finally {
+    if (existed) fs.renameSync(plansDirTmp, plansDir);
+  }
+});
+
+test('GET /api/projects/:slug/sessions/with-plans with invalid slug returns 400', async () => {
+  const res = await request(app).get('/api/projects/bad..slug/sessions/with-plans');
+  assert.strictEqual(res.status, 400);
+  assert.strictEqual(res.body.error, 'Invalid slug');
 });

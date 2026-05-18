@@ -31,9 +31,9 @@ const Dashboard = {
       project: decodeName(s.slug),
       timeAgo: s.modified ? Dashboard.timeAgo(new Date(s.modified)) : '',
       slug: s.slug,
-      dates: true
+      dates: true,
+      hasPlan: !!s.hasPlan
     })).join('');
-    if (typeof Sessions !== 'undefined') Sessions.annotatePlans(sessions);
   },
 
   renderStats(stats) {

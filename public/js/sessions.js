@@ -9,10 +9,10 @@ const Sessions = {
   async load(slug) {
     if (Sessions._searchSlug !== slug) {
       Sessions._planFilter = false;
-      Sessions._planSessionIds = null;
       const cb = document.getElementById('filter-plan-only');
       if (cb) cb.checked = false;
     }
+    Sessions._planSessionIds = null;
     Sessions._searchSlug = slug;
     const container = document.getElementById('sessions-list');
     showLoading(container, 'Loading sessions...');
@@ -93,7 +93,9 @@ const Sessions = {
     }
     container.innerHTML = Sessions.renderSearchBar(slug) +
       sessions.map((s, i) => Sessions.renderCard(slug, s, i)).join('');
-    Sessions.annotatePlans(sessions);
+    if (Sessions._planSessionIds === null) {
+      Sessions.annotatePlans(Sessions.cache[slug] || sessions);
+    }
   },
 
   renderCard(slug, s, i) {
@@ -105,12 +107,14 @@ const Sessions = {
     }).join('');
     const cached = Sessions.cache[slug] || [];
     const correctIndex = cached.findIndex(x => x.sessionId === s.sessionId);
+    const hasPlan = !!(Sessions._planSessionIds && Sessions._planSessionIds.has(s.sessionId));
     return renderSessionCard(s, {
       onclick: `Sessions.open('${slug}', '${s.sessionId}', ${correctIndex >= 0 ? correctIndex : i})`,
       slug,
       dates: true,
       sidechain: true,
-      snippets: snippetsHtml
+      snippets: snippetsHtml,
+      hasPlan
     });
   },
 
@@ -255,13 +259,17 @@ const Sessions = {
       title.title = titleText;
     }
 
+    const slug = Sessions.detailState.slug;
+    const projectHtml = slug
+      ? `<span class="session-project-chip" onclick="Sessions.goBack()" title="Go to project">${escapeHtml(decodeName(slug))}</span>`
+      : '';
     const createdHtml = merged.created
       ? `<div class="meta-item">Created <span class="meta-value">${new Date(merged.created).toLocaleString()}</span></div>`
       : '';
     const planBadge = Sessions._detailHasPlan
       ? '<span class="session-plan-badge" title="Plans were active during this session">plan</span>'
       : '';
-    meta.innerHTML = planBadge + createdHtml + renderSessionBadges(merged, { sidechain: true, modelPricing: true, skipBranches: true });
+    meta.innerHTML = projectHtml + planBadge + createdHtml + renderSessionBadges(merged, { sidechain: true, modelPricing: true, skipBranches: true });
 
     Sessions.renderDetailBranches(merged);
   },
@@ -297,7 +305,6 @@ const Sessions = {
     Sessions._detailInfo = info || {};
     Sessions._detailHasPlan = false;
     Sessions.renderDetailMeta(null);
-    Sessions.annotateDetailPlan();
 
     const idValue = document.getElementById('session-detail-id-value');
     if (idValue) {
@@ -409,7 +416,10 @@ const Sessions = {
       const data = await api(`/api/projects/${slugAtStart}/sessions/${sessionAtStart}?offset=0&limit=20`);
       if (state.slug !== slugAtStart || state.sessionId !== sessionAtStart) return;
 
-      if (data.stats) Sessions.renderDetailMeta(data.stats);
+      if (data.stats) {
+        Sessions.renderDetailMeta(data.stats);
+        Sessions.annotateDetailPlan(data.stats);
+      }
 
       if (typeof data.total !== 'number' || data.total <= state.total) return;
 
@@ -490,7 +500,10 @@ const Sessions = {
       state.hasMore = data.hasMore;
       state.offset += data.messages.length;
 
-      if (data.stats) Sessions.renderDetailMeta(data.stats);
+      if (data.stats) {
+        Sessions.renderDetailMeta(data.stats);
+        Sessions.annotateDetailPlan(data.stats);
+      }
 
       const html = data.messages.map(m => Sessions.renderMessage(m)).join('');
       container.insertAdjacentHTML('beforeend', html);
@@ -680,6 +693,23 @@ const Sessions = {
     msgs.style.display = isFC ? 'none' : '';
     fcBtn.classList.toggle('active', isFC);
     cvBtn.classList.toggle('active', !isFC);
+  },
+
+  _rerenderPlans() {
+    const slug = Sessions._searchSlug;
+    const projectView = document.getElementById('view-project-detail');
+    if (slug && Sessions.cache[slug] && projectView && projectView.classList.contains('active')) {
+      Sessions.rerenderWithFilter();
+      return;
+    }
+    const ids = Sessions._planSessionIds;
+    if (!ids || !ids.size) return;
+    for (const sessionId of ids) {
+      const card = document.querySelector(`.session-card[data-session-id="${sessionId}"]`);
+      if (!card || card.querySelector('.session-plan-badge')) continue;
+      const meta = card.querySelector('.session-meta');
+      if (meta) meta.insertAdjacentHTML('afterbegin', '<span class="session-plan-badge" title="Plans were active during this session">plan</span>');
+    }
   },
 
 };

@@ -287,7 +287,17 @@ function renderSessionCard(s, opts = {}) {
         </svg>
       </span>`
     : '';
-  const summaryText = escapeHtml(s.summary || s.firstPrompt || 'Untitled session');
+  function skillBadgeHtml(text) {
+    if (!text) return null;
+    const m = text.match(/^\/([\w-]+)(.*)/s);
+    if (!m) return null;
+    const rest = m[2].trim();
+    return `<span class="session-skill">/${escapeHtml(m[1])}</span>${rest ? ' ' + escapeHtml(rest) : ''}`;
+  }
+
+  const summaryRaw = s.summary || s.firstPrompt || '';
+  const skillHtml = skillBadgeHtml(summaryRaw);
+  const summaryText = skillHtml || escapeHtml(summaryRaw || 'Untitled session');
 
   let headerHtml;
   if (opts.timeAgo) {
@@ -298,7 +308,8 @@ function renderSessionCard(s, opts = {}) {
   } else {
     headerHtml = `<div class="session-summary">${dotHtml}${remoteIcon}${summaryText}</div>`;
     if (s.firstPrompt && s.summary) {
-      headerHtml += `<div class="session-prompt">${escapeHtml(s.firstPrompt)}</div>`;
+      const fpHtml = skillBadgeHtml(s.firstPrompt) || escapeHtml(s.firstPrompt);
+      headerHtml += `<div class="session-prompt">${fpHtml}</div>`;
     }
   }
 
@@ -312,6 +323,7 @@ function renderSessionCard(s, opts = {}) {
       ${headerHtml}
       ${opts.snippets || ''}
       <div class="session-meta">
+        ${opts.hasPlan ? '<span class="session-plan-badge" title="Plans were active during this session">plan</span>' : ''}
         ${opts.project ? `<span class="project-badge">${escapeHtml(opts.project)}</span>` : ''}
         ${idBadge}
         ${opts.dates ? `<div class="meta-item">Created <span class="meta-value">${s.created ? new Date(s.created).toLocaleString() : '—'}</span></div>
