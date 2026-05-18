@@ -1602,6 +1602,111 @@ mark.search-highlight {
   margin-bottom: 4px;
 }
 
+.session-group {
+  margin-bottom: 10px;
+}
+
+.session-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius) var(--radius) 0 0;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s;
+}
+
+.session-group-header:hover {
+  border-color: var(--border-light);
+  border-left-color: var(--accent);
+}
+
+.session-group-type-branch .session-group-header {
+  border-left-color: var(--text-secondary);
+}
+
+.session-group-type-temporal .session-group-header {
+  border-left-color: var(--text-muted);
+}
+
+.session-group-arrow {
+  color: var(--text-muted);
+  font-size: 9px;
+  width: 10px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.session-group-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.session-group-type-branch .session-group-label,
+.session-group-type-temporal .session-group-label {
+  color: var(--text-secondary);
+}
+
+.session-group-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-hover);
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+
+.session-group-date {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.session-group-body {
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  overflow: hidden;
+}
+
+.session-group-body.collapsed {
+  display: none;
+}
+
+.session-group-body .session-card {
+  border-radius: 0;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+}
+
+.session-group-body > *:last-child {
+  border-bottom: none;
+}
+
+.session-gap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 16px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.session-gap::before,
+.session-gap::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
 .session-id-label {
   font-size: 11px;
   text-transform: uppercase;

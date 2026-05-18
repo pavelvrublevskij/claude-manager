@@ -19,7 +19,10 @@ const router = express.Router({ mergeParams: true });
 
 function normalizePrompt(text) {
   const m = (text || '').match(/<command-name>(\/[\w-]+)<\/command-name>/);
-  return m ? m[1] : (text || '');
+  if (!m) return (text || '');
+  const args = (text || '').match(/<command-args>([\s\S]*?)<\/command-args>/);
+  const trimmedArgs = args ? args[1].trim() : '';
+  return trimmedArgs ? m[1] + ' ' + trimmedArgs : m[1];
 }
 
 function isSkippablePrompt(text) {
