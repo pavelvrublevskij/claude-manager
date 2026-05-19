@@ -1,5 +1,10 @@
 ## v1.0.2
 
+### Token Usage
+
+- Default period gauge changed from **Month** to **Day** when the "This month" preset is active
+- Filter state is now persisted in `localStorage` — date preset, period gauge, selected models, and selected projects are all restored when you return to the Token Usage view; **Clear all** resets to the same defaults
+
 ### Session grouping
 
 - Sessions that share a ticket reference (e.g. `PROJ-123`), a non-main feature branch, or were started within 30 minutes of each other on the same branch are now shown as a collapsible group with a labeled header
