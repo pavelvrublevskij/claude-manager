@@ -443,9 +443,10 @@ const Sessions = {
     if (!branches.length) {
       branches = Array.from(new Set([s.gitBranch, s.lastGitBranch].filter(Boolean)));
     }
+    const wrap = document.getElementById('session-detail-branches-wrap');
     if (!branches.length) {
       el.innerHTML = '';
-      el.style.display = 'none';
+      if (wrap) wrap.style.display = 'none';
       return;
     }
     const parts = [];
@@ -454,7 +455,7 @@ const Sessions = {
       parts.push(`<span class="session-branch">${escapeHtml(b)}</span>`);
     });
     el.innerHTML = parts.join('');
-    el.style.display = '';
+    if (wrap) wrap.style.display = 'flex';
   },
 
   async loadDetail(slug, sessionId, info) {

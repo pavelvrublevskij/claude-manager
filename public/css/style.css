@@ -1771,6 +1771,12 @@ mark.search-highlight {
   padding: 4px;
 }
 
+#footer-git .action-menu-panel {
+  top: auto;
+  bottom: calc(100% + 4px);
+  z-index: 200;
+}
+
 .action-menu-panel.open {
   display: block;
 }
@@ -3105,6 +3111,36 @@ mark.search-highlight {
 .ctx-file-badge-edited {
   background: rgba(56, 139, 253, 0.15);
   color: #58a6ff;
+}
+
+.git-file-badge {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.git-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+.git-icon-btn:hover {
+  color: var(--text-primary);
+}
+
+.git-count-badge {
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--accent, #58a6ff);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0 5px;
+  line-height: 16px;
+  min-width: 16px;
+  text-align: center;
 }
 
 .ctx-file-deleted .ctx-file-name {

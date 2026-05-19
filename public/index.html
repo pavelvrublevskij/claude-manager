@@ -524,9 +524,8 @@
               <button class="btn btn-sm" onclick="Sessions.goBack()">&#8592; Back</button>
               <h2 id="session-detail-title">Session</h2>
               <code class="session-id-value" id="session-detail-id-value" style="display:none"></code>
-              <div class="session-detail-branches" id="session-detail-branches" style="display:none"></div>
             </div>
-            <div style="display:flex;gap:8px;align-items:center">
+            <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
               <div class="action-menu">
                 <button class="btn btn-sm action-menu-btn" onclick="event.stopPropagation(); Sessions.toggleActionMenu(this)" aria-label="More actions">&#8942;</button>
                 <div class="action-menu-panel">
@@ -536,6 +535,10 @@
                 </div>
               </div>
             </div>
+          </div>
+          <div id="session-detail-branches-wrap" style="display:none;align-items:center;gap:6px;margin-top:4px;font-size:12px">
+            <span style="color:var(--text-muted)">Session branch:</span>
+            <div class="session-detail-branches" id="session-detail-branches"></div>
           </div>
           <div class="session-meta" id="session-detail-meta"></div>
         </div>
@@ -669,6 +672,7 @@
       <a href="https://github.com/pavelvrublevskij/claude-manager/issues/new" target="_blank" rel="noopener" class="app-footer-issue-link" title="Raise an issue on GitHub">&#9888; Raise Issue</a>
     </div>
     <div class="app-footer-right">
+      <div id="footer-git" style="display:none;align-items:center;gap:8px"></div>
       <span class="app-footer-status" id="footer-status">Idle</span>
       <span id="footer-host"></span>
       <span>Theme:</span>
@@ -711,6 +715,7 @@
   <script src="/js/manager-settings.js"></script>
   <script src="/js/file-history.js"></script>
   <script src="/js/tour.js"></script>
+  <script src="/js/git.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

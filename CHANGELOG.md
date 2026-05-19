@@ -1,5 +1,18 @@
 ## v1.1.0
 
+### Project detail
+
+- Project title now shows the decoded project name (e.g. `claude/manager`) and path on navigation
+- Git branch indicator and action button moved to the footer, visible whenever a git-enabled project is active
+- Session branch moved to its own line in the session detail header with a "Session branch:" label
+
+### Git integration
+
+- Git icon button in project and session headers — visible only when the directory is a git repo
+- Dropdown: **Commit**, **Push**, **Commit & Push**
+- Commit opens a modal with branch name, per-file checkboxes, and a commit message field
+- Badge on the icon shows count of uncommitted files
+
 ### Period filter
 
 - Added **Yesterday** option to all period selectors (Token Usage and Project detail views)

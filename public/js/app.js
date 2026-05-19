@@ -128,10 +128,21 @@ const App = {
 
     if (simpleViews[view]) {
       document.getElementById('view-' + view).classList.add('active');
+      if (typeof GitActions !== 'undefined') GitActions.reset();
       simpleViews[view]();
     } else if (view === 'project-detail') {
       document.getElementById('view-project-detail').classList.add('active');
       App.currentProject = opts.slug;
+      const _proj = Projects.data.find(p => p.slug === opts.slug);
+      const _titleEl = document.getElementById('project-detail-title');
+      if (_titleEl) _titleEl.textContent = decodeName(opts.slug);
+      const _pathEl = document.getElementById('project-detail-path');
+      if (_pathEl && _proj) {
+        _pathEl.textContent = _proj.path;
+        _pathEl.classList.add('clickable-path');
+        _pathEl.title = 'Open folder in file explorer';
+        _pathEl.onclick = () => Projects.openFolder(opts.slug);
+      }
       ProjectNav.expand();
       document.querySelectorAll('.project-tab').forEach(t => t.classList.remove('active'));
       document.getElementById('tab-sessions').classList.add('active');
@@ -163,6 +174,7 @@ const App = {
       }
       // Load per-project token usage in header
       ProjectUsage.load(opts.slug);
+      if (typeof GitActions !== 'undefined') GitActions.init(opts.slug);
       // Highlight in sidebar
       document.querySelectorAll('.project-list .nav-item').forEach(el => {
         el.classList.toggle('active', el.dataset.slug === opts.slug);
@@ -171,6 +183,7 @@ const App = {
       document.getElementById('view-session-detail').classList.add('active');
       App.currentProject = opts.slug;
       Sessions.loadDetail(opts.slug, opts.sessionId, opts.sessionInfo);
+      if (typeof GitActions !== 'undefined') GitActions.init(opts.slug);
     }
 
     // Update URL hash
