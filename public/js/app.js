@@ -133,15 +133,11 @@ const App = {
       document.getElementById('view-project-detail').classList.add('active');
       App.currentProject = opts.slug;
       ProjectNav.expand();
-      const landOnSessions = previousView === 'session-detail';
-      const activeTabId = landOnSessions ? 'tab-sessions' : 'tab-memory';
-      const activeBtnId = landOnSessions ? 'sessions-tab-btn' : 'memory-tab-btn';
       document.querySelectorAll('.project-tab').forEach(t => t.classList.remove('active'));
-      document.getElementById(activeTabId).classList.add('active');
+      document.getElementById('tab-sessions').classList.add('active');
       document.querySelectorAll('#view-project-detail .tab-btn').forEach(b => b.classList.remove('active'));
-      document.getElementById(activeBtnId).classList.add('active');
-      if (landOnSessions) Sessions.load(opts.slug);
-      else Memory.load(opts.slug);
+      document.getElementById('sessions-tab-btn').classList.add('active');
+      Sessions.load(opts.slug);
       // Show counts on tabs
       const project = Projects.data.find(p => p.slug === opts.slug);
       const memoryTabBtn = document.getElementById('memory-tab-btn');

@@ -272,7 +272,7 @@ const Usage = {
 
   setDatePreset(preset) {
     if (preset === 'custom') { Usage._df.datePreset = 'custom'; Usage.saveFilterState(); return; }
-    const autoGroup = { today: 'hour', '7d': 'day', '30d': 'day', month: 'day', year: 'month', all: 'month' };
+    const autoGroup = { today: 'hour', yesterday: 'hour', '7d': 'day', '30d': 'day', month: 'day', year: 'month', all: 'month' };
     if (autoGroup[preset]) {
       Usage.currentGroup = autoGroup[preset];
       document.querySelectorAll('#usage-period-tabs .tab-btn, #usage-period-tabs-chart .tab-btn').forEach(b => {

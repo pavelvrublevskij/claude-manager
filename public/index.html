@@ -154,6 +154,7 @@
               <select id="filter-date-preset" onchange="Usage.setDatePreset(this.value)">
                 <option value="all">All time</option>
                 <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
                 <option value="month" selected>This month</option>
@@ -419,6 +420,7 @@
               <select id="proj-filter-date-preset" onchange="ProjectUsage.setDatePreset(this.value)">
                 <option value="all">All time</option>
                 <option value="today" selected>Today</option>
+                <option value="yesterday">Yesterday</option>
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
                 <option value="month">This month</option>
@@ -443,8 +445,8 @@
           <div id="project-detail-usage" class="project-usage-bar"></div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
             <div class="tab-bar">
-              <button class="tab-btn active" id="memory-tab-btn" onclick="ProjectTabs.switch('memory', this)">Memory</button>
-              <button class="tab-btn" id="sessions-tab-btn" onclick="ProjectTabs.switch('sessions', this)">Sessions</button>
+              <button class="tab-btn active" id="sessions-tab-btn" onclick="ProjectTabs.switch('sessions', this)">Sessions</button>
+              <button class="tab-btn" id="memory-tab-btn" onclick="ProjectTabs.switch('memory', this)">Memory</button>
               <button class="tab-btn" onclick="ProjectTabs.switch('proj-settings', this)">Settings</button>
               <button class="tab-btn" onclick="ProjectTabs.switch('proj-mcp', this)">MCP</button>
               <button class="tab-btn" onclick="ProjectTabs.switch('proj-agents', this)">Agents</button>
@@ -456,7 +458,7 @@
           </div>
         </div>
         <div class="view-body">
-          <div class="project-tab active" id="tab-memory">
+          <div class="project-tab" id="tab-memory">
             <div class="memory-layout">
               <div class="memory-list">
                 <div class="memory-list-header">
@@ -475,7 +477,7 @@
               </div>
             </div>
           </div>
-          <div class="project-tab" id="tab-sessions">
+          <div class="project-tab active" id="tab-sessions">
             <div id="sessions-list"></div>
           </div>
           <div class="project-tab" id="tab-proj-settings">

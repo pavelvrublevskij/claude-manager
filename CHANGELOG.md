@@ -1,4 +1,8 @@
-## v1.0.2
+## v1.1.0
+
+### Period filter
+
+- Added **Yesterday** option to all period selectors (Token Usage and Project detail views)
 
 ### Token Usage
 
