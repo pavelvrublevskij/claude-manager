@@ -1,5 +1,5 @@
 const Usage = {
-  currentGroup: 'month',
+  currentGroup: 'day',
   currentModels: new Set(),
   currentProjects: new Map(),
   _df: null,
@@ -9,13 +9,47 @@ const Usage = {
   openDropdown: null,
   viewMode: 'charts',
 
-  async load() {
-    Usage.currentModels = new Set();
-    Usage.currentProjects = new Map();
-    Usage.currentGroup = 'month';
-    Usage.searchTerms = { models: '', projects: '' };
+  saveFilterState() {
+    localStorage.setItem('usage-group', Usage.currentGroup);
+    const preset = document.getElementById('filter-date-preset');
+    if (preset) localStorage.setItem('usage-date-preset', preset.value);
+    const from = document.getElementById('filter-from');
+    const to = document.getElementById('filter-to');
+    if (from) localStorage.setItem('usage-date-from', from.value || '');
+    if (to) localStorage.setItem('usage-date-to', to.value || '');
+    localStorage.setItem('usage-models', JSON.stringify(Array.from(Usage.currentModels)));
+    localStorage.setItem('usage-projects', JSON.stringify(Array.from(Usage.currentProjects.entries())));
+  },
+
+  restoreFilterState() {
+    const group = localStorage.getItem('usage-group') || 'day';
+    const preset = localStorage.getItem('usage-date-preset') || 'month';
+    const from = localStorage.getItem('usage-date-from') || '';
+    const to = localStorage.getItem('usage-date-to') || '';
+    const models = JSON.parse(localStorage.getItem('usage-models') || '[]');
+    const projects = JSON.parse(localStorage.getItem('usage-projects') || '[]');
+
+    Usage.currentGroup = group;
+    Usage.currentModels = new Set(models);
+    Usage.currentProjects = new Map(projects);
+
     Usage._df = makeDateFilter('filter-from', 'filter-to', 'filter-date-preset');
-    Usage.applyDatePresetState('month');
+    if (preset === 'custom') {
+      const fromEl = document.getElementById('filter-from');
+      const toEl = document.getElementById('filter-to');
+      if (fromEl) fromEl.value = from;
+      if (toEl) toEl.value = to;
+      Usage._df.applyCustom();
+      const presetEl = document.getElementById('filter-date-preset');
+      if (presetEl) presetEl.value = 'custom';
+    } else {
+      Usage.applyDatePresetState(preset);
+    }
+  },
+
+  async load() {
+    Usage.searchTerms = { models: '', projects: '' };
+    Usage.restoreFilterState();
     const savedMode = localStorage.getItem('usage-view-mode') || 'charts';
     Usage.setViewMode(savedMode, { silent: true });
     Usage.bindOutsideClick();
@@ -104,6 +138,7 @@ const Usage = {
 
   async setGroup(group, btn) {
     Usage.currentGroup = group;
+    Usage.saveFilterState();
     document.querySelectorAll('#usage-period-tabs .tab-btn, #usage-period-tabs-chart .tab-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.group === group);
     });
@@ -224,17 +259,19 @@ const Usage = {
   toggleModel(model) {
     if (Usage.currentModels.has(model)) Usage.currentModels.delete(model);
     else Usage.currentModels.add(model);
+    Usage.saveFilterState();
     Usage.refresh();
   },
 
   toggleProject(slug, name) {
     if (Usage.currentProjects.has(slug)) Usage.currentProjects.delete(slug);
     else Usage.currentProjects.set(slug, name || slug);
+    Usage.saveFilterState();
     Usage.refresh();
   },
 
   setDatePreset(preset) {
-    if (preset === 'custom') { Usage._df.datePreset = 'custom'; return; }
+    if (preset === 'custom') { Usage._df.datePreset = 'custom'; Usage.saveFilterState(); return; }
     const autoGroup = { today: 'hour', '7d': 'day', '30d': 'day', month: 'day', year: 'month', all: 'month' };
     if (autoGroup[preset]) {
       Usage.currentGroup = autoGroup[preset];
@@ -243,11 +280,13 @@ const Usage = {
       });
     }
     Usage.applyDatePresetState(preset);
+    Usage.saveFilterState();
     Usage.refresh();
   },
 
   applyCustomDates() {
     Usage._df.applyCustom();
+    Usage.saveFilterState();
     Usage.refresh();
   },
 
@@ -255,7 +294,9 @@ const Usage = {
     Usage.currentModels = new Set();
     Usage.currentProjects = new Map();
     Usage.searchTerms = { models: '', projects: '' };
+    Usage.currentGroup = 'day';
     Usage.applyDatePresetState('month');
+    Usage.saveFilterState();
     Usage.refresh();
   },
 
