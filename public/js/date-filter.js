@@ -15,6 +15,7 @@ function makeDateFilter(fromInputId, toInputId, presetInputId) {
 
       let fromDT = null, toDT = null;
       if (preset === 'today') { fromDT = fmtDT(now, 0, 0); toDT = fmtDT(now, 23, 59); }
+      else if (preset === 'yesterday') { const y = new Date(now); y.setDate(y.getDate() - 1); fromDT = fmtDT(y, 0, 0); toDT = fmtDT(y, 23, 59); }
       else if (preset === '7d') { const f = new Date(now); f.setDate(f.getDate() - 6); fromDT = fmtDT(f, 0, 0); toDT = fmtDT(now, 23, 59); }
       else if (preset === '30d') { const f = new Date(now); f.setDate(f.getDate() - 29); fromDT = fmtDT(f, 0, 0); toDT = fmtDT(now, 23, 59); }
       else if (preset === 'month') { fromDT = fmtDT(new Date(now.getFullYear(), now.getMonth(), 1), 0, 0); toDT = fmtDT(now, 23, 59); }

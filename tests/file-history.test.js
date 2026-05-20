@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const request = require('supertest');
-const { app, paths } = require('./helpers/app');
+const { app, paths, HOME } = require('./helpers/app');
 
 const SESSION_ID = 'fhtest111-1111-1111-1111-111111111111';
 const PROJ_SLUG = 'fh-test-project';
@@ -13,6 +13,11 @@ const TRACKED_FILE = '/projects/myapp/src/index.js';
 const FILE_HISTORY_DIR = path.join(paths.CLAUDE_DIR, 'file-history');
 const PLANS_DIR = path.join(paths.CLAUDE_DIR, 'plans');
 const SESSION_HIST_DIR = path.join(FILE_HISTORY_DIR, SESSION_ID);
+
+// Session that tracks a file which physically exists on disk (for mtime tests)
+const MTIME_SESSION_ID = 'mtimetest-2222-2222-2222-222222222222';
+const MTIME_HASH = 'mtimehash00012ab';
+const REAL_FILE = path.join(HOME, 'mtime-tracked-file.txt');
 
 before(() => {
   // Project dir + session JSONL
@@ -32,6 +37,14 @@ before(() => {
       }
     },
     { type: 'user', timestamp: '2026-01-01T11:00:00.000Z', message: { content: 'end' } },
+    {
+      type: 'assistant',
+      message: {
+        content: [
+          { type: 'tool_use', id: 'toolu_1', name: 'ExitPlanMode', input: { plan: '# In-range Plan\n\nContent.', planFilePath: `${paths.CLAUDE_DIR}/plans/fh-in-range-plan.md` } }
+        ]
+      }
+    }
   ];
   fs.writeFileSync(
     path.join(projDir, SESSION_ID + '.jsonl'),
@@ -101,22 +114,19 @@ test('context: projSlug is returned', async () => {
   assert.strictEqual(res.body.projSlug, PROJ_SLUG);
 });
 
-test('context: plans visible via explicit ?from/?to params', async () => {
-  const res = await request(app)
-    .get(`/api/file-history/${SESSION_ID}/context`)
-    .query({ from: '2026-01-01T10:00:00.000Z', to: '2026-01-01T11:00:00.000Z' });
-  assert.strictEqual(res.status, 200);
-  const names = res.body.plans.map(p => p.name);
-  assert.ok(names.includes('fh-in-range-plan'), 'in-range plan must appear');
-  assert.ok(!names.includes('fh-old-plan'), 'out-of-range plan must not appear');
-});
-
-test('context: plans visible without query params via JSONL timestamp fallback (Bug 2 regression)', async () => {
+test('context: plans linked via ExitPlanMode planFilePath appear', async () => {
   const res = await request(app).get(`/api/file-history/${SESSION_ID}/context`);
   assert.strictEqual(res.status, 200);
   const names = res.body.plans.map(p => p.name);
-  assert.ok(names.includes('fh-in-range-plan'), 'in-range plan must appear without query params');
-  assert.ok(!names.includes('fh-old-plan'), 'out-of-range plan must not appear');
+  assert.ok(names.includes('fh-in-range-plan'), 'plan referenced in ExitPlanMode must appear');
+  assert.ok(!names.includes('fh-old-plan'), 'plan not referenced must not appear');
+});
+
+test('context: plans not linked via ExitPlanMode are excluded even if mtime overlaps', async () => {
+  const res = await request(app).get(`/api/file-history/${SESSION_ID}/context`);
+  assert.strictEqual(res.status, 200);
+  const names = res.body.plans.map(p => p.name);
+  assert.ok(!names.includes('fh-old-plan'), 'unreferenced plan must not appear regardless of mtime');
 });
 
 test('context: invalid sessionId returns 400', async () => {
@@ -195,4 +205,50 @@ test('diff-current: without isNew, missing version still returns 404', async () 
     .get(`/api/file-history/${SESSION_ID}/${HASH}/diff-current`)
     .query({ version: 99, projSlug: PROJ_SLUG, filePath: 'created.js' });
   assert.strictEqual(res.status, 404);
+});
+
+// ── mtime field ───────────────────────────────────────────────────────────────
+
+before(() => {
+  fs.writeFileSync(REAL_FILE, 'real tracked content');
+
+  const projDir = path.join(paths.PROJECTS_DIR, PROJ_SLUG);
+  const entries = [
+    { type: 'user', timestamp: '2026-02-01T10:00:00.000Z', message: { content: 'mtime test' } },
+    {
+      type: 'file-history-snapshot',
+      isSnapshotUpdate: true,
+      snapshot: {
+        trackedFileBackups: {
+          [REAL_FILE]: { backupFileName: `${MTIME_HASH}@v1`, version: 1 }
+        }
+      }
+    }
+  ];
+  fs.writeFileSync(
+    path.join(projDir, MTIME_SESSION_ID + '.jsonl'),
+    entries.map(e => JSON.stringify(e)).join('\n')
+  );
+
+  const histDir = path.join(FILE_HISTORY_DIR, MTIME_SESSION_ID);
+  fs.mkdirSync(histDir, { recursive: true });
+  fs.writeFileSync(path.join(histDir, `${MTIME_HASH}@v1`), 'backup of real file');
+});
+
+test('context: mtime is a number for files that exist on disk', async () => {
+  const res = await request(app).get(`/api/file-history/${MTIME_SESSION_ID}/context`);
+  assert.strictEqual(res.status, 200);
+  const file = res.body.files.find(f => f.path === REAL_FILE);
+  assert.ok(file, 'tracked real file must appear');
+  assert.strictEqual(typeof file.mtime, 'number');
+  assert.ok(file.mtime > 0);
+  assert.strictEqual(file.isDeleted, false);
+});
+
+test('context: mtime is null and isDeleted=true for files missing from disk', async () => {
+  const res = await request(app).get(`/api/file-history/${SESSION_ID}/context`);
+  const file = res.body.files.find(f => f.path === TRACKED_FILE);
+  assert.ok(file);
+  assert.strictEqual(file.mtime, null);
+  assert.strictEqual(file.isDeleted, true);
 });

@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { CLAUDE_DIR, PROJECTS_DIR } = require('../lib/paths');
 const { wrapRoute } = require('../lib/file-helpers');
+const planCache = require('../lib/plan-cache');
 const { decodeSlug } = require('../lib/slug');
 
 const PLANS_DIR = path.join(CLAUDE_DIR, 'plans');
@@ -21,6 +22,7 @@ router.get('/:sessionId/context', wrapRoute((req, res) => {
   let sessionFrom = null, sessionTo = null;
 
   let projSlug = null;
+  const planPathsFromSession = new Set();
   if (fs.existsSync(histDir)) {
     // Find the session JSONL to get file path mappings
     let sessionContent = null;
@@ -42,6 +44,16 @@ router.get('/:sessionId/context', wrapRoute((req, res) => {
             const t = new Date(obj.timestamp).getTime();
             if (!sessionFrom) sessionFrom = t;
             sessionTo = t;
+          }
+          if (planPathsFromSession.size === 0 && planCache.get(sessionId) !== false && obj.type === 'assistant') {
+            const content = obj.message && obj.message.content;
+            if (Array.isArray(content)) {
+              for (const block of content) {
+                if (block.type === 'tool_use' && block.name === 'ExitPlanMode' && block.input && block.input.planFilePath) {
+                  planPathsFromSession.add(block.input.planFilePath);
+                }
+              }
+            }
           }
           if (obj.type !== 'file-history-snapshot' || !obj.isSnapshotUpdate) continue;
           const backups = obj.snapshot && obj.snapshot.trackedFileBackups;
@@ -67,31 +79,30 @@ router.get('/:sessionId/context', wrapRoute((req, res) => {
           .filter(v => !isNaN(v))
           .sort((a, b) => a - b) : [];
         let isDeleted = false;
+        let mtime = null;
         if (projectDir) {
           const currentFile = path.resolve(projectDir, filePath);
-          isDeleted = !fs.existsSync(currentFile);
+          try {
+            mtime = fs.statSync(currentFile).mtimeMs;
+          } catch (_) {
+            isDeleted = true;
+          }
         }
-        return { path: filePath, hash: info.hash, versions, isNew: info.isNew, isDeleted };
+        return { path: filePath, hash: info.hash, versions, isNew: info.isNew, isDeleted, mtime };
       }).filter(f => f.versions.length > 0 || f.isNew);
     }
   }
 
-  // Plans active during this session time range
-  let plans = [];
-  const from = req.query.from ? new Date(req.query.from).getTime() : sessionFrom;
-  const to = req.query.to ? new Date(req.query.to).getTime() : sessionTo;
-  if (from && to && fs.existsSync(PLANS_DIR)) {
-    const slack = 30 * 60 * 1000; // 30-min window either side
-    plans = fs.readdirSync(PLANS_DIR)
-      .filter(f => f.endsWith('.md'))
-      .map(f => {
-        const stat = fs.statSync(path.join(PLANS_DIR, f));
-        const t = new Date(stat.mtime).getTime();
-        return { name: f.replace(/\.md$/, ''), mtime: stat.mtime, t };
-      })
-      .filter(p => p.t >= from - slack && p.t <= to + slack)
-      .map(({ name, mtime }) => ({ name, mtime }));
+  // Plans linked to this session via ExitPlanMode planFilePath
+  const plans = [];
+  for (const planPath of planPathsFromSession) {
+    const name = path.basename(planPath, '.md');
+    try {
+      const stat = fs.statSync(path.join(PLANS_DIR, name + '.md'));
+      plans.push({ name, mtime: stat.mtime });
+    } catch (_) {}
   }
+  if (planCache.get(sessionId) === undefined) planCache.set(sessionId, plans.length > 0);
 
   res.json({ files, plans, projSlug });
 }));

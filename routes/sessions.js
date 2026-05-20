@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const { execFile, spawn } = require('child_process');
 const { safeSlug, wrapRoute, backup } = require('../lib/file-helpers');
+const { CLAUDE_DIR } = require('../lib/paths');
+const planCache = require('../lib/plan-cache');
 const { getProjectUsageMap, getSessionUsage, calcCost } = require('../lib/usage-index');
 const { decodeSlug } = require('../lib/slug');
 const { getCustomTitle } = require('../lib/session-title');
@@ -14,6 +16,35 @@ const { stampActive } = require('../lib/session-status');
 const { MAX_SNIPPETS, extractEntrySnippets, extractMetaSnippet } = require('../lib/session-search');
 
 const router = express.Router({ mergeParams: true });
+
+function normalizePrompt(text) {
+  const m = (text || '').match(/<command-name>(\/[\w-]+)<\/command-name>/);
+  if (!m) return (text || '');
+  const args = (text || '').match(/<command-args>([\s\S]*?)<\/command-args>/);
+  const trimmedArgs = args ? args[1].trim() : '';
+  return trimmedArgs ? m[1] + ' ' + trimmedArgs : m[1];
+}
+
+function isSkippablePrompt(text) {
+  const t = (text || '').trim();
+  if (t.includes('Caveat: The messages below were generated')) return true;
+  return normalizePrompt(t) === '/clear';
+}
+
+function findFirstMeaningfulPrompt(filePath) {
+  try {
+    const lines = fs.readFileSync(filePath, 'utf-8').split('\n').filter(Boolean);
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line);
+        if (entry.type !== 'user') continue;
+        const raw = typeof entry.message?.content === 'string' ? entry.message.content : '';
+        if (raw && !isSkippablePrompt(raw)) return normalizePrompt(raw).slice(0, 200);
+      } catch (_) {}
+    }
+  } catch (_) {}
+  return '';
+}
 
 function safeSpawn(cmd, args, opts) {
   const proc = spawn(cmd, args, opts);
@@ -80,6 +111,7 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
           s.lastGitBranch = s.gitBranches[s.gitBranches.length - 1];
         }
         s.remoteControlled = hasBridgeSession(filePath);
+        if (isSkippablePrompt(s.firstPrompt)) s.firstPrompt = findFirstMeaningfulPrompt(filePath);
       });
       const usageMap = getProjectUsageMap(req.params.slug);
       sessions.forEach(s => {
@@ -125,11 +157,12 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
           } else if (entry.type === 'user') {
             userMessages++;
             if (userMessages === 1) {
-              session.firstPrompt = typeof entry.message?.content === 'string'
-                ? entry.message.content.slice(0, 200)
-                : '';
               session.created = entry.timestamp || stat.birthtime.toISOString();
               session.gitBranch = entry.gitBranch || '';
+            }
+            if (!session.firstPrompt) {
+              const raw = typeof entry.message?.content === 'string' ? entry.message.content : '';
+              if (!isSkippablePrompt(raw)) session.firstPrompt = normalizePrompt(raw).slice(0, 200);
             }
             if (entry.gitBranch) {
               session.lastGitBranch = entry.gitBranch;
@@ -217,10 +250,12 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
           if (entry.type === 'user') {
             messageCount++;
             if (messageCount === 1) {
-              firstPrompt = typeof entry.message?.content === 'string'
-                ? entry.message.content.slice(0, 200) : '';
               created = entry.timestamp;
               gitBranch = entry.gitBranch || '';
+            }
+            if (!firstPrompt) {
+              const raw = typeof entry.message?.content === 'string' ? entry.message.content : '';
+              if (!isSkippablePrompt(raw)) firstPrompt = normalizePrompt(raw).slice(0, 200);
             }
             if (entry.gitBranch) {
               lastGitBranch = entry.gitBranch;
@@ -274,6 +309,38 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
   res.json(results);
 }));
 
+router.get('/:slug/sessions/with-plans', wrapRoute((req, res) => {
+  const dir = safeSlug(req.params.slug);
+  if (!dir) return res.status(400).json({ error: 'Invalid slug' });
+
+  const plansDir = path.join(CLAUDE_DIR, 'plans');
+  let planStems = [];
+  if (fs.existsSync(plansDir)) {
+    planStems = fs.readdirSync(plansDir)
+      .filter(f => f.endsWith('.md'))
+      .map(f => f.slice(0, -3));
+  }
+  if (!planStems.length) return res.json([]);
+
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl'));
+  const sessionIds = [];
+  for (const f of files) {
+    const sessionId = f.replace('.jsonl', '');
+    const cached = planCache.get(sessionId);
+    if (cached !== undefined) {
+      if (cached) sessionIds.push(sessionId);
+      continue;
+    }
+    try {
+      const content = fs.readFileSync(path.join(dir, f), 'utf-8');
+      const hasPlan = planStems.some(stem => content.includes(stem));
+      planCache.set(sessionId, hasPlan);
+      if (hasPlan) sessionIds.push(sessionId);
+    } catch (_) {}
+  }
+  res.json(sessionIds);
+}));
+
 router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
   const dir = safeSlug(req.params.slug);
   if (!dir) return res.status(400).json({ error: 'Invalid slug' });
@@ -292,19 +359,39 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
   let userMessageCount = 0;
   let firstPrompt = '';
   let indexSummary = '';
+  let created = null;
+  const cachedHasPlan = planCache.get(sessionId);
+  let hasPlan = cachedHasPlan === true;
 
   for (const line of lines) {
     try {
       const entry = JSON.parse(line);
       if (entry.isSidechain) isSidechain = true;
       if (entry.type === 'summary' && entry.summary) indexSummary = entry.summary;
-      if (entry.type === 'user') userMessageCount++;
+      if (entry.type === 'user') {
+        userMessageCount++;
+        if (!created && entry.timestamp) created = entry.timestamp;
+      }
       if (entry.type === 'user' && !firstPrompt) {
         const c = entry.message?.content;
-        if (typeof c === 'string' && c.trim()) firstPrompt = c.slice(0, 200);
+        let raw = '';
+        if (typeof c === 'string' && c.trim()) raw = c;
         else if (Array.isArray(c)) {
           const tb = c.find(b => b.type === 'text' && b.text?.trim());
-          if (tb) firstPrompt = tb.text.slice(0, 200);
+          if (tb) raw = tb.text;
+        }
+        if (raw && !isSkippablePrompt(raw)) firstPrompt = normalizePrompt(raw).slice(0, 200);
+      }
+      if (!hasPlan && cachedHasPlan === undefined && entry.type === 'assistant') {
+        const content = entry.message && entry.message.content;
+        if (Array.isArray(content)) {
+          for (const block of content) {
+            if (block.type === 'tool_use' && block.name === 'ExitPlanMode' && block.input && block.input.planFilePath) {
+              const stem = path.basename(block.input.planFilePath, '.md');
+              hasPlan = fs.existsSync(path.join(CLAUDE_DIR, 'plans', stem + '.md'));
+              if (hasPlan) break;
+            }
+          }
         }
       }
       if (entry.type === 'user' || entry.type === 'assistant') {
@@ -363,13 +450,20 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
   const lastGitBranch = gitBranches.length ? gitBranches[gitBranches.length - 1] : '';
   const usage = getSessionUsage(req.params.slug, sessionId);
   const customTitle = getCustomTitle(filePath);
+  if (cachedHasPlan === undefined) planCache.set(sessionId, hasPlan);
+
+  const gitBranch = gitBranches[0] || '';
   const stats = {
     messageCount: userMessageCount,
     summary: customTitle || indexSummary || firstPrompt.slice(0, 80) || '',
     firstPrompt,
+    created,
+    gitBranch,
     gitBranches,
     lastGitBranch,
-    isSidechain
+    isSidechain,
+    hasPlan,
+    remoteControlled: hasBridgeSession(filePath)
   };
   if (usage) {
     stats.tokens = usage.totals;

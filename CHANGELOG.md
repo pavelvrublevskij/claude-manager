@@ -1,3 +1,24 @@
+## v1.1.0
+
+- **Git integration** — footer git button (commit / push / commit & push) with file checkboxes, branch name, and uncommitted-file badge; visible only in git repos
+- **Session grouping** — sessions grouped by ticket, branch, or proximity (30 min); collapsible with day-gap indicators; sort order preserved
+- **Dashboard** — Recent/Active sessions toggle between flat and by-project views; remote-controlled sessions show wifi icon
+- **File Changes tab** — files grouped by directory; `.claude/` entries hidden; files flash on load and on each edit during live polling
+- **Token Usage** — filter state persisted in localStorage; Yesterday period added
+- **Session detail** — header restored correctly on page refresh; stale file context from previous session no longer bleeds in
+- **Page refresh flash** — wrong view no longer briefly appears before routing kicks in
+
+## v1.0.1
+
+### Bug fixes
+
+- **Plan detection false positives**: replaced the ±30-minute mtime overlap heuristic with exact content matching — plans are now linked to sessions via the `ExitPlanMode` tool call's `planFilePath`; unrelated plan files no longer appear under a session
+- **Session titles show `/clear` or system caveat text**: sessions that start with a `/clear` command or the "Caveat: The messages below were generated…" system message now skip those entries and surface the first real user message as the title
+- **Skill invocations shown with raw XML**: session cards whose first prompt was a skill call (e.g. `/review`) were rendering the raw `<command-name>` XML wrapper; they now show a styled `/skill` badge
+- **Active-session badge hidden in collapsed sidebar**: the green count badge was clipped by overflow in icon-only sidebar mode; fixed with absolute positioning
+- **Plan badge duplicated on session cards**: plan annotation could fire from two code paths, inserting the badge twice; refactored to use the server-provided `hasPlan` flag with a single `_rerenderPlans()` pass
+- **Session detail missing project context**: added a clickable project chip in the session detail header so you can navigate back to the project without using the browser back button
+
 ## v1.0.0
 
 ### Browser terminals run in background

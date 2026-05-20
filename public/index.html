@@ -86,7 +86,7 @@
     <main class="main">
       <div class="update-banner" id="update-banner" style="display:none"></div>
       <!-- Dashboard View -->
-      <div class="view active" id="view-dashboard">
+      <div class="view" id="view-dashboard">
         <div class="view-header">
           <h2>Dashboard</h2>
           <div class="subtitle">Overview of your Claude Code environment</div>
@@ -94,10 +94,22 @@
         <div class="view-body">
           <div class="dashboard-stats" id="dashboard-stats"></div>
           <div id="dashboard-active-wrap" style="display:none">
-            <h3 style="margin:24px 0 12px">Active Sessions</h3>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin:24px 0 12px">
+              <h3 style="margin:0">Active Sessions</h3>
+              <div class="ctx-sort-bar" style="margin:0">
+                <button class="ctx-sort-btn active" id="active-group-recent" onclick="Dashboard.setActiveGrouping('recent')">Recent</button>
+                <button class="ctx-sort-btn" id="active-group-project" onclick="Dashboard.setActiveGrouping('project')">By Project</button>
+              </div>
+            </div>
             <div id="dashboard-active-sessions"></div>
           </div>
-          <h3 style="margin:24px 0 12px">Recent Sessions</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin:24px 0 12px">
+            <h3 style="margin:0">Recent Sessions</h3>
+            <div class="ctx-sort-bar" style="margin:0">
+              <button class="ctx-sort-btn active" id="recent-group-recent" onclick="Dashboard.setGrouping('recent')">Recent</button>
+              <button class="ctx-sort-btn" id="recent-group-project" onclick="Dashboard.setGrouping('project')">By Project</button>
+            </div>
+          </div>
           <div id="dashboard-recent-sessions"></div>
         </div>
       </div>
@@ -154,6 +166,7 @@
               <select id="filter-date-preset" onchange="Usage.setDatePreset(this.value)">
                 <option value="all">All time</option>
                 <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
                 <option value="month" selected>This month</option>
@@ -181,7 +194,7 @@
                   <button class="tab-btn" data-group="hour" onclick="Usage.setGroup('hour', this)">Hour</button>
                   <button class="tab-btn" data-group="day" onclick="Usage.setGroup('day', this)">Day</button>
                   <button class="tab-btn" data-group="week" onclick="Usage.setGroup('week', this)">Week</button>
-                  <button class="tab-btn active" data-group="month" onclick="Usage.setGroup('month', this)">Month</button>
+                  <button class="tab-btn" data-group="month" onclick="Usage.setGroup('month', this)">Month</button>
                   <button class="tab-btn" data-group="year" onclick="Usage.setGroup('year', this)">Year</button>
                 </div>
               </div>
@@ -223,7 +236,7 @@
             <button class="tab-btn" data-group="hour" onclick="Usage.setGroup('hour', this)">Hour</button>
             <button class="tab-btn" data-group="day" onclick="Usage.setGroup('day', this)">Day</button>
             <button class="tab-btn" data-group="week" onclick="Usage.setGroup('week', this)">Week</button>
-            <button class="tab-btn active" data-group="month" onclick="Usage.setGroup('month', this)">Month</button>
+            <button class="tab-btn" data-group="month" onclick="Usage.setGroup('month', this)">Month</button>
             <button class="tab-btn" data-group="year" onclick="Usage.setGroup('year', this)">Year</button>
           </div>
           <div id="usage-periods" style="margin-top:12px"></div>
@@ -419,6 +432,7 @@
               <select id="proj-filter-date-preset" onchange="ProjectUsage.setDatePreset(this.value)">
                 <option value="all">All time</option>
                 <option value="today" selected>Today</option>
+                <option value="yesterday">Yesterday</option>
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
                 <option value="month">This month</option>
@@ -443,8 +457,8 @@
           <div id="project-detail-usage" class="project-usage-bar"></div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
             <div class="tab-bar">
-              <button class="tab-btn active" id="memory-tab-btn" onclick="ProjectTabs.switch('memory', this)">Memory</button>
-              <button class="tab-btn" id="sessions-tab-btn" onclick="ProjectTabs.switch('sessions', this)">Sessions</button>
+              <button class="tab-btn active" id="sessions-tab-btn" onclick="ProjectTabs.switch('sessions', this)">Sessions</button>
+              <button class="tab-btn" id="memory-tab-btn" onclick="ProjectTabs.switch('memory', this)">Memory</button>
               <button class="tab-btn" onclick="ProjectTabs.switch('proj-settings', this)">Settings</button>
               <button class="tab-btn" onclick="ProjectTabs.switch('proj-mcp', this)">MCP</button>
               <button class="tab-btn" onclick="ProjectTabs.switch('proj-agents', this)">Agents</button>
@@ -456,7 +470,7 @@
           </div>
         </div>
         <div class="view-body">
-          <div class="project-tab active" id="tab-memory">
+          <div class="project-tab" id="tab-memory">
             <div class="memory-layout">
               <div class="memory-list">
                 <div class="memory-list-header">
@@ -475,7 +489,7 @@
               </div>
             </div>
           </div>
-          <div class="project-tab" id="tab-sessions">
+          <div class="project-tab active" id="tab-sessions">
             <div id="sessions-list"></div>
           </div>
           <div class="project-tab" id="tab-proj-settings">
@@ -520,11 +534,13 @@
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
             <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1">
               <button class="btn btn-sm" onclick="Sessions.goBack()">&#8592; Back</button>
-              <h2 id="session-detail-title">Session</h2>
+              <div style="display:flex;align-items:center;gap:6px;min-width:0">
+                <span id="session-detail-remote-icon"></span>
+                <h2 id="session-detail-title" style="margin:0">Session</h2>
+              </div>
               <code class="session-id-value" id="session-detail-id-value" style="display:none"></code>
-              <div class="session-detail-branches" id="session-detail-branches" style="display:none"></div>
             </div>
-            <div style="display:flex;gap:8px;align-items:center">
+            <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
               <div class="action-menu">
                 <button class="btn btn-sm action-menu-btn" onclick="event.stopPropagation(); Sessions.toggleActionMenu(this)" aria-label="More actions">&#8942;</button>
                 <div class="action-menu-panel">
@@ -534,6 +550,10 @@
                 </div>
               </div>
             </div>
+          </div>
+          <div id="session-detail-branches-wrap" style="display:none;align-items:center;gap:6px;margin-top:4px;font-size:12px">
+            <span style="color:var(--text-muted)">Session branch:</span>
+            <div class="session-detail-branches" id="session-detail-branches"></div>
           </div>
           <div class="session-meta" id="session-detail-meta"></div>
         </div>
@@ -667,6 +687,7 @@
       <a href="https://github.com/pavelvrublevskij/claude-manager/issues/new" target="_blank" rel="noopener" class="app-footer-issue-link" title="Raise an issue on GitHub">&#9888; Raise Issue</a>
     </div>
     <div class="app-footer-right">
+      <div id="footer-git" style="display:none;align-items:center;gap:8px"></div>
       <span class="app-footer-status" id="footer-status">Idle</span>
       <span id="footer-host"></span>
       <span>Theme:</span>
@@ -709,6 +730,7 @@
   <script src="/js/manager-settings.js"></script>
   <script src="/js/file-history.js"></script>
   <script src="/js/tour.js"></script>
+  <script src="/js/git.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

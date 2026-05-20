@@ -100,6 +100,30 @@ test('GET /api/dashboard returns activeSessions array (empty when nothing is act
   assert.strictEqual(res.body.activeSessions.length, 0);
 });
 
+test('GET /api/dashboard recentSessions entries include remoteControlled field', async () => {
+  const res = await request(app).get('/api/dashboard');
+  assert.strictEqual(res.status, 200);
+  for (const s of res.body.recentSessions) {
+    assert.ok('remoteControlled' in s, `session ${s.sessionId} must have remoteControlled`);
+    assert.strictEqual(typeof s.remoteControlled, 'boolean');
+  }
+});
+
+test('GET /api/dashboard remoteControlled is true when JSONL contains bridge-session marker', async () => {
+  const slug = 'dash-bridge-proj';
+  const projDir = path.join(paths.PROJECTS_DIR, slug);
+  fs.mkdirSync(projDir, { recursive: true });
+  const bridgeEntry = JSON.stringify({ type: 'bridge-session', timestamp: new Date().toISOString() });
+  const userEntry = JSON.stringify({ type: 'user', message: { content: 'hi' }, timestamp: new Date().toISOString() });
+  fs.writeFileSync(path.join(projDir, 'bridge-sess.jsonl'), bridgeEntry + '\n' + userEntry + '\n');
+
+  const res = await request(app).get('/api/dashboard');
+  assert.strictEqual(res.status, 200);
+  const s = res.body.recentSessions.find(r => r.sessionId === 'bridge-sess');
+  assert.ok(s, 'bridge session must appear in recent');
+  assert.strictEqual(s.remoteControlled, true);
+});
+
 test('GET /api/dashboard splits active vs recent: active sessions removed from recent list', async () => {
   const activeSessions = require('../lib/active-sessions');
   const terminalServer = require('../lib/terminal-server');

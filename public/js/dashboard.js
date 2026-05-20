@@ -1,28 +1,95 @@
 const Dashboard = {
+  _grouping: 'recent',
+  _activeGrouping: 'recent',
+  _sessions: [],
+  _activeSessions: [],
+
   async load() {
     showLoading('dashboard-stats');
     showLoading('dashboard-recent-sessions', 'Loading recent sessions...');
     try {
       const data = await api('/api/dashboard');
       Dashboard.renderStats(data.stats);
-      Dashboard.renderActiveSessions(data.activeSessions || []);
-      Dashboard.renderRecentSessions(data.recentSessions);
+      Dashboard._activeSessions = data.activeSessions || [];
+      Dashboard.renderActiveSessions(Dashboard._activeSessions);
+      Dashboard._sessions = data.recentSessions;
+      Dashboard._renderRecent();
     } catch (e) {
       toast('Could not load dashboard: ' + e.message, 'error');
     }
   },
 
+  _applyGrouping(stateKey, btnPrefix, mode, renderFn) {
+    Dashboard[stateKey] = mode;
+    const r = document.getElementById(btnPrefix + '-recent');
+    const p = document.getElementById(btnPrefix + '-project');
+    if (r) r.classList.toggle('active', mode === 'recent');
+    if (p) p.classList.toggle('active', mode === 'project');
+    renderFn();
+  },
+
+  setGrouping(mode) {
+    Dashboard._applyGrouping('_grouping', 'recent-group', mode, Dashboard._renderRecent);
+  },
+
+  setActiveGrouping(mode) {
+    Dashboard._applyGrouping('_activeGrouping', 'active-group', mode, Dashboard._renderActiveCards);
+  },
+
+  _renderRecent() {
+    if (Dashboard._grouping === 'project') {
+      Dashboard._renderByProject(Dashboard._sessions, 'dashboard-recent-sessions');
+    } else {
+      Dashboard.renderRecentSessions(Dashboard._sessions);
+    }
+  },
+
+  _renderActiveCards() {
+    const container = document.getElementById('dashboard-active-sessions');
+    if (Dashboard._activeGrouping === 'project') {
+      Dashboard._renderByProject(Dashboard._activeSessions, 'dashboard-active-sessions');
+    } else {
+      Dashboard._renderCards(container, Dashboard._activeSessions);
+    }
+  },
+
+  _renderByProject(sessions, containerId) {
+    const container = document.getElementById(containerId);
+    if (!sessions.length) {
+      container.innerHTML = '<div class="empty-state"><p>No sessions</p></div>';
+      return;
+    }
+    const groups = new Map();
+    sessions.forEach(s => {
+      const key = s.slug;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(s);
+    });
+    container.innerHTML = [...groups.entries()].map(([slug, items]) => {
+      const cards = items.map(s => renderSessionCard(s, {
+        onclick: `App.navigate('session-detail', { slug: '${s.slug}', sessionId: '${s.sessionId}', sessionInfo: null })`,
+        timeAgo: s.modified ? Dashboard.timeAgo(new Date(s.modified)) : '',
+        slug: s.slug,
+        dates: true,
+        hasPlan: !!s.hasPlan
+      })).join('');
+      return `<div class="dashboard-project-group">
+        <div class="dashboard-project-group-header" onclick="App.navigate('project-detail',{slug:'${slug}'})">${escapeHtml(decodeName(slug))}</div>
+        <div class="dashboard-project-group-cards">${cards}</div>
+      </div>`;
+    }).join('');
+  },
+
   renderActiveSessions(sessions) {
     const wrap = document.getElementById('dashboard-active-wrap');
-    const container = document.getElementById('dashboard-active-sessions');
-    if (!wrap || !container) return;
+    if (!wrap) return;
     if (!sessions.length) {
       wrap.style.display = 'none';
-      container.innerHTML = '';
+      document.getElementById('dashboard-active-sessions').innerHTML = '';
       return;
     }
     wrap.style.display = '';
-    Dashboard._renderCards(container, sessions);
+    Dashboard._renderActiveCards();
   },
 
   _renderCards(container, sessions) {
@@ -31,9 +98,9 @@ const Dashboard = {
       project: decodeName(s.slug),
       timeAgo: s.modified ? Dashboard.timeAgo(new Date(s.modified)) : '',
       slug: s.slug,
-      dates: true
+      dates: true,
+      hasPlan: !!s.hasPlan
     })).join('');
-    if (typeof Sessions !== 'undefined') Sessions.annotatePlans(sessions);
   },
 
   renderStats(stats) {
@@ -59,7 +126,7 @@ const Dashboard = {
 
   renderRecentSessions(sessions) {
     const container = document.getElementById('dashboard-recent-sessions');
-    if (!sessions.length) {
+    if (!sessions || !sessions.length) {
       container.innerHTML = '<div class="empty-state"><p>No recent sessions</p></div>';
       return;
     }

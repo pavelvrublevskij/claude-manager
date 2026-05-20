@@ -17,65 +17,39 @@ Object.assign(Sessions, {
       if (!hasFiles && !hasPlans) return;
 
       const ctx = Sessions._ctx;
-      const sameFiles = ctx && ctx.files.length === data.files.length;
-      const samePlans = ctx && ctx.plans.length === (data.plans ? data.plans.length : 0);
-      if (sameFiles && samePlans) return;
+      const oldFilesMap = new Map(ctx ? ctx.files.map(f => [f.path, f]) : []);
+      const changedPaths = new Set(
+        data.files.filter(f => {
+          const old = oldFilesMap.get(f.path);
+          return !old || f.mtime !== old.mtime;
+        }).map(f => f.path)
+      );
+      const plansChanged = (data.plans ? data.plans.length : 0) !== (ctx ? ctx.plans.length : 0);
+      if (!changedPaths.size && !plansChanged) return;
 
       const savedSort = ctx && ctx.sort || 'default';
       Sessions.renderContext(el, sessionId, data);
       if (savedSort !== 'default') Sessions.sortCtxFiles(savedSort);
+
+      Sessions._flashItems(el, changedPaths);
     } catch (_) {}
   },
 
-  async annotateDetailPlan() {
-    const info = Sessions._detailInfo;
-    if (!info || !info.created || !info.modified) return;
-    try {
-      const plans = await api('/api/plans');
-      if (!plans.length) return;
-      const slack = 30 * 60 * 1000;
-      const from = new Date(info.created).getTime() - slack;
-      const to = new Date(info.modified).getTime() + slack;
-      const hasPlans = plans.some(p => {
-        const t = new Date(p.mtime).getTime();
-        return t >= from && t <= to;
-      });
-      if (hasPlans) {
-        Sessions._detailHasPlan = true;
-        Sessions.renderDetailMeta(null);
-      }
-    } catch (_) {}
+  annotateDetailPlan(stats) {
+    if (stats && stats.hasPlan) {
+      Sessions._detailHasPlan = true;
+      Sessions.renderDetailMeta(null);
+    }
   },
 
   async annotatePlans(sessions) {
-    if (!sessions.length) {
-      Sessions._planSessionIds = new Set();
-      return;
-    }
+    if (!sessions.length) { Sessions._planSessionIds = new Set(); return; }
+    const slug = Sessions._searchSlug;
+    if (!slug) { Sessions._planSessionIds = new Set(); return; }
     try {
-      const plans = await api('/api/plans');
-      if (!plans.length) {
-        Sessions._planSessionIds = new Set();
-        return;
-      }
-      const slack = 30 * 60 * 1000;
-      const ids = new Set();
-      for (const s of sessions) {
-        if (!s.created || !s.modified) continue;
-        const from = new Date(s.created).getTime() - slack;
-        const to = new Date(s.modified).getTime() + slack;
-        const hasPlans = plans.some(p => {
-          const t = new Date(p.mtime).getTime();
-          return t >= from && t <= to;
-        });
-        if (!hasPlans) continue;
-        ids.add(s.sessionId);
-        const card = document.querySelector(`.session-card[data-session-id="${s.sessionId}"]`);
-        if (!card) continue;
-        const meta = card.querySelector('.session-meta');
-        if (meta) meta.insertAdjacentHTML('afterbegin', '<span class="session-plan-badge" title="Plans were active during this session">plan</span>');
-      }
-      Sessions._planSessionIds = ids;
+      const ids = await api(`/api/projects/${encodeURIComponent(slug)}/sessions/with-plans`);
+      Sessions._planSessionIds = new Set(ids);
+      Sessions._rerenderPlans();
     } catch (_) {
       Sessions._planSessionIds = new Set();
     }
@@ -91,7 +65,9 @@ Object.assign(Sessions, {
 
     try {
       const data = await api(`/api/file-history/${encodeURIComponent(sessionId)}/context${qs}`);
+      if (Sessions.detailState.sessionId !== sessionId) return;
       Sessions.renderContext(el, sessionId, data);
+      Sessions._flashItems(el, null);
     } catch (_) {
       Sessions.switchTab('conversation');
     }
@@ -146,24 +122,59 @@ Object.assign(Sessions, {
 
   _renderCtxFileList() {
     const { sessionId, files, sort } = Sessions._ctx;
-    let visible = files.slice();
-    if (sort === 'asc') visible.sort((a, b) => a.path.split(/[\\/]/).pop().localeCompare(b.path.split(/[\\/]/).pop()));
-    else if (sort === 'desc') visible.sort((a, b) => b.path.split(/[\\/]/).pop().localeCompare(a.path.split(/[\\/]/).pop()));
-    if (!visible.length) return '<div class="ctx-empty">No files changed</div>';
-    return visible.map(f => {
-      const name = f.path.replace(/\\/g, '/').split('/').pop();
-      const status = f.isNew ? 'new' : (f.isDeleted ? 'deleted' : 'edited');
-      const badge = `<span class="ctx-file-badge ctx-file-badge-${status}">${status}</span>`;
-      return `<div class="ctx-file-item ctx-file-${status}"
-        data-session="${escapeHtml(sessionId)}"
-        data-hash="${escapeHtml(f.hash || '')}"
-        data-from="${f.versions[0] || ''}"
-        data-path="${escapeHtml(f.path)}"
-        data-is-new="${f.isNew ? '1' : ''}"
-        data-is-deleted="${f.isDeleted ? '1' : ''}"
-        title="${escapeHtml(f.path)}"
-        onclick="Sessions._openCtxDiff(this)">${badge}<span class="ctx-file-name">${escapeHtml(name)}</span></div>`;
+    if (!files.length) return '<div class="ctx-empty">No files changed</div>';
+
+    const groups = new Map();
+    files.forEach(f => {
+      const normalized = f.path.replace(/\\/g, '/');
+      if (normalized.includes('/.claude/') || normalized.startsWith('.claude/')) return;
+      const lastSlash = normalized.lastIndexOf('/');
+      const dir = lastSlash >= 0 ? normalized.slice(0, lastSlash + 1) : '';
+      const name = lastSlash >= 0 ? normalized.slice(lastSlash + 1) : normalized;
+      if (!groups.has(dir)) groups.set(dir, []);
+      groups.get(dir).push({ ...f, name });
+    });
+
+    let dirs = [...groups.keys()];
+    if (sort === 'asc') dirs.sort((a, b) => a.localeCompare(b));
+    else if (sort === 'desc') dirs.sort((a, b) => b.localeCompare(a));
+
+    return dirs.map(dir => {
+      let groupFiles = groups.get(dir);
+      if (sort === 'asc') groupFiles = groupFiles.slice().sort((a, b) => a.name.localeCompare(b.name));
+      else if (sort === 'desc') groupFiles = groupFiles.slice().sort((a, b) => b.name.localeCompare(a.name));
+
+      const header = `<div class="ctx-file-group-header">${escapeHtml(dir || '/')}</div>`;
+      const items = groupFiles.map(f => {
+        const status = f.isNew ? 'new' : (f.isDeleted ? 'deleted' : 'edited');
+        const badge = `<span class="ctx-file-badge ctx-file-badge-${status}">${status}</span>`;
+        return `<div class="ctx-file-item ctx-file-${status}"
+          data-session="${escapeHtml(sessionId)}"
+          data-hash="${escapeHtml(f.hash || '')}"
+          data-from="${f.versions[0] || ''}"
+          data-path="${escapeHtml(f.path)}"
+          data-is-new="${f.isNew ? '1' : ''}"
+          data-is-deleted="${f.isDeleted ? '1' : ''}"
+          onclick="Sessions._openCtxDiff(this)">${badge}<span class="ctx-file-name">${escapeHtml(f.name)}</span></div>`;
+      }).join('');
+      return `<div class="ctx-file-group">${header}${items}</div>`;
     }).join('');
+  },
+
+  _flashItems(el, pathSet) {
+    if (el.style.display === 'none') {
+      Sessions._pendingFlash = pathSet;
+      return;
+    }
+    requestAnimationFrame(() => {
+      el.querySelectorAll('.ctx-file-item').forEach(item => {
+        if (!pathSet || pathSet.has(item.dataset.path)) {
+          item.classList.remove('ctx-file-flash');
+          void item.offsetWidth;
+          item.classList.add('ctx-file-flash');
+        }
+      });
+    });
   },
 
   sortCtxFiles(order) {

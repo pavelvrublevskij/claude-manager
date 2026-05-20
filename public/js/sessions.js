@@ -5,14 +5,155 @@ const Sessions = {
   _searchSlug: null,
   _planFilter: false,
   _planSessionIds: null,
+  _renderedGroups: [],
+  GROUP_COLLAPSED_KEY: 'claude-manager-collapsed-groups',
+
+  _getCollapsed() {
+    try { return new Set(JSON.parse(localStorage.getItem(Sessions.GROUP_COLLAPSED_KEY) || '[]')); }
+    catch (_) { return new Set(); }
+  },
+
+  _saveCollapsed(set) {
+    localStorage.setItem(Sessions.GROUP_COLLAPSED_KEY, JSON.stringify([...set]));
+  },
+
+  groupSessions(sessions) {
+    const TICKET_RE = /\b[A-Z]{2,10}-\d+\b/g;
+    const SKIP = new Set(['main', 'master', 'HEAD', 'develop', 'dev']);
+    const TEMP_MS = 30 * 60 * 1000;
+
+    function tickets(s) {
+      return [...new Set(((s.firstPrompt || '') + ' ' + (s.summary || '')).match(TICKET_RE) || [])];
+    }
+    function featureBranch(s) {
+      const b = s.lastGitBranch || s.gitBranch;
+      return b && !SKIP.has(b) ? b : null;
+    }
+    function anyBranch(s) { return s.lastGitBranch || s.gitBranch || null; }
+
+    const chron = [...sessions].sort((a, b) => new Date(a.created || 0) - new Date(b.created || 0));
+    const groups = [];
+    const ticketMap = {};
+    const branchMap = {};
+
+    for (const s of chron) {
+      const tt = tickets(s);
+      const fb = featureBranch(s);
+      const ab = anyBranch(s);
+      let matched = null;
+
+      for (const t of tt) { if (ticketMap[t]) { matched = ticketMap[t]; break; } }
+      if (!matched && fb && branchMap[fb]) matched = branchMap[fb];
+
+      if (!matched && ab) {
+        for (let i = groups.length - 1; i >= 0; i--) {
+          const g = groups[i];
+          const last = g.sessions[g.sessions.length - 1];
+          const gap = new Date(s.created || 0) - new Date(last.modified || last.created || 0);
+          if (gap >= 0 && gap <= TEMP_MS && anyBranch(last) === ab) { matched = g; break; }
+        }
+      }
+
+      if (matched) {
+        matched.sessions.push(s);
+        for (const t of tt) if (!ticketMap[t]) ticketMap[t] = matched;
+        if (fb && !branchMap[fb]) branchMap[fb] = matched;
+      } else {
+        const label = tt[0] || fb;
+        const type = tt.length ? 'ticket' : fb ? 'branch' : 'temporal';
+        const group = { key: (label || 'tmp') + ':' + groups.length, label: label || ab || 'session', type, sessions: [s] };
+        groups.push(group);
+        for (const t of tt) ticketMap[t] = group;
+        if (fb) branchMap[fb] = group;
+      }
+    }
+
+    const real = groups.filter(g => g.sessions.length > 1);
+    const singles = groups.filter(g => g.sessions.length === 1).map(g => g.sessions[0]);
+    real.sort((a, b) => new Date(b.sessions[b.sessions.length - 1].modified || 0) - new Date(a.sessions[a.sessions.length - 1].modified || 0));
+    return {
+      groups: real,
+      ungrouped: singles.sort((a, b) => new Date(b.modified || 0) - new Date(a.modified || 0))
+    };
+  },
+
+  _formatGap(ms) {
+    const m = Math.round(ms / 60000);
+    if (m < 60) return `${m}m gap`;
+    const h = Math.round(ms / 3600000);
+    if (h < 24) return `${h}h gap`;
+    const d = Math.round(ms / 86400000);
+    return `${d} day${d !== 1 ? 's' : ''} gap`;
+  },
+
+  _groupDateRange(sessions) {
+    const first = sessions[0]?.created;
+    const last = (sessions[sessions.length - 1]?.modified) || sessions[sessions.length - 1]?.created;
+    if (!first) return '';
+    const d1 = new Date(first), d2 = new Date(last);
+    const fmt = d => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return d1.toDateString() === d2.toDateString() ? fmt(d1) : `${fmt(d1)} – ${fmt(d2)}`;
+  },
+
+  renderGapRow(gapMs) {
+    return `<div class="session-gap"><span>${Sessions._formatGap(gapMs)}</span></div>`;
+  },
+
+  renderGroup(slug, group, collapsed, idx) {
+    const isCollapsed = collapsed.has(group.key);
+    const allSessions = Sessions.cache[slug] || [];
+    const hasPlanIds = Sessions._planSessionIds;
+
+    const desc = [...group.sessions].reverse();
+    let bodyHtml = '';
+    desc.forEach((s, i) => {
+      if (i > 0) {
+        const gapMs = new Date(desc[i - 1].created || 0) - new Date(s.modified || s.created || 0);
+        if (gapMs > 1800000) bodyHtml += Sessions.renderGapRow(gapMs);
+      }
+      const ci = allSessions.findIndex(x => x.sessionId === s.sessionId);
+      const hasPlan = !!(hasPlanIds && hasPlanIds.has(s.sessionId));
+      bodyHtml += renderSessionCard(s, {
+        onclick: `Sessions.open('${slug}', '${s.sessionId}', ${ci >= 0 ? ci : i})`,
+        slug, dates: true, sidechain: true, hasPlan
+      });
+    });
+
+    const dateRange = Sessions._groupDateRange(group.sessions);
+    const arrow = isCollapsed ? '&#9654;' : '&#9660;';
+    const typeClass = `session-group-type-${group.type}`;
+
+    return `<div class="session-group ${typeClass}" data-group-idx="${idx}">
+      <div class="session-group-header" onclick="Sessions.toggleGroup(${idx})">
+        <span class="session-group-arrow">${arrow}</span>
+        <span class="session-group-label">${escapeHtml(group.label)}</span>
+        <span class="session-group-count">${group.sessions.length}</span>
+        ${dateRange ? `<span class="session-group-date">${escapeHtml(dateRange)}</span>` : ''}
+      </div>
+      <div class="session-group-body${isCollapsed ? ' collapsed' : ''}">${bodyHtml}</div>
+    </div>`;
+  },
+
+  toggleGroup(idx) {
+    const group = Sessions._renderedGroups[idx];
+    if (!group) return;
+    const collapsed = Sessions._getCollapsed();
+    if (collapsed.has(group.key)) collapsed.delete(group.key);
+    else collapsed.add(group.key);
+    Sessions._saveCollapsed(collapsed);
+    const el = document.querySelector(`.session-group[data-group-idx="${idx}"]`);
+    if (!el) return;
+    el.querySelector('.session-group-body').classList.toggle('collapsed', collapsed.has(group.key));
+    el.querySelector('.session-group-arrow').innerHTML = collapsed.has(group.key) ? '&#9654;' : '&#9660;';
+  },
 
   async load(slug) {
     if (Sessions._searchSlug !== slug) {
       Sessions._planFilter = false;
-      Sessions._planSessionIds = null;
       const cb = document.getElementById('filter-plan-only');
       if (cb) cb.checked = false;
     }
+    Sessions._planSessionIds = null;
     Sessions._searchSlug = slug;
     const container = document.getElementById('sessions-list');
     showLoading(container, 'Loading sessions...');
@@ -91,9 +232,31 @@ const Sessions = {
         '<div class="empty-state"><p>No sessions found</p></div>';
       return;
     }
-    container.innerHTML = Sessions.renderSearchBar(slug) +
-      sessions.map((s, i) => Sessions.renderCard(slug, s, i)).join('');
-    Sessions.annotatePlans(sessions);
+
+    const { groups, ungrouped } = Sessions.groupSessions(sessions);
+    Sessions._renderedGroups = groups;
+    const collapsed = Sessions._getCollapsed();
+    const allSessions = Sessions.cache[slug] || sessions;
+
+    const items = [
+      ...groups.map((g, idx) => ({ isGroup: true, g, idx, date: new Date(g.sessions[g.sessions.length - 1].modified || 0) })),
+      ...ungrouped.map(s => ({ isGroup: false, s, date: new Date(s.modified || 0) }))
+    ].sort((a, b) => b.date - a.date);
+
+    let html = Sessions.renderSearchBar(slug);
+    items.forEach((item, i) => {
+      if (item.isGroup) {
+        html += Sessions.renderGroup(slug, item.g, collapsed, item.idx);
+      } else {
+        const ci = allSessions.findIndex(x => x.sessionId === item.s.sessionId);
+        html += Sessions.renderCard(slug, item.s, ci >= 0 ? ci : i);
+      }
+    });
+
+    container.innerHTML = html;
+    if (Sessions._planSessionIds === null) {
+      Sessions.annotatePlans(Sessions.cache[slug] || sessions);
+    }
   },
 
   renderCard(slug, s, i) {
@@ -105,12 +268,14 @@ const Sessions = {
     }).join('');
     const cached = Sessions.cache[slug] || [];
     const correctIndex = cached.findIndex(x => x.sessionId === s.sessionId);
+    const hasPlan = !!(Sessions._planSessionIds && Sessions._planSessionIds.has(s.sessionId));
     return renderSessionCard(s, {
       onclick: `Sessions.open('${slug}', '${s.sessionId}', ${correctIndex >= 0 ? correctIndex : i})`,
       slug,
       dates: true,
       sidechain: true,
-      snippets: snippetsHtml
+      snippets: snippetsHtml,
+      hasPlan
     });
   },
 
@@ -142,6 +307,7 @@ const Sessions = {
     try {
       let results = await api(`/api/projects/${slug}/sessions/search?q=${encodeURIComponent(q)}`);
       if (Sessions._lastQuery !== q) return;
+      results = Sessions.filterByDateRange(results);
       if (Sessions._planFilter && Sessions._planSessionIds) {
         results = results.filter(s => Sessions._planSessionIds.has(s.sessionId));
       }
@@ -255,13 +421,28 @@ const Sessions = {
       title.title = titleText;
     }
 
+    const slug = Sessions.detailState.slug;
+    const projectHtml = slug
+      ? `<span class="session-project-chip" onclick="Sessions.goBack()" title="Go to project">${escapeHtml(decodeName(slug))}</span>`
+      : '';
     const createdHtml = merged.created
       ? `<div class="meta-item">Created <span class="meta-value">${new Date(merged.created).toLocaleString()}</span></div>`
       : '';
     const planBadge = Sessions._detailHasPlan
       ? '<span class="session-plan-badge" title="Plans were active during this session">plan</span>'
       : '';
-    meta.innerHTML = planBadge + createdHtml + renderSessionBadges(merged, { sidechain: true, modelPricing: true, skipBranches: true });
+    const remoteIconEl = document.getElementById('session-detail-remote-icon');
+    if (remoteIconEl) {
+      remoteIconEl.innerHTML = merged.remoteControlled
+        ? `<span class="session-remote-icon" title="Remote-controlled session">
+            <svg viewBox="0 0 16 16" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3.5 5.5a5 5 0 0 1 9 0"/><path d="M5.5 7.5a2.5 2.5 0 0 1 5 0"/>
+              <circle cx="8" cy="9.5" r="0.9" fill="currentColor" stroke="none"/>
+            </svg>
+          </span>`
+        : '';
+    }
+    meta.innerHTML = projectHtml + planBadge + createdHtml + renderSessionBadges(merged, { sidechain: true, modelPricing: true, skipBranches: true });
 
     Sessions.renderDetailBranches(merged);
   },
@@ -273,9 +454,10 @@ const Sessions = {
     if (!branches.length) {
       branches = Array.from(new Set([s.gitBranch, s.lastGitBranch].filter(Boolean)));
     }
+    const wrap = document.getElementById('session-detail-branches-wrap');
     if (!branches.length) {
       el.innerHTML = '';
-      el.style.display = 'none';
+      if (wrap) wrap.style.display = 'none';
       return;
     }
     const parts = [];
@@ -284,7 +466,7 @@ const Sessions = {
       parts.push(`<span class="session-branch">${escapeHtml(b)}</span>`);
     });
     el.innerHTML = parts.join('');
-    el.style.display = '';
+    if (wrap) wrap.style.display = 'flex';
   },
 
   async loadDetail(slug, sessionId, info) {
@@ -297,7 +479,6 @@ const Sessions = {
     Sessions._detailInfo = info || {};
     Sessions._detailHasPlan = false;
     Sessions.renderDetailMeta(null);
-    Sessions.annotateDetailPlan();
 
     const idValue = document.getElementById('session-detail-id-value');
     if (idValue) {
@@ -306,6 +487,7 @@ const Sessions = {
     }
 
     Sessions.detailState = { slug, sessionId, offset: 0, loading: false, hasMore: false, total: 0 };
+    Sessions._pendingFlash = undefined;
     container.innerHTML = '';
 
     // Reset search
@@ -342,6 +524,7 @@ const Sessions = {
     Sessions.applyConversationHiddenState();
     Sessions.applyToolDetailsState();
     if (!Sessions.isConversationHidden()) Sessions.startAutoRefresh();
+    Sessions.startCtxPolling();
   },
 
   startAutoRefresh() {
@@ -354,9 +537,18 @@ const Sessions = {
     }
   },
 
+  startCtxPolling() {
+    if (Sessions._ctxTimer) { clearInterval(Sessions._ctxTimer); Sessions._ctxTimer = null; }
+    Sessions._ctxTimer = setInterval(() => {
+      const { slug, sessionId } = Sessions.detailState;
+      if (slug && sessionId) Sessions.pollContext(slug, sessionId);
+    }, Sessions.refreshIntervalMs());
+  },
+
   stopAutoRefresh() {
     Sessions._stopDiscovery();
     if (Sessions._refreshTimer) { clearInterval(Sessions._refreshTimer); Sessions._refreshTimer = null; }
+    if (Sessions._ctxTimer) { clearInterval(Sessions._ctxTimer); Sessions._ctxTimer = null; }
     if (typeof setFooterStatus === 'function') setFooterStatus('Idle', false);
   },
 
@@ -409,7 +601,10 @@ const Sessions = {
       const data = await api(`/api/projects/${slugAtStart}/sessions/${sessionAtStart}?offset=0&limit=20`);
       if (state.slug !== slugAtStart || state.sessionId !== sessionAtStart) return;
 
-      if (data.stats) Sessions.renderDetailMeta(data.stats);
+      if (data.stats) {
+        Sessions.renderDetailMeta(data.stats);
+        Sessions.annotateDetailPlan(data.stats);
+      }
 
       if (typeof data.total !== 'number' || data.total <= state.total) return;
 
@@ -426,8 +621,6 @@ const Sessions = {
 
       Sessions.updateMessageCount();
     } catch (_) { /* silent — transient network error */ }
-
-    Sessions.pollContext(slugAtStart, sessionAtStart);
   },
 
   scrollContainer() {
@@ -490,7 +683,10 @@ const Sessions = {
       state.hasMore = data.hasMore;
       state.offset += data.messages.length;
 
-      if (data.stats) Sessions.renderDetailMeta(data.stats);
+      if (data.stats) {
+        Sessions.renderDetailMeta(data.stats);
+        Sessions.annotateDetailPlan(data.stats);
+      }
 
       const html = data.messages.map(m => Sessions.renderMessage(m)).join('');
       container.insertAdjacentHTML('beforeend', html);
@@ -680,6 +876,28 @@ const Sessions = {
     msgs.style.display = isFC ? 'none' : '';
     fcBtn.classList.toggle('active', isFC);
     cvBtn.classList.toggle('active', !isFC);
+    if (isFC && Sessions._pendingFlash !== undefined) {
+      const pending = Sessions._pendingFlash;
+      Sessions._pendingFlash = undefined;
+      Sessions._flashItems(ctx, pending);
+    }
+  },
+
+  _rerenderPlans() {
+    const slug = Sessions._searchSlug;
+    const projectView = document.getElementById('view-project-detail');
+    if (slug && Sessions.cache[slug] && projectView && projectView.classList.contains('active') && !Sessions._lastQuery) {
+      Sessions.rerenderWithFilter();
+      return;
+    }
+    const ids = Sessions._planSessionIds;
+    if (!ids || !ids.size) return;
+    for (const sessionId of ids) {
+      const card = document.querySelector(`.session-card[data-session-id="${sessionId}"]`);
+      if (!card || card.querySelector('.session-plan-badge')) continue;
+      const meta = card.querySelector('.session-meta');
+      if (meta) meta.insertAdjacentHTML('afterbegin', '<span class="session-plan-badge" title="Plans were active during this session">plan</span>');
+    }
   },
 
 };

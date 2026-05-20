@@ -103,6 +103,20 @@ body {
 .app.sidebar-collapsed .nav-item {
   justify-content: center;
   padding: 9px 0;
+  position: relative;
+}
+
+.app.sidebar-collapsed .nav-item .badge.badge-active {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  margin: 0;
+  border-radius: 50%;
+  font-size: 0;
+  min-width: unset;
 }
 
 .app.sidebar-collapsed .nav-section-title {
@@ -1436,6 +1450,26 @@ mark.search-highlight {
   border-radius: var(--radius-sm);
 }
 
+.dashboard-project-group {
+  margin-bottom: 24px;
+}
+
+.dashboard-project-group-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 6px 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dashboard-project-group-header:hover {
+  color: var(--text);
+}
+
 .session-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
@@ -1588,6 +1622,111 @@ mark.search-highlight {
   margin-bottom: 4px;
 }
 
+.session-group {
+  margin-bottom: 10px;
+}
+
+.session-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius) var(--radius) 0 0;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s;
+}
+
+.session-group-header:hover {
+  border-color: var(--border-light);
+  border-left-color: var(--accent);
+}
+
+.session-group-type-branch .session-group-header {
+  border-left-color: var(--text-secondary);
+}
+
+.session-group-type-temporal .session-group-header {
+  border-left-color: var(--text-muted);
+}
+
+.session-group-arrow {
+  color: var(--text-muted);
+  font-size: 9px;
+  width: 10px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.session-group-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.session-group-type-branch .session-group-label,
+.session-group-type-temporal .session-group-label {
+  color: var(--text-secondary);
+}
+
+.session-group-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-hover);
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+
+.session-group-date {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.session-group-body {
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  overflow: hidden;
+}
+
+.session-group-body.collapsed {
+  display: none;
+}
+
+.session-group-body .session-card {
+  border-radius: 0;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+}
+
+.session-group-body > *:last-child {
+  border-bottom: none;
+}
+
+.session-gap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 16px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.session-gap::before,
+.session-gap::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
 .session-id-label {
   font-size: 11px;
   text-transform: uppercase;
@@ -1652,6 +1791,12 @@ mark.search-highlight {
   padding: 4px;
 }
 
+#footer-git .action-menu-panel {
+  top: auto;
+  bottom: calc(100% + 4px);
+  z-index: 200;
+}
+
 .action-menu-panel.open {
   display: block;
 }
@@ -1713,6 +1858,17 @@ mark.search-highlight {
   color: var(--warning);
   padding: 2px 8px;
   border-radius: 10px;
+}
+
+.session-skill {
+  display: inline-block;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  background: rgba(56, 189, 148, 0.12);
+  color: #3dba93;
+  padding: 1px 7px;
+  border-radius: 10px;
+  margin-right: 4px;
 }
 
 /* --- Chat / Session Messages --- */
@@ -2936,7 +3092,7 @@ mark.search-highlight {
   border-radius: 4px;
   transition: background 0.1s;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
 }
 
@@ -2947,8 +3103,22 @@ mark.search-highlight {
 .ctx-file-name {
   flex: 1;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ctx-file-group {
+  margin-bottom: 4px;
+}
+
+.ctx-file-group-header {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 8px 2px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
 }
 
 .ctx-file-badge {
@@ -2960,6 +3130,7 @@ mark.search-highlight {
   border-radius: 3px;
   font-weight: 600;
   flex-shrink: 0;
+  margin-top: 1px;
 }
 
 .ctx-file-badge-new {
@@ -2975,6 +3146,46 @@ mark.search-highlight {
 .ctx-file-badge-edited {
   background: rgba(56, 139, 253, 0.15);
   color: #58a6ff;
+}
+
+@keyframes ctx-file-flash {
+  0%   { background: rgba(56, 139, 253, 0.45); }
+  30%  { background: rgba(56, 139, 253, 0.3); }
+  100% { background: transparent; }
+}
+
+.ctx-file-flash {
+  animation: ctx-file-flash 2.5s ease-out;
+}
+
+.git-file-badge {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.git-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+.git-icon-btn:hover {
+  color: var(--text-primary);
+}
+
+.git-count-badge {
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--accent, #58a6ff);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0 5px;
+  line-height: 16px;
+  min-width: 16px;
+  text-align: center;
 }
 
 .ctx-file-deleted .ctx-file-name {
@@ -3028,6 +3239,29 @@ mark.search-highlight {
   vertical-align: middle;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.session-project-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  margin-right: 8px;
+  vertical-align: middle;
+  cursor: pointer;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-project-chip:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
 }
 
 /* --- Diff View --- */

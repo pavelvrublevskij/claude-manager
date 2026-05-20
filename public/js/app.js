@@ -20,6 +20,17 @@ const App = {
       if (btn) btn.textContent = '›';
     }
 
+    // Immediately switch view container to prevent dashboard flash during Projects.load()
+    const _hash = window.location.hash.slice(1);
+    if (_hash) {
+      const _viewName = _hash.split('/')[0];
+      const _viewEl = document.getElementById('view-' + _viewName);
+      if (_viewEl) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        _viewEl.classList.add('active');
+      }
+    }
+
     // Load projects first (needed for sidebar nav and routing)
     Projects.load().then(() => {
       // Restore route from hash or default to settings
@@ -28,6 +39,15 @@ const App = {
 
     // Listen for back/forward
     window.addEventListener('hashchange', () => App.restoreRoute());
+
+    // Intercept keyboard refresh shortcuts — handle in-app instead of reloading
+    window.addEventListener('keydown', e => {
+      const isRefresh = e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key === 'r');
+      if (isRefresh) {
+        e.preventDefault();
+        App.restoreRoute();
+      }
+    });
 
     if (typeof ActiveCount !== 'undefined') ActiveCount.start();
   },
@@ -62,10 +82,16 @@ const App = {
     const sessionId = parts[2] || null;
 
     if (view === 'session-detail' && slug && sessionId) {
-      // Find session info from cache if available
       const sessions = Sessions.cache[slug] || [];
       const info = sessions.find(s => s.sessionId === sessionId);
-      App.navigate('session-detail', { slug, sessionId, sessionInfo: info }, true);
+      if (info) {
+        App.navigate('session-detail', { slug, sessionId, sessionInfo: info }, true);
+      } else {
+        Sessions.load(slug).then(() => {
+          const loaded = (Sessions.cache[slug] || []).find(s => s.sessionId === sessionId);
+          App.navigate('session-detail', { slug, sessionId, sessionInfo: loaded }, true);
+        });
+      }
     } else if (view === 'project-detail' && slug) {
       App.navigate(view, { slug }, true);
     } else {
@@ -128,20 +154,27 @@ const App = {
 
     if (simpleViews[view]) {
       document.getElementById('view-' + view).classList.add('active');
+      if (typeof GitActions !== 'undefined') GitActions.reset();
       simpleViews[view]();
     } else if (view === 'project-detail') {
       document.getElementById('view-project-detail').classList.add('active');
       App.currentProject = opts.slug;
+      const _proj = Projects.data.find(p => p.slug === opts.slug);
+      const _titleEl = document.getElementById('project-detail-title');
+      if (_titleEl) _titleEl.textContent = decodeName(opts.slug);
+      const _pathEl = document.getElementById('project-detail-path');
+      if (_pathEl && _proj) {
+        _pathEl.textContent = _proj.path;
+        _pathEl.classList.add('clickable-path');
+        _pathEl.title = 'Open folder in file explorer';
+        _pathEl.onclick = () => Projects.openFolder(opts.slug);
+      }
       ProjectNav.expand();
-      const landOnSessions = previousView === 'session-detail';
-      const activeTabId = landOnSessions ? 'tab-sessions' : 'tab-memory';
-      const activeBtnId = landOnSessions ? 'sessions-tab-btn' : 'memory-tab-btn';
       document.querySelectorAll('.project-tab').forEach(t => t.classList.remove('active'));
-      document.getElementById(activeTabId).classList.add('active');
+      document.getElementById('tab-sessions').classList.add('active');
       document.querySelectorAll('#view-project-detail .tab-btn').forEach(b => b.classList.remove('active'));
-      document.getElementById(activeBtnId).classList.add('active');
-      if (landOnSessions) Sessions.load(opts.slug);
-      else Memory.load(opts.slug);
+      document.getElementById('sessions-tab-btn').classList.add('active');
+      Sessions.load(opts.slug);
       // Show counts on tabs
       const project = Projects.data.find(p => p.slug === opts.slug);
       const memoryTabBtn = document.getElementById('memory-tab-btn');
@@ -167,6 +200,7 @@ const App = {
       }
       // Load per-project token usage in header
       ProjectUsage.load(opts.slug);
+      if (typeof GitActions !== 'undefined') GitActions.init(opts.slug);
       // Highlight in sidebar
       document.querySelectorAll('.project-list .nav-item').forEach(el => {
         el.classList.toggle('active', el.dataset.slug === opts.slug);
@@ -175,6 +209,7 @@ const App = {
       document.getElementById('view-session-detail').classList.add('active');
       App.currentProject = opts.slug;
       Sessions.loadDetail(opts.slug, opts.sessionId, opts.sessionInfo);
+      if (typeof GitActions !== 'undefined') GitActions.init(opts.slug);
     }
 
     // Update URL hash
