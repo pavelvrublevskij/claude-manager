@@ -20,6 +20,17 @@ const App = {
       if (btn) btn.textContent = '›';
     }
 
+    // Immediately switch view container to prevent dashboard flash during Projects.load()
+    const _hash = window.location.hash.slice(1);
+    if (_hash) {
+      const _viewName = _hash.split('/')[0];
+      const _viewEl = document.getElementById('view-' + _viewName);
+      if (_viewEl) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        _viewEl.classList.add('active');
+      }
+    }
+
     // Load projects first (needed for sidebar nav and routing)
     Projects.load().then(() => {
       // Restore route from hash or default to settings
@@ -28,6 +39,15 @@ const App = {
 
     // Listen for back/forward
     window.addEventListener('hashchange', () => App.restoreRoute());
+
+    // Intercept keyboard refresh shortcuts — handle in-app instead of reloading
+    window.addEventListener('keydown', e => {
+      const isRefresh = e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key === 'r');
+      if (isRefresh) {
+        e.preventDefault();
+        App.restoreRoute();
+      }
+    });
 
     if (typeof ActiveCount !== 'undefined') ActiveCount.start();
   },
@@ -62,10 +82,16 @@ const App = {
     const sessionId = parts[2] || null;
 
     if (view === 'session-detail' && slug && sessionId) {
-      // Find session info from cache if available
       const sessions = Sessions.cache[slug] || [];
       const info = sessions.find(s => s.sessionId === sessionId);
-      App.navigate('session-detail', { slug, sessionId, sessionInfo: info }, true);
+      if (info) {
+        App.navigate('session-detail', { slug, sessionId, sessionInfo: info }, true);
+      } else {
+        Sessions.load(slug).then(() => {
+          const loaded = (Sessions.cache[slug] || []).find(s => s.sessionId === sessionId);
+          App.navigate('session-detail', { slug, sessionId, sessionInfo: loaded }, true);
+        });
+      }
     } else if (view === 'project-detail' && slug) {
       App.navigate(view, { slug }, true);
     } else {

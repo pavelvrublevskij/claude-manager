@@ -25,12 +25,13 @@ const GitActions = {
     if (footer) { footer.innerHTML = ''; footer.style.display = 'none'; }
   },
 
-  _menuHtml() {
+  _menuHtml(branch) {
     const count = (GitActions._info.files || []).length;
     const countBadge = count > 0 ? `<span class="git-count-badge">${count}</span>` : '';
+    const branchLabel = branch ? `<span>${escapeHtml(branch)}</span>` : '';
     const icon = `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="display:inline-block;vertical-align:middle"><path d="M5 3.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm0 2.122a2.25 2.25 0 1 0-1.5 0v.878A2.25 2.25 0 0 0 5.75 8.5h1.5v2.128a2.251 2.251 0 1 0 1.5 0V8.5h1.5a2.25 2.25 0 0 0 2.25-2.25v-.878a2.25 2.25 0 1 0-1.5 0v.878a.75.75 0 0 1-.75.75h-4.5A.75.75 0 0 1 5 6.25v-.878zm3.75 7.378a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm3-8.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0z"/></svg>`;
     return `<div class="action-menu">
-        <button class="btn btn-sm git-icon-btn" title="Git actions" onclick="event.stopPropagation(); GitActions.toggleMenu(this)">${icon}${countBadge}</button>
+        <button class="btn btn-sm git-icon-btn" title="Git actions" onclick="event.stopPropagation(); GitActions.toggleMenu(this)">${icon}${branchLabel}${countBadge}</button>
         <div class="action-menu-panel">
           <button class="action-menu-item" onclick="event.stopPropagation(); GitActions.openCommitModal(false)">Commit</button>
           <button class="action-menu-item" onclick="event.stopPropagation(); GitActions.push()">Push</button>
@@ -41,14 +42,11 @@ const GitActions = {
 
   _render() {
     if (!GitActions._info || !GitActions._info.available) return;
-    const menu = GitActions._menuHtml();
+    const branch = GitActions._info.branch;
+    const menu = GitActions._menuHtml(branch);
     const footer = document.getElementById('footer-git');
     if (footer) {
-      const branch = GitActions._info.branch;
-      const branchHtml = branch
-        ? `<span style="display:inline-flex;align-items:center;gap:4px"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm0 2.122a2.25 2.25 0 1 0-1.5 0v.878A2.25 2.25 0 0 0 5.75 8.5h1.5v2.128a2.251 2.251 0 1 0 1.5 0V8.5h1.5a2.25 2.25 0 0 0 2.25-2.25v-.878a2.25 2.25 0 1 0-1.5 0v.878a.75.75 0 0 1-.75.75h-4.5A.75.75 0 0 1 5 6.25v-.878zm3.75 7.378a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm3-8.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0z"/></svg>${escapeHtml(branch)}</span>`
-        : '';
-      footer.innerHTML = branchHtml + menu;
+      footer.innerHTML = menu;
       footer.style.display = 'flex';
     }
   },

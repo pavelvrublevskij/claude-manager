@@ -79,11 +79,16 @@ router.get('/:sessionId/context', wrapRoute((req, res) => {
           .filter(v => !isNaN(v))
           .sort((a, b) => a - b) : [];
         let isDeleted = false;
+        let mtime = null;
         if (projectDir) {
           const currentFile = path.resolve(projectDir, filePath);
-          isDeleted = !fs.existsSync(currentFile);
+          try {
+            mtime = fs.statSync(currentFile).mtimeMs;
+          } catch (_) {
+            isDeleted = true;
+          }
         }
-        return { path: filePath, hash: info.hash, versions, isNew: info.isNew, isDeleted };
+        return { path: filePath, hash: info.hash, versions, isNew: info.isNew, isDeleted, mtime };
       }).filter(f => f.versions.length > 0 || f.isNew);
     }
   }

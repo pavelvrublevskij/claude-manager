@@ -86,7 +86,7 @@
     <main class="main">
       <div class="update-banner" id="update-banner" style="display:none"></div>
       <!-- Dashboard View -->
-      <div class="view active" id="view-dashboard">
+      <div class="view" id="view-dashboard">
         <div class="view-header">
           <h2>Dashboard</h2>
           <div class="subtitle">Overview of your Claude Code environment</div>
@@ -94,10 +94,22 @@
         <div class="view-body">
           <div class="dashboard-stats" id="dashboard-stats"></div>
           <div id="dashboard-active-wrap" style="display:none">
-            <h3 style="margin:24px 0 12px">Active Sessions</h3>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin:24px 0 12px">
+              <h3 style="margin:0">Active Sessions</h3>
+              <div class="ctx-sort-bar" style="margin:0">
+                <button class="ctx-sort-btn active" id="active-group-recent" onclick="Dashboard.setActiveGrouping('recent')">Recent</button>
+                <button class="ctx-sort-btn" id="active-group-project" onclick="Dashboard.setActiveGrouping('project')">By Project</button>
+              </div>
+            </div>
             <div id="dashboard-active-sessions"></div>
           </div>
-          <h3 style="margin:24px 0 12px">Recent Sessions</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin:24px 0 12px">
+            <h3 style="margin:0">Recent Sessions</h3>
+            <div class="ctx-sort-bar" style="margin:0">
+              <button class="ctx-sort-btn active" id="recent-group-recent" onclick="Dashboard.setGrouping('recent')">Recent</button>
+              <button class="ctx-sort-btn" id="recent-group-project" onclick="Dashboard.setGrouping('project')">By Project</button>
+            </div>
+          </div>
           <div id="dashboard-recent-sessions"></div>
         </div>
       </div>
@@ -522,7 +534,10 @@
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
             <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1">
               <button class="btn btn-sm" onclick="Sessions.goBack()">&#8592; Back</button>
-              <h2 id="session-detail-title">Session</h2>
+              <div style="display:flex;align-items:center;gap:6px;min-width:0">
+                <span id="session-detail-remote-icon"></span>
+                <h2 id="session-detail-title" style="margin:0">Session</h2>
+              </div>
               <code class="session-id-value" id="session-detail-id-value" style="display:none"></code>
             </div>
             <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">

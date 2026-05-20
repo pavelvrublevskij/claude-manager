@@ -359,6 +359,7 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
   let userMessageCount = 0;
   let firstPrompt = '';
   let indexSummary = '';
+  let created = null;
   const cachedHasPlan = planCache.get(sessionId);
   let hasPlan = cachedHasPlan === true;
 
@@ -367,7 +368,10 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
       const entry = JSON.parse(line);
       if (entry.isSidechain) isSidechain = true;
       if (entry.type === 'summary' && entry.summary) indexSummary = entry.summary;
-      if (entry.type === 'user') userMessageCount++;
+      if (entry.type === 'user') {
+        userMessageCount++;
+        if (!created && entry.timestamp) created = entry.timestamp;
+      }
       if (entry.type === 'user' && !firstPrompt) {
         const c = entry.message?.content;
         let raw = '';
@@ -448,14 +452,18 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
   const customTitle = getCustomTitle(filePath);
   if (cachedHasPlan === undefined) planCache.set(sessionId, hasPlan);
 
+  const gitBranch = gitBranches[0] || '';
   const stats = {
     messageCount: userMessageCount,
     summary: customTitle || indexSummary || firstPrompt.slice(0, 80) || '',
     firstPrompt,
+    created,
+    gitBranch,
     gitBranches,
     lastGitBranch,
     isSidechain,
-    hasPlan
+    hasPlan,
+    remoteControlled: hasBridgeSession(filePath)
   };
   if (usage) {
     stats.tokens = usage.totals;

@@ -1450,6 +1450,26 @@ mark.search-highlight {
   border-radius: var(--radius-sm);
 }
 
+.dashboard-project-group {
+  margin-bottom: 24px;
+}
+
+.dashboard-project-group-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 6px 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dashboard-project-group-header:hover {
+  color: var(--text);
+}
+
 .session-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
@@ -3072,7 +3092,7 @@ mark.search-highlight {
   border-radius: 4px;
   transition: background 0.1s;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
 }
 
@@ -3083,8 +3103,22 @@ mark.search-highlight {
 .ctx-file-name {
   flex: 1;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ctx-file-group {
+  margin-bottom: 4px;
+}
+
+.ctx-file-group-header {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 8px 2px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
 }
 
 .ctx-file-badge {
@@ -3096,6 +3130,7 @@ mark.search-highlight {
   border-radius: 3px;
   font-weight: 600;
   flex-shrink: 0;
+  margin-top: 1px;
 }
 
 .ctx-file-badge-new {
@@ -3111,6 +3146,16 @@ mark.search-highlight {
 .ctx-file-badge-edited {
   background: rgba(56, 139, 253, 0.15);
   color: #58a6ff;
+}
+
+@keyframes ctx-file-flash {
+  0%   { background: rgba(56, 139, 253, 0.45); }
+  30%  { background: rgba(56, 139, 253, 0.3); }
+  100% { background: transparent; }
+}
+
+.ctx-file-flash {
+  animation: ctx-file-flash 2.5s ease-out;
 }
 
 .git-file-badge {

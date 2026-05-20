@@ -431,6 +431,17 @@ const Sessions = {
     const planBadge = Sessions._detailHasPlan
       ? '<span class="session-plan-badge" title="Plans were active during this session">plan</span>'
       : '';
+    const remoteIconEl = document.getElementById('session-detail-remote-icon');
+    if (remoteIconEl) {
+      remoteIconEl.innerHTML = merged.remoteControlled
+        ? `<span class="session-remote-icon" title="Remote-controlled session">
+            <svg viewBox="0 0 16 16" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3.5 5.5a5 5 0 0 1 9 0"/><path d="M5.5 7.5a2.5 2.5 0 0 1 5 0"/>
+              <circle cx="8" cy="9.5" r="0.9" fill="currentColor" stroke="none"/>
+            </svg>
+          </span>`
+        : '';
+    }
     meta.innerHTML = projectHtml + planBadge + createdHtml + renderSessionBadges(merged, { sidechain: true, modelPricing: true, skipBranches: true });
 
     Sessions.renderDetailBranches(merged);
@@ -476,6 +487,7 @@ const Sessions = {
     }
 
     Sessions.detailState = { slug, sessionId, offset: 0, loading: false, hasMore: false, total: 0 };
+    Sessions._pendingFlash = undefined;
     container.innerHTML = '';
 
     // Reset search
@@ -512,6 +524,7 @@ const Sessions = {
     Sessions.applyConversationHiddenState();
     Sessions.applyToolDetailsState();
     if (!Sessions.isConversationHidden()) Sessions.startAutoRefresh();
+    Sessions.startCtxPolling();
   },
 
   startAutoRefresh() {
@@ -524,9 +537,18 @@ const Sessions = {
     }
   },
 
+  startCtxPolling() {
+    if (Sessions._ctxTimer) { clearInterval(Sessions._ctxTimer); Sessions._ctxTimer = null; }
+    Sessions._ctxTimer = setInterval(() => {
+      const { slug, sessionId } = Sessions.detailState;
+      if (slug && sessionId) Sessions.pollContext(slug, sessionId);
+    }, Sessions.refreshIntervalMs());
+  },
+
   stopAutoRefresh() {
     Sessions._stopDiscovery();
     if (Sessions._refreshTimer) { clearInterval(Sessions._refreshTimer); Sessions._refreshTimer = null; }
+    if (Sessions._ctxTimer) { clearInterval(Sessions._ctxTimer); Sessions._ctxTimer = null; }
     if (typeof setFooterStatus === 'function') setFooterStatus('Idle', false);
   },
 
@@ -599,8 +621,6 @@ const Sessions = {
 
       Sessions.updateMessageCount();
     } catch (_) { /* silent — transient network error */ }
-
-    Sessions.pollContext(slugAtStart, sessionAtStart);
   },
 
   scrollContainer() {
@@ -856,6 +876,11 @@ const Sessions = {
     msgs.style.display = isFC ? 'none' : '';
     fcBtn.classList.toggle('active', isFC);
     cvBtn.classList.toggle('active', !isFC);
+    if (isFC && Sessions._pendingFlash !== undefined) {
+      const pending = Sessions._pendingFlash;
+      Sessions._pendingFlash = undefined;
+      Sessions._flashItems(ctx, pending);
+    }
   },
 
   _rerenderPlans() {

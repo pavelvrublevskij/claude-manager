@@ -1,40 +1,12 @@
 ## v1.1.0
 
-### Project detail
-
-- Project title now shows the decoded project name (e.g. `claude/manager`) and path on navigation
-- Git branch indicator and action button moved to the footer, visible whenever a git-enabled project is active
-- Session branch moved to its own line in the session detail header with a "Session branch:" label
-
-### Git integration
-
-- Git icon button in project and session headers — visible only when the directory is a git repo
-- Dropdown: **Commit**, **Push**, **Commit & Push**
-- Commit opens a modal with branch name, per-file checkboxes, and a commit message field
-- Badge on the icon shows count of uncommitted files
-
-### Period filter
-
-- Added **Yesterday** option to all period selectors (Token Usage and Project detail views)
-
-### Token Usage
-
-- Default period gauge changed from **Month** to **Day** when the "This month" preset is active
-- Filter state is now persisted in `localStorage` — date preset, period gauge, selected models, and selected projects are all restored when you return to the Token Usage view; **Clear all** resets to the same defaults
-
-### Session grouping
-
-- Sessions that share a ticket reference (e.g. `PROJ-123`), a non-main feature branch, or were started within 30 minutes of each other on the same branch are now shown as a collapsible group with a labeled header
-- Day-gap indicators appear between sessions in a group when there is time between them
-- Collapse state is persisted in localStorage per group
-- Groups and ungrouped sessions are interleaved in a single descending-by-date list, so overall sort order is preserved
-
-### Bug fixes
-
-- **Ticket detection in skill invocations**: ticket references passed as command arguments (e.g. `/specify PROJ-123`) were stripped by `normalizePrompt`; they are now included in `firstPrompt` so grouping works correctly
-- **Sort order lost after grouping**: groups were previously rendered before ungrouped sessions regardless of timestamps; now all items are sorted together by most-recent activity
-- **Search wiped by plan annotation**: typing in the search box triggered `annotatePlans`, whose async completion called `rerenderWithFilter` and overwrote the search results; guarded by `_lastQuery` check
-- **Within-group sort direction**: sessions inside a group are now shown newest-first
+- **Git integration** — footer git button (commit / push / commit & push) with file checkboxes, branch name, and uncommitted-file badge; visible only in git repos
+- **Session grouping** — sessions grouped by ticket, branch, or proximity (30 min); collapsible with day-gap indicators; sort order preserved
+- **Dashboard** — Recent/Active sessions toggle between flat and by-project views; remote-controlled sessions show wifi icon
+- **File Changes tab** — files grouped by directory; `.claude/` entries hidden; files flash on load and on each edit during live polling
+- **Token Usage** — filter state persisted in localStorage; Yesterday period added
+- **Session detail** — header restored correctly on page refresh; stale file context from previous session no longer bleeds in
+- **Page refresh flash** — wrong view no longer briefly appears before routing kicks in
 
 ## v1.0.1
 

@@ -273,6 +273,31 @@ test('GET /api/projects/:slug/sessions/:sessionId includes stats for badge rende
   assert.strictEqual(res.body.stats.isSidechain, false);
 });
 
+test('GET /api/projects/:slug/sessions/:sessionId stats.created is first user message timestamp', async () => {
+  const res = await request(app).get(`/api/projects/${SLUG}/sessions/${SESSION_A}`);
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.body.stats.created, '2026-01-01T10:00:00.000Z');
+});
+
+test('GET /api/projects/:slug/sessions/:sessionId stats.remoteControlled is false when no bridge entry', async () => {
+  const res = await request(app).get(`/api/projects/${SLUG}/sessions/${SESSION_A}`);
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.body.stats.remoteControlled, false);
+});
+
+test('GET /api/projects/:slug/sessions/:sessionId stats.remoteControlled is true when JSONL has bridge-session', async () => {
+  const bridgeId = 'bridge-ses-4444-4444-4444-444444444444';
+  const bridgeEntries = [
+    { type: 'bridge-session', timestamp: '2026-01-10T09:00:00.000Z' },
+    { type: 'user', timestamp: '2026-01-10T09:00:01.000Z', message: { content: 'from bridge' } }
+  ];
+  writeJsonl(path.join(PROJECT_DIR, bridgeId + '.jsonl'), bridgeEntries);
+
+  const res = await request(app).get(`/api/projects/${SLUG}/sessions/${bridgeId}`);
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.body.stats.remoteControlled, true);
+});
+
 test('GET /api/projects/:slug/sessions/:sessionId honors offset and limit', async () => {
   const res = await request(app).get(`/api/projects/${SLUG}/sessions/${SESSION_A}`).query({ offset: 1, limit: 2 });
   assert.strictEqual(res.status, 200);

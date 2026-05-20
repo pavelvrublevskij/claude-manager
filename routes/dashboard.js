@@ -8,6 +8,7 @@ const { buildIndex, calcCostMultiModel } = require('../lib/usage-index');
 const { getCustomTitle } = require('../lib/session-title');
 const { collectBranches } = require('../lib/session-branches');
 const { stampActive, listAllActiveSessions } = require('../lib/session-status');
+const { hasBridgeSession } = require('../lib/session-flags');
 const planCache = require('../lib/plan-cache');
 
 const PLANS_DIR = path.join(CLAUDE_DIR, 'plans');
@@ -106,7 +107,8 @@ router.get('/', wrapRoute(async (req, res) => {
             gitBranch: e.gitBranch || (gitBranches[0] || ''),
             lastGitBranch: gitBranches[gitBranches.length - 1] || '',
             gitBranches,
-            hasPlan: fileHasPlan(e.sessionId, filePath, planStems)
+            hasPlan: fileHasPlan(e.sessionId, filePath, planStems),
+            remoteControlled: hasBridgeSession(filePath)
           });
         }
       } catch (_) { /* malformed index */ }
@@ -162,7 +164,8 @@ router.get('/', wrapRoute(async (req, res) => {
                 gitBranch,
                 lastGitBranch,
                 gitBranches,
-                hasPlan: fileHasPlan(f.replace('.jsonl', ''), filePath, planStems)
+                hasPlan: fileHasPlan(f.replace('.jsonl', ''), filePath, planStems),
+                remoteControlled: hasBridgeSession(filePath)
               });
             }
           } catch (_) { /* unreadable file */ }
