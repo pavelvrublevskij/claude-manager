@@ -327,7 +327,7 @@ const Sessions = {
     } catch (e) {
       toast('Search failed', 'error');
     }
-  }, 300),
+  }, 500),
 
   open(slug, sessionId, index) {
     Sessions.stopAutoRefresh();
@@ -491,6 +491,7 @@ const Sessions = {
     container.innerHTML = '';
 
     // Reset search
+    Sessions._detailSearchQuery = '';
     const searchInput = document.getElementById('session-detail-search-input');
     if (searchInput) searchInput.value = '';
     const countEl = document.getElementById('session-detail-search-count');
@@ -673,6 +674,8 @@ const Sessions = {
     try {
       const data = await api(`/api/projects/${state.slug}/sessions/${state.sessionId}?offset=${state.offset}&limit=20`);
       loader.remove();
+
+      if (Sessions.detailState !== state) return;
 
       if (data.total === 0 && state.offset === 0) {
         container.innerHTML = '<div class="empty-state"><p>No messages in this session</p></div>';
