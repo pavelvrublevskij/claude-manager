@@ -26,6 +26,31 @@ before(() => {
     }
   });
   fs.writeFileSync(path.join(projDir, sessionId + '.jsonl'), line + '\n');
+
+  // Seed a session with duplicate requestIds to test deduplication.
+  // Claude Code splits one API response into multiple JSONL entries (thinking,
+  // text, tool_use blocks) each sharing the same requestId and identical usage.
+  // Only one entry per requestId should be counted.
+  const dedupSlug = 'usage-proj-dedup';
+  const dedupDir = path.join(paths.PROJECTS_DIR, dedupSlug);
+  fs.mkdirSync(dedupDir, { recursive: true });
+  const makeEntry = (requestId, contentType) => JSON.stringify({
+    type: 'assistant',
+    requestId,
+    timestamp: '2026-03-01T10:00:00Z',
+    message: {
+      model: 'claude-sonnet-4-6',
+      content: [{ type: contentType }],
+      usage: { input_tokens: 100, output_tokens: 50, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }
+    }
+  });
+  const dedupLines = [
+    makeEntry('req-aaa', 'thinking'),  // \
+    makeEntry('req-aaa', 'text'),      //  } same API call — only count once
+    makeEntry('req-aaa', 'tool_use'),  // /
+    makeEntry('req-bbb', 'text'),      // different API call — count separately
+  ];
+  fs.writeFileSync(path.join(dedupDir, 'sess-dedup.jsonl'), dedupLines.join('\n') + '\n');
 });
 
 test('GET /api/usage/summary returns aggregated shape', async () => {
@@ -113,6 +138,16 @@ test('GET /api/usage/by-period?group=hour returns hourly buckets', async () => {
   const hourEntry = res.body.periods.find(p => p.label === '2026-03-01 12:00');
   assert.ok(hourEntry, 'hourly label from seeded session should exist');
   assert.ok(hourEntry.input_tokens >= 100);
+});
+
+test('usage indexer deduplicates entries sharing the same requestId', async () => {
+  const res = await request(app).get('/api/usage/project/usage-proj-dedup');
+  assert.strictEqual(res.status, 200);
+  // 3 entries share req-aaa (input=100, output=50 each) + 1 entry req-bbb (same values).
+  // Without dedup: 4 × 100 = 400 input, 4 × 50 = 200 output.
+  // With dedup: 2 unique requestIds × 100 = 200 input, 2 × 50 = 100 output.
+  assert.strictEqual(res.body.totals.input_tokens, 200);
+  assert.strictEqual(res.body.totals.output_tokens, 100);
 });
 
 test('GET /api/usage/summary with fromTime/toTime filters by hour', async () => {

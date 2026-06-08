@@ -1,3 +1,9 @@
+## v1.1.2
+
+### Bug fixes
+
+- **Token/cost calculation over-counting** — Claude Code splits a single API response into multiple JSONL entries (one per content block: thinking, text, tool_use), each carrying identical usage data and the same `requestId`. The usage indexer now deduplicates by `requestId`, counting each API call only once. Previously, sessions with extended thinking or mixed content types reported 2–3× the real token count and cost.
+
 ## v1.1.1
 
 ### Features
