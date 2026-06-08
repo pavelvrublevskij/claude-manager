@@ -17,14 +17,14 @@ const FileHistory = {
       else { params.set('version', String(version)); }
       const hashSeg = isNew ? 'none' : encodeURIComponent(hash);
       const result = await api(`/api/file-history/${encodeURIComponent(sessionId)}/${hashSeg}/diff-current?${params.toString()}`);
-      FileHistory.renderDiff(overlay.querySelector('#fh-diff-body'), result);
+      FileHistory.renderDiff(overlay.querySelector('#fh-diff-body'), result, filePath);
     } catch (e) {
       overlay.querySelector('#fh-diff-body').innerHTML =
         `<div class="empty-state"><p>Could not load diff: ${escapeHtml(e.message)}</p></div>`;
     }
   },
 
-  renderDiff(container, result) {
+  renderDiff(container, result, filePath) {
     if (result.tooLarge) { container.innerHTML = '<div class="empty-state"><p>File too large to diff (&gt;5000 lines)</p></div>'; return; }
     if (!result.hunks.length) { container.innerHTML = '<div class="empty-state"><p>No differences found</p></div>'; return; }
 
@@ -42,6 +42,31 @@ const FileHistory = {
         }).join('')
     ).join('<div class="diff-separator"></div>');
 
-    container.innerHTML = stats + `<div class="diff-view">${hunks}</div>`;
+    const diffHtml = stats + `<div class="diff-view">${hunks}</div>`;
+
+    const isMd = filePath && filePath.toLowerCase().endsWith('.md') && result.currentText;
+    if (!isMd) {
+      container.innerHTML = diffHtml;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="md-view-toggle">
+        <button class="md-toggle-btn active" onclick="FileHistory._showMdPane('preview')">Preview</button>
+        <button class="md-toggle-btn" onclick="FileHistory._showMdPane('diff')">Diff</button>
+      </div>
+      <div id="fh-md-preview" class="md-preview-pane markdown-body">${renderMarkdown(result.currentText)}</div>
+      <div id="fh-diff-pane" style="display:none">${diffHtml}</div>
+    `;
+  },
+
+  _showMdPane(which) {
+    const preview = document.getElementById('fh-md-preview');
+    const diff = document.getElementById('fh-diff-pane');
+    const btns = preview.closest('#fh-diff-body').querySelectorAll('.md-toggle-btn');
+    const isPreview = which === 'preview';
+    preview.style.display = isPreview ? '' : 'none';
+    diff.style.display = isPreview ? 'none' : '';
+    btns.forEach((b, i) => b.classList.toggle('active', isPreview ? i === 0 : i === 1));
   }
 };

@@ -1,3 +1,17 @@
+## v1.1.1
+
+### Features
+
+- **Markdown preview in File Changes** — `.md` files now open in a rendered Preview by default; a **Preview / Diff** toggle lets you switch to the raw diff view at any time
+- **Markdown table styling** — tables in the preview pane render as proper grids with borders, header background, and alternating row shading
+
+### Bug fixes
+
+- **Search debounce** — session list and session detail search now wait 500 ms after the last keystroke before firing; previously 300 ms / 250 ms caused requests on nearly every character
+- **Session detail stale messages** — `loadMore` race condition could insert a previous session's messages into the new one; bails out if `detailState` changed while fetch was in-flight
+- **Session detail stale search filter** — `_detailSearchQuery` was not reset on session open, causing the previous search term to filter the new session's messages
+- **Markdown checkbox rendering** — checked task-list items (`- [x]`) now show a filled accent checkbox; the global `:disabled` background override no longer hides the `:checked` state
+
 ## v1.1.0
 
 - **Git integration** — footer git button (commit / push / commit & push) with file checkboxes, branch name, and uncommitted-file badge; visible only in git repos

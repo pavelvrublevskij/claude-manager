@@ -670,6 +670,10 @@ body {
 .markdown-body a:hover { text-decoration: underline; }
 .markdown-body strong { color: var(--text-primary); }
 .markdown-body hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+.markdown-body table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 12px; }
+.markdown-body th, .markdown-body td { border: 1px solid var(--border); padding: 6px 12px; text-align: left; }
+.markdown-body th { background: var(--bg-tertiary); font-weight: 600; color: var(--text-primary); }
+.markdown-body tr:nth-child(even) td { background: var(--bg-secondary); }
 
 /* --- Buttons --- */
 
@@ -916,6 +920,10 @@ input[type="checkbox"]:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   background: var(--bg-secondary);
+}
+input[type="checkbox"]:checked:disabled {
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 label {
@@ -3331,4 +3339,39 @@ mark.search-highlight {
   background: var(--bg);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
+}
+
+.md-view-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.md-toggle-btn {
+  padding: 2px 12px;
+  font-size: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.1s, color 0.1s;
+}
+
+.md-toggle-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.md-toggle-btn.active {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.md-preview-pane {
+  padding: 4px 8px;
+  max-height: 60vh;
+  overflow-y: auto;
+  line-height: 1.6;
 }

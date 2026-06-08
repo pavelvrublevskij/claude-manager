@@ -55,7 +55,7 @@ Object.assign(Sessions, {
       if (Sessions._detailSearchQuery !== q) return;
     }
     Sessions.applyDetailFilter(q);
-  }, 250),
+  }, 500),
 
   async loadAllMessages() {
     while (Sessions.detailState.hasMore && !Sessions.detailState.loading) {

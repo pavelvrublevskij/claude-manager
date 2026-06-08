@@ -167,7 +167,7 @@ router.get('/:sessionId/:hash/diff-current', wrapRoute((req, res) => {
   }
 
   const newText = currentExists ? fs.readFileSync(currentFile, 'utf-8') : '';
-  res.json(computeDiff(oldText, newText));
+  res.json({ ...computeDiff(oldText, newText), currentText: newText });
 }));
 
 function computeDiff(oldText, newText) {
