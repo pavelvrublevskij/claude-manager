@@ -1,3 +1,17 @@
+## v1.2.0
+
+### Features
+
+- **Session Activity tab** — a third tab in the session detail view (next to File Changes and Conversation) showing every tool call Claude made during the session: shell commands, file operations, web fetches, searches, and sub-agents spawned. Filter by category with the top bar; click any expandable row to see the full command, path, or URL; click WebFetch URLs to open them in a new browser tab.
+- **Sub-agent visibility** — tool calls from sub-agents (spawned via the `Agent` or `Workflow` tool) are included and grouped under collapsible headers showing the agent's task description. Each group shows the number of tool calls made by that agent.
+- **Live activity refresh** — when a session is active, the Activity tab silently re-fetches and updates alongside the Conversation auto-refresh.
+
+### Bug fixes
+
+- **Conversation table rendering** — markdown tables in assistant messages now render as styled grids with borders, header background, and alternating rows
+- **Session messages resize** — chat container no longer has a max-width cap; messages fill the full panel width as the terminal splitter is dragged; panel enforces a 400 px minimum so messages never collapse below a readable width; terminal pane is CSS-capped to prevent overflow
+- **Session search bar width** — search input in the conversation header now fills the available width (a `width: auto` override was preventing `width: 100%` from taking effect)
+
 ## v1.1.3
 
 ### Bug fixes
