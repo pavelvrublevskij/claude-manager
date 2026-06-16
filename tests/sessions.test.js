@@ -559,3 +559,28 @@ test('GET /api/projects/:slug/sessions/:sessionId/activity returns 400 for inval
   const res = await request(app).get('/api/projects/bad..slug/sessions/any/activity');
   assert.strictEqual(res.status, 400);
 });
+
+test('GET /api/projects/active returns active sessions with titles', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  activeSessions._reset();
+  activeSessions.register(SLUG, SESSION_A, 'os-terminal');
+
+  const res = await request(app).get('/api/projects/active');
+  assert.strictEqual(res.status, 200);
+  assert.ok(Array.isArray(res.body));
+  const entry = res.body.find(s => s.slug === SLUG && s.sessionId === SESSION_A);
+  assert.ok(entry, 'active session should be present');
+  assert.strictEqual(entry.kind, 'os');
+  assert.ok(typeof entry.title === 'string');
+
+  activeSessions._reset();
+});
+
+test('GET /api/projects/active returns empty when no active sessions', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  activeSessions._reset();
+
+  const res = await request(app).get('/api/projects/active');
+  assert.strictEqual(res.status, 200);
+  assert.deepStrictEqual(res.body, []);
+});

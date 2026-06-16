@@ -886,6 +886,7 @@ const Sessions = {
       await Sessions.checkPricing();
       await api(`/api/projects/${slug}/sessions/new`, { method: 'POST' });
       toast('New session opened');
+      if (typeof ActiveSessionsBar !== 'undefined') ActiveSessionsBar.poll();
     } catch (e) {
       toast('Failed to open terminal: ' + e.message, 'error');
     }
@@ -918,6 +919,7 @@ const Sessions = {
         TerminalPanel.close();
       }
       toast('Terminal opened with session');
+      if (typeof ActiveSessionsBar !== 'undefined') ActiveSessionsBar.poll();
     } catch (e) {
       toast('Failed to open terminal: ' + e.message, 'error');
     }

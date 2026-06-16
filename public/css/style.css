@@ -108,15 +108,18 @@ body {
 
 .app.sidebar-collapsed .nav-item .badge.badge-active {
   position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 7px;
-  height: 7px;
-  padding: 0;
+  top: 4px;
+  right: 4px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
   margin: 0;
-  border-radius: 50%;
-  font-size: 0;
-  min-width: unset;
+  border-radius: 8px;
+  font-size: 9px;
+  line-height: 15px;
+  text-align: center;
+  background: #2ea043;
+  color: #fff;
 }
 
 .app.sidebar-collapsed .nav-section-title {
@@ -3643,4 +3646,125 @@ mark.search-highlight {
   max-height: 60vh;
   overflow-y: auto;
   line-height: 1.6;
+}
+
+/* --- Active Sessions Bar --- */
+
+.active-sessions-bar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  overflow-x: auto;
+  min-height: 46px;
+}
+
+.asb-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  min-width: 110px;
+  max-width: 170px;
+  flex-shrink: 0;
+  user-select: none;
+  transition: border-color 0.15s;
+}
+
+.asb-pill:hover {
+  border-color: var(--accent);
+}
+
+.asb-pill:active {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+}
+
+.asb-pill--current {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.asb-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.asb-close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 0 0 4px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.asb-pill:hover .asb-close,
+.asb-pill--current .asb-close {
+  opacity: 1;
+}
+
+.asb-close:hover {
+  color: var(--danger, #f85149);
+}
+
+.asb-close--sidebar {
+  margin-left: auto;
+  padding: 0;
+  font-size: 13px;
+  opacity: 0;
+}
+
+.project-active-sub:hover .asb-close--sidebar,
+.project-active-sub.active .asb-close--sidebar {
+  opacity: 1;
+}
+
+.asb-project {
+  font-size: 10px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.asb-session {
+  font-size: 11px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+/* Sidebar active session sub-items */
+
+.project-active-sub {
+  padding-left: 32px !important;
+}
+
+.project-active-sub .nav-label {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app.sidebar-collapsed .project-active-sub {
+  display: none;
 }

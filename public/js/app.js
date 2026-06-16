@@ -50,6 +50,7 @@ const App = {
     });
 
     if (typeof ActiveCount !== 'undefined') ActiveCount.start();
+    if (typeof ActiveSessionsBar !== 'undefined') ActiveSessionsBar.start();
   },
 
   toggleSidebar() {
@@ -122,6 +123,7 @@ const App = {
       if (previousProject && typeof Sessions !== 'undefined' && Sessions.cache) {
         delete Sessions.cache[previousProject];
       }
+      if (typeof ActiveSessionsBar !== 'undefined') { ActiveSessionsBar._render(); ActiveSessionsBar._renderSidebar(); }
     }
 
     // Deactivate all nav items
@@ -210,6 +212,7 @@ const App = {
       App.currentProject = opts.slug;
       Sessions.loadDetail(opts.slug, opts.sessionId, opts.sessionInfo);
       if (typeof GitActions !== 'undefined') GitActions.init(opts.slug);
+      if (typeof ActiveSessionsBar !== 'undefined') { ActiveSessionsBar._render(); ActiveSessionsBar._renderSidebar(); }
     }
 
     // Update URL hash

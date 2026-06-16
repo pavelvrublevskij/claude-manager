@@ -12,7 +12,7 @@ const { collectBranches } = require('../lib/session-branches');
 const { hasBridgeSession } = require('../lib/session-flags');
 const terminalServer = require('../lib/terminal-server');
 const activeSessions = require('../lib/active-sessions');
-const { stampActive } = require('../lib/session-status');
+const { stampActive, listAllActiveSessions } = require('../lib/session-status');
 const { MAX_SNIPPETS, extractEntrySnippets, extractMetaSnippet } = require('../lib/session-search');
 
 const router = express.Router({ mergeParams: true });
@@ -81,6 +81,20 @@ function launchTerminal(projectPath, cmd) {
     throw new Error('No supported terminal found');
   }
 }
+
+router.get('/active', wrapRoute((req, res) => {
+  const all = listAllActiveSessions();
+  const result = all.map(({ slug, sessionId, kind }) => {
+    const dir = safeSlug(slug);
+    let title = '';
+    if (dir) {
+      const filePath = path.join(dir, sessionId + '.jsonl');
+      title = getCustomTitle(filePath) || findFirstMeaningfulPrompt(filePath);
+    }
+    return { slug, sessionId, title: title || '', kind };
+  });
+  res.json(result);
+}));
 
 router.get('/:slug/sessions', wrapRoute((req, res) => {
   const dir = safeSlug(req.params.slug);
@@ -641,6 +655,17 @@ router.post('/:slug/sessions/:sessionId/resume', wrapRoute((req, res) => {
   } catch (e) {
     res.status(500).json({ error: 'Failed to open terminal: ' + e.message });
   }
+}));
+
+router.post('/:slug/sessions/:sessionId/deactivate', wrapRoute((req, res) => {
+  const slug = req.params.slug;
+  const sessionId = req.params.sessionId;
+  if (sessionId.includes('..') || sessionId.includes('/') || sessionId.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid session ID' });
+  }
+  terminalServer.disconnectFor(slug, sessionId, 'Closed by user.');
+  activeSessions.deactivate(slug, sessionId);
+  res.json({ ok: true });
 }));
 
 router.post('/:slug/sessions/:sessionId/rename', wrapRoute((req, res) => {
