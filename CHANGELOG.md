@@ -1,3 +1,11 @@
+## v1.1.3
+
+### Bug fixes
+
+- **Token Usage timezone** — hour-bucketed data and the "Day" period grouping now convert UTC hour keys to local time before labeling and filtering; previously, usage near midnight could appear on the wrong day
+- **Session list date filter** — filter bounds are now compared as timestamps instead of ISO strings, so sessions are no longer incorrectly excluded when `modified` includes a timezone offset
+- **File Changes — new files missing** — files created by a `Write` tool call during a session but never modified again (no backup entry) now appear in the File Changes list
+
 ## v1.1.2
 
 ### Bug fixes

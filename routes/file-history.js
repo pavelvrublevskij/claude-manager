@@ -71,6 +71,31 @@ router.get('/:sessionId/context', wrapRoute((req, res) => {
       }
 
       const projectDir = projSlug ? decodeSlug(projSlug) : null;
+
+      if (projectDir) {
+        const resolvedProjectDir = path.resolve(projectDir);
+        const existingKeys = new Set(Object.keys(fileMap).map(k => k.replace(/\\/g, '/')));
+        for (const line of sessionContent.split('\n')) {
+          if (!line.trim()) continue;
+          try {
+            const obj = JSON.parse(line);
+            if (obj.type !== 'assistant') continue;
+            const content = obj.message && obj.message.content;
+            if (!Array.isArray(content)) continue;
+            for (const block of content) {
+              if (block.type !== 'tool_use' || block.name !== 'Write' || !block.input || !block.input.file_path) continue;
+              const rel = path.relative(resolvedProjectDir, path.resolve(block.input.file_path));
+              if (rel.startsWith('..') || path.isAbsolute(rel)) continue;
+              const relNorm = rel.replace(/\\/g, '/');
+              if (!existingKeys.has(relNorm)) {
+                existingKeys.add(relNorm);
+                fileMap[relNorm] = { hash: null, maxVersion: 0, isNew: true };
+              }
+            }
+          } catch (_) {}
+        }
+      }
+
       const histFiles = fs.readdirSync(histDir);
       files = Object.entries(fileMap).map(([filePath, info]) => {
         const versions = info.hash ? histFiles

@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const request = require('supertest');
 const { app, paths, HOME } = require('./helpers/app');
+const { decodeSlug } = require('../lib/slug');
 
 const SESSION_ID = 'fhtest111-1111-1111-1111-111111111111';
 const PROJ_SLUG = 'fh-test-project';
@@ -251,4 +252,57 @@ test('context: mtime is null and isDeleted=true for files missing from disk', as
   assert.ok(file);
   assert.strictEqual(file.mtime, null);
   assert.strictEqual(file.isDeleted, true);
+});
+
+// ── Write tool scan ───────────────────────────────────────────────────────────
+
+const WRITE_SESSION_ID = 'writetest1-3333-3333-3333-333333333333';
+const WRITE_PROJ_DIR = path.resolve(decodeSlug(PROJ_SLUG));
+const WRITE_FILE_PATH = path.join(WRITE_PROJ_DIR, 'write-created.md');
+
+before(() => {
+  const projDir = path.join(paths.PROJECTS_DIR, PROJ_SLUG);
+
+  const entries = [
+    { type: 'user', timestamp: '2026-03-01T10:00:00.000Z', message: { content: 'write test' } },
+    {
+      type: 'assistant',
+      message: {
+        content: [
+          { type: 'tool_use', id: 'toolu_write', name: 'Write', input: { file_path: WRITE_FILE_PATH, content: '# New File\n' } }
+        ]
+      }
+    }
+  ];
+  fs.writeFileSync(
+    path.join(projDir, WRITE_SESSION_ID + '.jsonl'),
+    entries.map(e => JSON.stringify(e)).join('\n')
+  );
+
+  fs.mkdirSync(path.join(FILE_HISTORY_DIR, WRITE_SESSION_ID), { recursive: true });
+});
+
+test('context: file created via Write tool appears with isNew=true', async () => {
+  const res = await request(app).get(`/api/file-history/${WRITE_SESSION_ID}/context`);
+  assert.strictEqual(res.status, 200);
+  const f = res.body.files.find(f => f.path === 'write-created.md');
+  assert.ok(f, 'file created via Write tool must appear in file changes');
+  assert.strictEqual(f.isNew, true);
+  assert.strictEqual(f.hash, null);
+  assert.deepStrictEqual(f.versions, []);
+});
+
+test('context: Write tool files not in trackedFileBackups are not duplicated', async () => {
+  const res = await request(app).get(`/api/file-history/${WRITE_SESSION_ID}/context`);
+  const matches = res.body.files.filter(f => f.path === 'write-created.md');
+  assert.strictEqual(matches.length, 1, 'must appear exactly once');
+});
+
+test('context: Write file already in snapshot is not overridden with isNew', async () => {
+  // The snapshot entry for '/projects/myapp/src/new-file.js' has backupFileName=null
+  // meaning it was tracked by snapshot (isNew=true from snapshot); a Write tool use
+  // for the same path should not create a duplicate or change the entry.
+  const res = await request(app).get(`/api/file-history/${SESSION_ID}/context`);
+  const matches = res.body.files.filter(f => f.path === '/projects/myapp/src/new-file.js');
+  assert.strictEqual(matches.length, 1, 'snapshot-tracked new file must appear exactly once');
 });

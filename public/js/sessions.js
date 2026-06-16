@@ -171,12 +171,12 @@ const Sessions = {
     const pu = (typeof ProjectUsage !== 'undefined') ? ProjectUsage : {};
     const { fromDate, toDate, fromTime, toTime } = pu;
     if (!fromDate && !toDate) return sessions;
-    const from = fromDate ? fromDate + 'T' + (fromTime || '00:00') : null;
-    const to = toDate ? toDate + 'T' + (toTime || '23:59') : null;
+    const fromMs = fromDate ? new Date(fromDate + 'T' + (fromTime || '00:00') + ':00').getTime() : null;
+    const toMs = toDate ? new Date(toDate + 'T' + (toTime || '23:59') + ':59').getTime() : null;
     return sessions.filter(s => {
-      const dt = (s.modified || '').slice(0, 16);
-      if (from && dt < from) return false;
-      if (to && dt > to) return false;
+      const t = s.modified ? new Date(s.modified).getTime() : 0;
+      if (fromMs && t < fromMs) return false;
+      if (toMs && t > toMs) return false;
       return true;
     });
   },

@@ -92,12 +92,16 @@ test('GET /api/usage/by-period returns periods array', async () => {
   }
 });
 
-test('GET /api/usage/by-period?group=day groups by day', async () => {
+test('GET /api/usage/by-period?group=day groups by local day', async () => {
   const res = await request(app).get('/api/usage/by-period?group=day');
   assert.strictEqual(res.status, 200);
   assert.ok(Array.isArray(res.body.periods));
-  const dayEntry = res.body.periods.find(p => p.label === '2026-03-01');
-  assert.ok(dayEntry, 'day label from seeded session should exist');
+  // Server converts the UTC hour key to local date, so the expected label depends
+  // on the timezone where tests run (2026-03-01T12:00:00Z = local day on that machine).
+  const seededTs = new Date('2026-03-01T12:00:00Z');
+  const localDay = seededTs.getFullYear() + '-' + String(seededTs.getMonth() + 1).padStart(2, '0') + '-' + String(seededTs.getDate()).padStart(2, '0');
+  const dayEntry = res.body.periods.find(p => p.label === localDay);
+  assert.ok(dayEntry, 'day label from seeded session should exist as local date ' + localDay);
 });
 
 test('GET /api/usage/by-project returns projects array', async () => {
@@ -135,8 +139,13 @@ test('GET /api/usage/by-period?group=hour returns hourly buckets', async () => {
   const res = await request(app).get('/api/usage/by-period?group=hour');
   assert.strictEqual(res.status, 200);
   assert.ok(Array.isArray(res.body.periods));
-  const hourEntry = res.body.periods.find(p => p.label === '2026-03-01 12:00');
-  assert.ok(hourEntry, 'hourly label from seeded session should exist');
+  // Server converts UTC hour key to local time, so expected label depends on test machine timezone.
+  const seededTs = new Date('2026-03-01T12:00:00Z');
+  const localDay = seededTs.getFullYear() + '-' + String(seededTs.getMonth() + 1).padStart(2, '0') + '-' + String(seededTs.getDate()).padStart(2, '0');
+  const localHour = String(seededTs.getHours()).padStart(2, '0');
+  const expectedLabel = localDay + ' ' + localHour + ':00';
+  const hourEntry = res.body.periods.find(p => p.label === expectedLabel);
+  assert.ok(hourEntry, 'hourly label from seeded session should exist as local time ' + expectedLabel);
   assert.ok(hourEntry.input_tokens >= 100);
 });
 
@@ -151,11 +160,64 @@ test('usage indexer deduplicates entries sharing the same requestId', async () =
 });
 
 test('GET /api/usage/summary with fromTime/toTime filters by hour', async () => {
-  const inRange = await request(app).get('/api/usage/summary?fromTime=12:00&toTime=12:59');
-  assert.strictEqual(inRange.status, 200);
-  assert.ok(inRange.body.totals.input_tokens >= 100, 'hour 12 is in range');
+  // fromTime/toTime are local hours; server converts UTC hour keys to local before comparing.
+  const seededTs = new Date('2026-03-01T12:00:00Z');
+  const localHour = String(seededTs.getHours()).padStart(2, '0');
+  const nextHour = String((seededTs.getHours() + 1) % 24).padStart(2, '0');
 
-  const outRange = await request(app).get('/api/usage/summary?fromTime=13:00&toTime=23:00');
+  const inRange = await request(app).get(`/api/usage/summary?fromTime=${localHour}:00&toTime=${localHour}:59`);
+  assert.strictEqual(inRange.status, 200);
+  assert.ok(inRange.body.totals.input_tokens >= 100, 'local hour ' + localHour + ' is in range');
+
+  const outRange = await request(app).get(`/api/usage/summary?fromTime=${nextHour}:00&toTime=${nextHour}:59`);
   assert.strictEqual(outRange.status, 200);
-  assert.strictEqual(outRange.body.totals.input_tokens, 0, 'hour 12 excluded');
+  assert.strictEqual(outRange.body.totals.input_tokens, 0, 'local hour ' + localHour + ' excluded when filter is ' + nextHour);
+});
+
+// ── Date range filter tests ───────────────────────────────────────────────────
+// The client converts local dates to UTC before sending (queryParts in date-filter.js).
+// These tests verify the server correctly includes/excludes data based on UTC day keys.
+
+test('summary: from/to filter includes sessions within UTC date range', async () => {
+  const res = await request(app).get('/api/usage/summary?from=2026-03-01&to=2026-03-01');
+  assert.strictEqual(res.status, 200);
+  assert.ok(res.body.totals.input_tokens >= 100, 'session at 2026-03-01T12:00Z should be included');
+  assert.ok(res.body.sessionCount >= 1);
+});
+
+test('summary: from/to filter excludes sessions outside UTC date range', async () => {
+  const res = await request(app).get('/api/usage/summary?from=2026-02-01&to=2026-02-28');
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.body.totals.input_tokens, 0, 'no sessions in February');
+  assert.strictEqual(res.body.sessionCount, 0);
+});
+
+test('summary: from filter alone excludes earlier sessions', async () => {
+  const res = await request(app).get('/api/usage/summary?from=2026-03-02');
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.body.totals.input_tokens, 0, 'session on 2026-03-01 excluded when from=2026-03-02');
+});
+
+test('summary: to filter alone excludes later sessions', async () => {
+  const res = await request(app).get('/api/usage/summary?to=2026-02-28');
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.body.totals.input_tokens, 0, 'session on 2026-03-01 excluded when to=2026-02-28');
+});
+
+test('by-period: date filter excludes out-of-range periods', async () => {
+  const res = await request(app).get('/api/usage/by-period?group=day&from=2026-04-01&to=2026-04-30');
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.body.periods.length, 0, 'no periods in April');
+});
+
+test('by-project: date filter scopes project data', async () => {
+  const inRange = await request(app).get('/api/usage/by-project?from=2026-03-01&to=2026-03-01');
+  assert.strictEqual(inRange.status, 200);
+  const proj = inRange.body.projects.find(p => p.slug === 'usage-proj-gamma');
+  assert.ok(proj, 'project with March session should appear in March filter');
+
+  const outRange = await request(app).get('/api/usage/by-project?from=2026-02-01&to=2026-02-28');
+  assert.strictEqual(outRange.status, 200);
+  const proj2 = outRange.body.projects.find(p => p.slug === 'usage-proj-gamma');
+  assert.ok(!proj2, 'project should not appear for February filter');
 });
