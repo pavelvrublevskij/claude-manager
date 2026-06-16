@@ -477,6 +477,134 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
   res.json({ messages: page, total: messages.length, hasMore: offset + limit < messages.length, stats });
 }));
 
+router.get('/:slug/sessions/:sessionId/activity', wrapRoute((req, res) => {
+  const dir = safeSlug(req.params.slug);
+  if (!dir) return res.status(400).json({ error: 'Invalid slug' });
+
+  const sessionId = req.params.sessionId;
+  if (sessionId.includes('..') || sessionId.includes('/') || sessionId.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid session ID' });
+  }
+
+  const filePath = path.join(dir, sessionId + '.jsonl');
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Session not found' });
+
+  const AGENT_TOOLS = new Set(['Agent', 'Task', 'TaskCreate', 'TaskUpdate', 'TaskGet', 'TaskList', 'TaskStop', 'TaskOutput']);
+  const WEB_TOOLS = new Set(['WebFetch', 'WebSearch']);
+  const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
+  const FILE_TOOLS = new Set(['Read', 'Write', 'Edit', 'MultiEdit', 'Glob', 'Grep', 'NotebookEdit']);
+
+  function getCategory(name) {
+    if (AGENT_TOOLS.has(name)) return 'agent';
+    if (WEB_TOOLS.has(name)) return 'web';
+    if (SHELL_TOOLS.has(name)) return 'shell';
+    if (FILE_TOOLS.has(name)) return 'file';
+    return 'other';
+  }
+
+  function getLabel(name, input) {
+    switch (name) {
+      case 'Bash':
+      case 'PowerShell': return (input.command || '');
+      case 'Read':
+      case 'Write':
+      case 'Edit':
+      case 'MultiEdit': return input.file_path || '';
+      case 'NotebookEdit': return input.notebook_path || '';
+      case 'Glob': return input.pattern || '';
+      case 'Grep': return input.pattern || '';
+      case 'WebFetch': return input.url || '';
+      case 'WebSearch': return input.query || '';
+      case 'Agent': return input.description || (input.prompt || '').slice(0, 200);
+      default: return JSON.stringify(input).slice(0, 200);
+    }
+  }
+
+  function extractAgentLabel(lines) {
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line);
+        if (entry.type !== 'user') continue;
+        const c = entry.message?.content;
+        if (typeof c === 'string' && c.trim()) return c.trim().slice(0, 200);
+        if (Array.isArray(c)) {
+          for (const b of c) {
+            if (b.type === 'text' && b.text?.trim()) return b.text.trim().slice(0, 200);
+          }
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  function collectFromJsonl(jsonlPath, agentId) {
+    const result = [];
+    try {
+      const lines = fs.readFileSync(jsonlPath, 'utf-8').split('\n').filter(Boolean);
+      const agentLabel = agentId ? extractAgentLabel(lines) : null;
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line);
+          if (entry.type !== 'assistant') continue;
+          const content = entry.message?.content;
+          if (!Array.isArray(content)) continue;
+          for (const block of content) {
+            if (block.type !== 'tool_use') continue;
+            result.push({
+              tool: block.name,
+              category: getCategory(block.name),
+              timestamp: entry.timestamp || null,
+              label: getLabel(block.name, block.input || {}),
+              agentId: agentId || null,
+              agentLabel: agentLabel || null
+            });
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+    return result;
+  }
+
+  function collectFromDir(dirPath, maxFiles) {
+    const result = [];
+    let count = 0;
+    function walk(d) {
+      let entries;
+      try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch (_) { return; }
+      for (const e of entries) {
+        if (count >= maxFiles) return;
+        const full = path.join(d, e.name);
+        if (e.isDirectory()) { walk(full); }
+        else if (e.isFile() && e.name.endsWith('.jsonl') && e.name !== 'journal.jsonl') {
+          result.push(...collectFromJsonl(full, e.name.replace('.jsonl', '')));
+          count++;
+        }
+      }
+    }
+    walk(dirPath);
+    return result;
+  }
+
+  const items = collectFromJsonl(filePath, null);
+
+  const sessionSubDir = path.join(dir, sessionId);
+  if (fs.existsSync(sessionSubDir)) {
+    items.push(...collectFromDir(sessionSubDir, 500));
+  }
+
+  items.sort((a, b) => {
+    if (!a.timestamp && !b.timestamp) return 0;
+    if (!a.timestamp) return 1;
+    if (!b.timestamp) return -1;
+    return new Date(a.timestamp) - new Date(b.timestamp);
+  });
+
+  const byCategory = { agent: 0, web: 0, shell: 0, file: 0, other: 0 };
+  for (const item of items) byCategory[item.category]++;
+
+  res.json({ items, stats: { total: items.length, byCategory } });
+}));
+
 router.post('/:slug/sessions/new', wrapRoute((req, res) => {
   const dir = safeSlug(req.params.slug);
   if (!dir) return res.status(400).json({ error: 'Invalid slug' });

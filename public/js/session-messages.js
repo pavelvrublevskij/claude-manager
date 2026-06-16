@@ -50,6 +50,7 @@ Object.assign(Sessions, {
   onDetailSearch: debounce(async function(value) {
     const q = value.trim();
     Sessions._detailSearchQuery = q;
+    if (q.length >= 2) Sessions._saveToHistory(q, Sessions.DETAIL_SEARCH_HISTORY_KEY);
     if (q && Sessions.detailState.hasMore) {
       await Sessions.loadAllMessages();
       if (Sessions._detailSearchQuery !== q) return;

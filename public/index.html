@@ -562,14 +562,22 @@
             <div class="session-tab-bar">
               <button class="session-tab-btn active" id="tab-btn-file-changes" onclick="Sessions.switchTab('file-changes')">File Changes</button>
               <button class="session-tab-btn" id="tab-btn-conversation" onclick="Sessions.switchTab('conversation')">Conversation</button>
+              <button class="session-tab-btn" id="tab-btn-activity" onclick="Sessions.switchTab('activity')">Activity</button>
             </div>
             <div id="session-context" class="session-context" style="display:none"></div>
+            <div id="session-activity" class="session-activity-panel" style="display:none"></div>
             <div class="session-messages-wrap" id="session-messages-wrap" style="display:none">
             <div class="session-messages-header">
               <div class="subtitle" id="session-count" style="color:var(--text-muted)"></div>
               <div class="session-search-wrap" style="margin-top:8px;margin-bottom:0">
-                <input type="text" class="session-search" id="session-detail-search-input"
-                  placeholder="Search in this session..." oninput="Sessions.onDetailSearch(this.value)">
+                <div class="session-search-container">
+                  <input type="text" class="session-search" id="session-detail-search-input"
+                    placeholder="Search in this session..."
+                    oninput="Sessions._hideDetailHistoryDropdown(); Sessions.onDetailSearch(this.value)"
+                    onfocus="Sessions.showDetailHistory()"
+                    onblur="Sessions._hideDetailHistoryDropdown()">
+                  <div class="search-history-dropdown" id="detail-search-history-dropdown" style="display:none"></div>
+                </div>
                 <span id="session-detail-search-count" style="font-size:12px;color:var(--text-muted);white-space:nowrap"></span>
                 <label class="session-tool-toggle" title="Show tool calls (commands, file edits) and their results">
                   <input type="checkbox" id="session-detail-show-tools" onchange="Sessions.setShowToolDetails(this.checked)">
@@ -714,6 +722,7 @@
   <script src="/js/sessions.js"></script>
   <script src="/js/session-messages.js"></script>
   <script src="/js/session-context.js"></script>
+  <script src="/js/session-activity.js"></script>
   <script src="/js/crud-frontmatter.js"></script>
   <script src="/js/project-settings-tab.js"></script>
   <script src="/js/project-mcp-tab.js"></script>

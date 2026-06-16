@@ -479,3 +479,83 @@ test('GET /api/projects/:slug/sessions/with-plans with invalid slug returns 400'
   assert.strictEqual(res.status, 400);
   assert.strictEqual(res.body.error, 'Invalid slug');
 });
+
+test('GET /api/projects/:slug/sessions/:sessionId/activity returns categorized tool calls', async () => {
+  const tmpSlug = 'activity-test-proj';
+  const sid = 'activ111-1111-1111-1111-111111111111';
+  const dir = path.join(paths.PROJECTS_DIR, tmpSlug);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+
+  writeJsonl(path.join(dir, sid + '.jsonl'), [
+    { type: 'user', uuid: 'u1', timestamp: '2026-01-01T10:00:00Z', message: { content: 'go' } },
+    {
+      type: 'assistant', uuid: 'a1', timestamp: '2026-01-01T10:00:05Z',
+      message: { content: [
+        { type: 'tool_use', name: 'Bash', input: { command: 'npm test' } },
+        { type: 'tool_use', name: 'Read', input: { file_path: '/src/index.js' } },
+        { type: 'tool_use', name: 'WebSearch', input: { query: 'node docs' } },
+        { type: 'tool_use', name: 'Agent', input: { description: 'run sub-task' } }
+      ]}
+    },
+    {
+      type: 'assistant', uuid: 'a2', timestamp: '2026-01-01T10:00:10Z',
+      message: { content: [
+        { type: 'tool_use', name: 'Edit', input: { file_path: '/src/foo.js', old_string: 'a', new_string: 'b' } }
+      ]}
+    }
+  ]);
+
+  const res = await request(app).get(`/api/projects/${tmpSlug}/sessions/${sid}/activity`);
+  assert.strictEqual(res.status, 200);
+  const { items, stats } = res.body;
+
+  assert.strictEqual(stats.total, 5);
+  assert.strictEqual(stats.byCategory.shell, 1);
+  assert.strictEqual(stats.byCategory.file, 2);
+  assert.strictEqual(stats.byCategory.web, 1);
+  assert.strictEqual(stats.byCategory.agent, 1);
+
+  const bash = items.find(i => i.tool === 'Bash');
+  assert.ok(bash, 'Bash item present');
+  assert.strictEqual(bash.category, 'shell');
+  assert.strictEqual(bash.label, 'npm test');
+
+  const webSearch = items.find(i => i.tool === 'WebSearch');
+  assert.ok(webSearch);
+  assert.strictEqual(webSearch.category, 'web');
+  assert.strictEqual(webSearch.label, 'node docs');
+
+  const agent = items.find(i => i.tool === 'Agent');
+  assert.ok(agent);
+  assert.strictEqual(agent.category, 'agent');
+  assert.strictEqual(agent.label, 'run sub-task');
+});
+
+test('GET /api/projects/:slug/sessions/:sessionId/activity returns empty items for session with no tool calls', async () => {
+  const tmpSlug = 'activity-empty-proj';
+  const sid = 'empty111-1111-1111-1111-111111111111';
+  const dir = path.join(paths.PROJECTS_DIR, tmpSlug);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+
+  writeJsonl(path.join(dir, sid + '.jsonl'), [
+    { type: 'user', uuid: 'u1', timestamp: '2026-01-01T10:00:00Z', message: { content: 'hello' } },
+    { type: 'assistant', uuid: 'a1', timestamp: '2026-01-01T10:00:05Z', message: { content: 'hi' } }
+  ]);
+
+  const res = await request(app).get(`/api/projects/${tmpSlug}/sessions/${sid}/activity`);
+  assert.strictEqual(res.status, 200);
+  assert.deepStrictEqual(res.body.items, []);
+  assert.strictEqual(res.body.stats.total, 0);
+});
+
+test('GET /api/projects/:slug/sessions/:sessionId/activity returns 404 for unknown session', async () => {
+  const res = await request(app).get(`/api/projects/${SLUG}/sessions/no-such-session/activity`);
+  assert.strictEqual(res.status, 404);
+});
+
+test('GET /api/projects/:slug/sessions/:sessionId/activity returns 400 for invalid slug', async () => {
+  const res = await request(app).get('/api/projects/bad..slug/sessions/any/activity');
+  assert.strictEqual(res.status, 400);
+});

@@ -14,7 +14,7 @@ Object.assign(Sessions, {
 
     try {
       const data = await api(`/api/projects/${slug}/sessions/${sessionId}/activity`);
-      Sessions._activityItems = data.items || [];
+      Sessions._activityItems = (data.items || []).reverse();
       Sessions._activityFilter = null;
       Sessions._activityLoaded = true;
       Sessions._renderActivity(data);
@@ -31,7 +31,7 @@ Object.assign(Sessions, {
     if (!slug || !sessionId) return;
     try {
       const data = await api(`/api/projects/${slug}/sessions/${sessionId}/activity`);
-      Sessions._activityItems = data.items || [];
+      Sessions._activityItems = (data.items || []).reverse();
       const prevFilter = Sessions._activityFilter;
       Sessions._renderActivity(data);
       if (prevFilter) Sessions._applyActivityFilter(prevFilter);
@@ -66,12 +66,11 @@ Object.assign(Sessions, {
       </button>`
     ).join('');
 
-    const listHtml = items.map((item, i) => Sessions._renderActivityItem(item, i)).join('');
-
     panel.innerHTML = `
       <div class="activity-filter-bar">${filterBar}</div>
-      <div class="activity-list" id="activity-list">${listHtml}</div>
+      <div class="activity-list" id="activity-list"></div>
     `;
+    Sessions._renderActivityList(Sessions._activityItems);
   },
 
   _applyActivityFilter(cat) {
@@ -79,16 +78,71 @@ Object.assign(Sessions, {
     document.querySelectorAll('.activity-filter-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.cat === (cat || ''));
     });
-    const list = document.getElementById('activity-list');
-    if (!list) return;
     const filtered = cat
       ? Sessions._activityItems.filter(item => item.category === cat)
       : Sessions._activityItems;
-    if (filtered.length === 0) {
+    Sessions._renderActivityList(filtered);
+  },
+
+  _renderActivityList(items) {
+    const list = document.getElementById('activity-list');
+    if (!list) return;
+    if (items.length === 0) {
       list.innerHTML = '<div class="empty-state"><p>No items in this category</p></div>';
       return;
     }
-    list.innerHTML = filtered.map((item, i) => Sessions._renderActivityItem(item, i)).join('');
+
+    // Separate main-session items from sub-agent items
+    const mainItems = items.filter(i => !i.agentId);
+    const subItems = items.filter(i => i.agentId);
+
+    // Group sub-agent items by agentId, preserving first-appearance order
+    const agentOrder = [];
+    const agentGroups = {};
+    for (const item of subItems) {
+      if (!agentGroups[item.agentId]) {
+        agentGroups[item.agentId] = { label: item.agentLabel || item.agentId, items: [] };
+        agentOrder.push(item.agentId);
+      }
+      agentGroups[item.agentId].items.push(item);
+    }
+
+    let html = '';
+    let idx = 0;
+
+    // Main session items (no grouping, newest first)
+    for (const item of mainItems) {
+      html += Sessions._renderActivityItem(item, idx++);
+    }
+
+    // Sub-agent groups, newest first by their first item's timestamp
+    for (const agentId of agentOrder) {
+      const group = agentGroups[agentId];
+      const groupId = 'ag-' + agentId.slice(0, 12);
+      const shortLabel = group.label.slice(0, 80) + (group.label.length > 80 ? '…' : '');
+      const count = group.items.length;
+      html += `
+        <div class="activity-agent-group">
+          <div class="activity-agent-header" onclick="Sessions._toggleAgentGroup('${groupId}')">
+            <span class="activity-agent-arrow" id="${groupId}-arrow">&#9660;</span>
+            <span class="activity-agent-label" title="${escapeHtml(group.label)}">${escapeHtml(shortLabel)}</span>
+            <span class="activity-filter-count">${count}</span>
+          </div>
+          <div class="activity-agent-body" id="${groupId}">
+            ${group.items.map(item => Sessions._renderActivityItem(item, idx++)).join('')}
+          </div>
+        </div>`;
+    }
+
+    list.innerHTML = html;
+  },
+
+  _toggleAgentGroup(groupId) {
+    const body = document.getElementById(groupId);
+    const arrow = document.getElementById(groupId + '-arrow');
+    if (!body) return;
+    const collapsed = body.classList.toggle('collapsed');
+    if (arrow) arrow.innerHTML = collapsed ? '&#9654;' : '&#9660;';
   },
 
   _renderActivityItem(item, i) {
@@ -98,7 +152,7 @@ Object.assign(Sessions, {
 
     if (item.category === 'file') {
       shortLabel = label.split(/[/\\]/).pop() || label;
-    } else if (item.category === 'web' && item.tool === 'WebFetch') {
+    } else if (item.tool === 'WebFetch') {
       try {
         const u = new URL(label);
         const p = u.pathname.length > 40 ? u.pathname.slice(0, 40) + '…' : u.pathname;
@@ -106,23 +160,26 @@ Object.assign(Sessions, {
       } catch (_) {
         shortLabel = label.slice(0, 80);
       }
-    } else if (item.category === 'shell') {
-      shortLabel = label.slice(0, 90) + (label.length > 90 ? '…' : '');
     } else {
       shortLabel = label.slice(0, 90) + (label.length > 90 ? '…' : '');
     }
 
+    const isWebFetch = item.tool === 'WebFetch';
     const needsDetail = label.length > shortLabel.length || item.category === 'file';
     const detailContent = item.category === 'file'
       ? `<div class="activity-detail-path">${escapeHtml(label)}</div>`
       : `<pre class="tool-code">${escapeHtml(label)}</pre>`;
     const itemId = 'act-' + i;
 
+    const labelHtml = isWebFetch
+      ? `<a class="activity-item-label activity-item-link" href="${escapeHtml(label)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(label)}" onclick="event.stopPropagation()">${escapeHtml(shortLabel)}</a>`
+      : `<span class="activity-item-label" title="${escapeHtml(label)}">${escapeHtml(shortLabel)}</span>`;
+
     return `
       <div class="activity-item${needsDetail ? ' activity-item-expandable' : ''}" ${needsDetail ? `onclick="document.getElementById('${itemId}').classList.toggle('open')"` : ''}>
         <div class="activity-item-main">
           <span class="activity-tool-badge activity-cat-${escapeHtml(item.category)}">${escapeHtml(item.tool)}</span>
-          <span class="activity-item-label" title="${escapeHtml(label)}">${escapeHtml(shortLabel)}</span>
+          ${labelHtml}
           <span class="activity-item-time">${time}</span>
         </div>
         ${needsDetail ? `<div class="activity-item-detail" id="${itemId}">${detailContent}</div>` : ''}
