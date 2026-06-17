@@ -10,7 +10,7 @@ const SESSION_B = '55555555-5555-5555-5555-555555555555';
 const PROJECT_DIR = path.join(paths.PROJECTS_DIR, SLUG);
 
 const activeSessions = require('../lib/active-sessions');
-const { ACTIVE_THRESHOLD_MS, LAUNCH_GRACE_MS } = activeSessions;
+const { ACTIVE_THRESHOLD_MS, LAUNCH_GRACE_MS, IGNORE_TTL_MS } = activeSessions;
 
 before(() => {
   fs.rmSync(PROJECT_DIR, { recursive: true, force: true });
@@ -92,4 +92,59 @@ test('multiple sessions in one project can be active simultaneously', () => {
   const iso = new Date().toISOString();
   assert.strictEqual(activeSessions.isActive(SLUG, SESSION_A, iso), true);
   assert.strictEqual(activeSessions.isActive(SLUG, SESSION_B, iso), true);
+});
+
+// ── deactivate ────────────────────────────────────────────────────────────────
+
+test('deactivate: removes entry from registry', () => {
+  activeSessions.register(SLUG, SESSION_A, 'os-terminal');
+  activeSessions.deactivate(SLUG, SESSION_A);
+  assert.strictEqual(activeSessions.isActive(SLUG, SESSION_A, new Date().toISOString()), false);
+});
+
+test('deactivate: re-registration within TTL is suppressed', () => {
+  activeSessions.register(SLUG, SESSION_A, 'os-terminal');
+  activeSessions.deactivate(SLUG, SESSION_A);
+  activeSessions.register(SLUG, SESSION_A, 'os-terminal');
+  assert.strictEqual(activeSessions.isActive(SLUG, SESSION_A, new Date().toISOString()), false);
+});
+
+test('deactivate: re-registration succeeds after TTL expires', () => {
+  activeSessions.register(SLUG, SESSION_A, 'os-terminal');
+  activeSessions.deactivate(SLUG, SESSION_A);
+  // Backdate the ignored entry to simulate TTL expiry
+  activeSessions._backdateIgnored(SLUG, SESSION_A, Date.now() - (IGNORE_TTL_MS + 1000));
+  activeSessions.register(SLUG, SESSION_A, 'os-terminal');
+  assert.strictEqual(activeSessions.isActive(SLUG, SESSION_A, new Date().toISOString()), true);
+});
+
+test('deactivate: no-op for unknown session', () => {
+  activeSessions.deactivate(SLUG, 'no-such-session');
+  assert.strictEqual(activeSessions.isActive(SLUG, 'no-such-session', new Date().toISOString()), false);
+});
+
+// ── listActive / TTL sweep ────────────────────────────────────────────────────
+
+test('listActive: sweeps expired ignored entries so ignored map does not grow unbounded', () => {
+  activeSessions.deactivate(SLUG, SESSION_A);
+  activeSessions.deactivate(SLUG, SESSION_B);
+  assert.strictEqual(activeSessions._ignoredSize(), 2);
+
+  // Expire both entries
+  activeSessions._backdateIgnored(SLUG, SESSION_A, Date.now() - (IGNORE_TTL_MS + 1000));
+  activeSessions._backdateIgnored(SLUG, SESSION_B, Date.now() - (IGNORE_TTL_MS + 1000));
+
+  activeSessions.listActive();
+  assert.strictEqual(activeSessions._ignoredSize(), 0);
+});
+
+test('listActive: does not sweep ignored entries still within TTL', () => {
+  activeSessions.deactivate(SLUG, SESSION_A);
+  activeSessions.deactivate(SLUG, SESSION_B);
+
+  // Only expire one
+  activeSessions._backdateIgnored(SLUG, SESSION_A, Date.now() - (IGNORE_TTL_MS + 1000));
+
+  activeSessions.listActive();
+  assert.strictEqual(activeSessions._ignoredSize(), 1);
 });

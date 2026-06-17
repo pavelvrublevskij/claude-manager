@@ -189,9 +189,13 @@ Object.assign(Sessions, {
 
   _openCtxDiff(el) {
     const { session, hash, from, path, isNew, isDeleted } = el.dataset;
+    const allItems = [...document.querySelectorAll('#ctx-file-list .ctx-file-item')];
+    const index = allItems.indexOf(el);
     FileHistory.showDiffCurrent(session, hash, parseInt(from, 10), Sessions._ctx.projSlug, path, {
       isNew: isNew === '1',
-      isDeleted: isDeleted === '1'
+      isDeleted: isDeleted === '1',
+      allItems,
+      index
     });
   },
 

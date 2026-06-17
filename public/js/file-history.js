@@ -4,24 +4,125 @@ const FileHistory = {
   async showDiffCurrent(sessionId, hash, version, projSlug, filePath, opts = {}) {
     const isNew = !!opts.isNew;
     const isDeleted = !!opts.isDeleted;
-    const label = isNew ? '(new file)' : isDeleted ? '(deleted)' : `v${version} → current`;
+    const allItems = opts.allItems || null;
+    const index = opts.index != null ? opts.index : -1;
+
+    const label = FileHistory._makeLabel(isNew, isDeleted, version);
+
+    let navHtml = '';
+    if (allItems && allItems.length > 1 && index >= 0) {
+      const hasPrev = index > 0;
+      const hasNext = index < allItems.length - 1;
+      navHtml = `<div class="diff-nav">
+        <div class="diff-nav-btns">
+          <button class="diff-nav-btn" id="diff-nav-prev"${hasPrev ? '' : ' disabled'}>&#8592; prev</button>
+          <button class="diff-nav-btn" id="diff-nav-next"${hasNext ? '' : ' disabled'}>next &#8594;</button>
+        </div>
+        <span class="diff-nav-label">${index + 1} / ${allItems.length}</span>
+      </div>`;
+    }
+
     const overlay = openModal({
-      title: `Diff: ${filePath} ${label}`,
-      width: 860,
-      body: '<div id="fh-diff-body"><div class="loading"><div class="spinner"></div>Computing diff…</div></div>',
+      title: `${filePath} ${label}`,
+      cls: 'modal--diff',
+      body: `${navHtml}<div id="fh-diff-body"><div class="loading"><div class="spinner"></div>Computing diff…</div></div>`,
       buttons: []
     });
+
+    if (allItems && allItems.length > 1 && index >= 0) {
+      FileHistory._updateNav(overlay, allItems, index);
+    }
+
+    FileHistory._addResizeHandle(overlay.querySelector('.modal'));
+    await FileHistory._loadDiff(overlay, sessionId, hash, version, projSlug, filePath, { isNew, isDeleted });
+  },
+
+  _makeLabel(isNew, isDeleted, version) {
+    return isNew ? '(new file)' : isDeleted ? '(deleted)' : `v${version} → current`;
+  },
+
+  _updateNav(overlay, allItems, index) {
+    const prevBtn = overlay.querySelector('#diff-nav-prev');
+    const nextBtn = overlay.querySelector('#diff-nav-next');
+    const navLabel = overlay.querySelector('.diff-nav-label');
+    if (prevBtn) { prevBtn.disabled = index <= 0; prevBtn.onclick = () => FileHistory._navToDiff(overlay, allItems, index - 1); }
+    if (nextBtn) { nextBtn.disabled = index >= allItems.length - 1; nextBtn.onclick = () => FileHistory._navToDiff(overlay, allItems, index + 1); }
+    if (navLabel) navLabel.textContent = `${index + 1} / ${allItems.length}`;
+  },
+
+  async _loadDiff(overlay, sessionId, hash, version, projSlug, filePath, { isNew, isDeleted }) {
     try {
       const params = new URLSearchParams({ projSlug, filePath });
       if (isNew) { params.set('isNew', 'true'); }
       else { params.set('version', String(version)); }
       const hashSeg = isNew ? 'none' : encodeURIComponent(hash);
       const result = await api(`/api/file-history/${encodeURIComponent(sessionId)}/${hashSeg}/diff-current?${params.toString()}`);
-      FileHistory.renderDiff(overlay.querySelector('#fh-diff-body'), result, filePath);
+      const body = overlay.querySelector('#fh-diff-body');
+      if (body) FileHistory.renderDiff(body, result, filePath);
     } catch (e) {
-      overlay.querySelector('#fh-diff-body').innerHTML =
-        `<div class="empty-state"><p>Could not load diff: ${escapeHtml(e.message)}</p></div>`;
+      const body = overlay.querySelector('#fh-diff-body');
+      if (body) body.innerHTML = `<div class="empty-state"><p>Could not load diff: ${escapeHtml(e.message)}</p></div>`;
     }
+  },
+
+  async _navToDiff(overlay, allItems, newIndex) {
+    const el = allItems[newIndex];
+    if (!el) return;
+    const { session, hash, from, path, isNew, isDeleted } = el.dataset;
+    const isNewBool = isNew === '1';
+    const isDeletedBool = isDeleted === '1';
+    const version = parseInt(from, 10);
+
+    const titleEl = overlay.querySelector('h3');
+    if (titleEl) titleEl.textContent = `${path} ${FileHistory._makeLabel(isNewBool, isDeletedBool, version)}`;
+
+    FileHistory._updateNav(overlay, allItems, newIndex);
+
+    const diffBody = overlay.querySelector('#fh-diff-body');
+    if (diffBody) diffBody.innerHTML = '<div class="loading"><div class="spinner"></div>Computing diff…</div>';
+
+    const projSlug = Sessions._ctx ? Sessions._ctx.projSlug : '';
+    await FileHistory._loadDiff(overlay, session, hash, version, projSlug, path, {
+      isNew: isNewBool,
+      isDeleted: isDeletedBool
+    });
+  },
+
+  _addResizeHandle(modal) {
+    if (!modal) return;
+    const handle = document.createElement('div');
+    handle.className = 'modal-resize-handle';
+    modal.appendChild(handle);
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();
+      const rect = modal.getBoundingClientRect();
+      modal.style.position = 'fixed';
+      modal.style.top = rect.top + 'px';
+      modal.style.left = rect.left + 'px';
+      modal.style.width = rect.width + 'px';
+      modal.style.height = rect.height + 'px';
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startW = rect.width;
+      const startH = rect.height;
+      const onMove = e => {
+        const newW = Math.max(400, startW + 2 * (e.clientX - startX));
+        const newH = Math.max(300, startH + 2 * (e.clientY - startY));
+        modal.style.width = newW + 'px';
+        modal.style.height = newH + 'px';
+        modal.style.left = ((window.innerWidth - newW) / 2) + 'px';
+        modal.style.top = ((window.innerHeight - newH) / 2) + 'px';
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        modal.style.position = '';
+        modal.style.top = '';
+        modal.style.left = '';
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
   },
 
   renderDiff(container, result, filePath) {

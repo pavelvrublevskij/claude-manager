@@ -1,3 +1,20 @@
+## v1.2.0
+
+### Features
+
+- **Session Activity tab** — a third tab in the session detail view (next to File Changes and Conversation) showing every tool call Claude made during the session: shell commands, file operations, web fetches, searches, and sub-agents spawned. Filter by category with the top bar; click any expandable row to see the full command, path, or URL; click WebFetch URLs to open them in a new browser tab.
+- **Sub-agent visibility** — tool calls from sub-agents (spawned via the `Agent` or `Workflow` tool) are included and grouped under collapsible headers showing the agent's task description. Each group shows the number of tool calls made by that agent.
+- **Live activity refresh** — when a session is active, the Activity tab silently re-fetches and updates alongside the Conversation auto-refresh.
+- **Active sessions bar** — a persistent pill strip at the bottom of the window shows all background sessions (project name + session title); click a pill to jump to that session, click × to close it. Active session sub-items also appear under each project entry in the sidebar (hidden when sidebar is collapsed). Works for both browser-terminal and OS-terminal sessions.
+
+### Bug fixes
+
+- **Conversation table rendering** — markdown tables in assistant messages now render as styled grids with borders, header background, and alternating rows
+- **Session messages resize** — chat container no longer has a max-width cap; messages fill the full panel width as the terminal splitter is dragged; panel enforces a 400 px minimum so messages never collapse below a readable width; terminal pane is CSS-capped to prevent overflow
+- **Session search bar width** — search input in the conversation header now fills the available width (a `width: auto` override was preventing `width: 100%` from taking effect)
+- **Closed session reappearing** — clicking × on a background session could cause it to reappear after the next poll if it was created within the 30-second new-session discovery window; the session registry now blocks re-registration for 2 minutes after an explicit close
+- **Collapsed sidebar badge** — active-session count badge in icon-only sidebar mode now shows the session count as a solid green number pill, matching the green used by active-session dots elsewhere
+
 ## v1.1.3
 
 ### Bug fixes

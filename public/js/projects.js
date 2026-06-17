@@ -54,12 +54,12 @@ const Projects = {
         <span class="icon">&#128193;</span>
         <span class="nav-label">${escapeHtml(decodeName(p.slug))}</span>
         <span class="badge badge-active nav-active-badge" data-slug="${p.slug}" style="display:none"></span>
-        ${p.memoryCount > 0 ? `<span class="badge nav-label">${p.memoryCount}</span>` : ''}
       </div>
     `).join('');
     const countEl = document.getElementById('project-nav-count');
     if (countEl) countEl.textContent = Projects.data.length;
     if (typeof ActiveCount !== 'undefined') ActiveCount.refresh();
+    if (typeof ActiveSessionsBar !== 'undefined') ActiveSessionsBar._renderSidebar();
   },
 
   async openFolder(slug) {

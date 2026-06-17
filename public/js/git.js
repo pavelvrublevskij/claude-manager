@@ -14,6 +14,16 @@ const GitActions = {
     GitActions._render();
   },
 
+  async refresh() {
+    if (!GitActions._slug) return;
+    try {
+      GitActions._info = await api(`/api/projects/${encodeURIComponent(GitActions._slug)}/git/info`);
+    } catch (_) {
+      GitActions._info = { available: false };
+    }
+    GitActions._render();
+  },
+
   reset() {
     GitActions._slug = null;
     GitActions._info = null;

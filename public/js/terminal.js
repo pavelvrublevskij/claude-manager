@@ -63,6 +63,7 @@ const TerminalPanel = {
     const done = (choice) => {
       onProceed && onProceed(choice);
       if (typeof ActiveCount !== 'undefined') setTimeout(() => ActiveCount.refresh(), 300);
+      if (typeof ActiveSessionsBar !== 'undefined') setTimeout(() => ActiveSessionsBar.poll(), 300);
     };
     if (!this.hasAttachedPty()) { done('none'); return; }
     if (!this.state.sessionId) {
@@ -158,6 +159,7 @@ const TerminalPanel = {
       this._setStatus('connected', 'connected');
       this._sendResize();
       if (typeof ActiveCount !== 'undefined') ActiveCount.refresh();
+      if (typeof ActiveSessionsBar !== 'undefined') ActiveSessionsBar.poll();
     };
     ws.onmessage = ev => { term.write(typeof ev.data === 'string' ? ev.data : ''); };
     ws.onclose = () => { this._setStatus('disconnected', 'error'); };

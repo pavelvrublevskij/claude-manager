@@ -7,6 +7,8 @@ const Sessions = {
   _planSessionIds: null,
   _renderedGroups: [],
   GROUP_COLLAPSED_KEY: 'claude-manager-collapsed-groups',
+  SEARCH_HISTORY_KEY: 'claude-manager-search-history',
+  DETAIL_SEARCH_HISTORY_KEY: 'claude-manager-detail-search-history',
 
   _getCollapsed() {
     try { return new Set(JSON.parse(localStorage.getItem(Sessions.GROUP_COLLAPSED_KEY) || '[]')); }
@@ -205,8 +207,14 @@ const Sessions = {
 
   renderSearchBar(slug) {
     return `<div class="session-search-wrap">
-      <input type="text" class="session-search" id="session-search-input"
-        placeholder="Search sessions..." oninput="Sessions.onSearch('${slug}', this.value)">
+      <div class="session-search-container">
+        <input type="text" class="session-search" id="session-search-input"
+          placeholder="Search sessions..."
+          oninput="Sessions._hideHistoryDropdown(); Sessions.onSearch('${slug}', this.value)"
+          onfocus="Sessions.showHistory('${slug}')"
+          onblur="Sessions._hideHistoryDropdown()">
+        <div class="search-history-dropdown" id="search-history-dropdown" style="display:none"></div>
+      </div>
       <div class="action-menu">
         <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); Sessions.toggleActionMenu(this)">New Session &#9662;</button>
         <div class="action-menu-panel">
@@ -215,6 +223,145 @@ const Sessions = {
         </div>
       </div>
     </div>`;
+  },
+
+  _getHistory(key) {
+    try { return JSON.parse(localStorage.getItem(key || Sessions.SEARCH_HISTORY_KEY) || '[]'); }
+    catch (_) { return []; }
+  },
+
+  _saveToHistory(q, key) {
+    const k = key || Sessions.SEARCH_HISTORY_KEY;
+    let h = Sessions._getHistory(k).filter(e => e.q !== q);
+    h.unshift({ q, ts: Date.now() });
+    if (h.length > 50) h = h.slice(0, 50);
+    localStorage.setItem(k, JSON.stringify(h));
+  },
+
+  _removeFromHistory(q) {
+    const h = Sessions._getHistory(Sessions.SEARCH_HISTORY_KEY).filter(e => e.q !== q);
+    localStorage.setItem(Sessions.SEARCH_HISTORY_KEY, JSON.stringify(h));
+    Sessions._renderHistoryDropdown(Sessions._historySlug);
+  },
+
+  _clearHistory() {
+    localStorage.removeItem(Sessions.SEARCH_HISTORY_KEY);
+    Sessions._hideHistoryDropdown();
+  },
+
+  _removeFromDetailHistory(q) {
+    const h = Sessions._getHistory(Sessions.DETAIL_SEARCH_HISTORY_KEY).filter(e => e.q !== q);
+    localStorage.setItem(Sessions.DETAIL_SEARCH_HISTORY_KEY, JSON.stringify(h));
+    Sessions._renderDetailHistoryDropdown();
+  },
+
+  _clearDetailHistory() {
+    localStorage.removeItem(Sessions.DETAIL_SEARCH_HISTORY_KEY);
+    Sessions._hideDetailHistoryDropdown();
+  },
+
+  _historySlug: null,
+
+  showHistory(slug) {
+    Sessions._historySlug = slug;
+    Sessions._renderHistoryDropdown(slug);
+  },
+
+  showDetailHistory() {
+    Sessions._renderDetailHistoryDropdown();
+  },
+
+  _relTime(ts) {
+    const diff = Date.now() - ts;
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(diff / 3600000);
+    if (h < 24) return `${h}h ago`;
+    const d = Math.floor(diff / 86400000);
+    if (d < 30) return `${d}d ago`;
+    return new Date(ts).toLocaleDateString();
+  },
+
+  _renderHistoryInto(dropdownId, storageKey, applyHandler, removeHandler, clearHandler) {
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    const h = Sessions._getHistory(storageKey);
+    if (!h.length) { dropdown.style.display = 'none'; return; }
+
+    const now = Date.now();
+    const DAY = 86400000;
+    const groups = [
+      { label: 'Today',     items: h.filter(e => now - e.ts < DAY) },
+      { label: 'Yesterday', items: h.filter(e => now - e.ts >= DAY && now - e.ts < 2 * DAY) },
+      { label: 'This week', items: h.filter(e => now - e.ts >= 2 * DAY && now - e.ts < 7 * DAY) },
+      { label: 'Older',     items: h.filter(e => now - e.ts >= 7 * DAY) },
+    ].filter(g => g.items.length);
+
+    let html = '';
+    for (const g of groups) {
+      html += `<div class="search-history-group">${escapeHtml(g.label)}</div>`;
+      for (const e of g.items) {
+        html += `<div class="search-history-item" data-query="${escapeHtml(e.q)}" onmousedown="${applyHandler}">
+          <span class="search-history-icon">&#128269;</span>
+          <span class="search-history-query">${escapeHtml(e.q)}</span>
+          <span class="search-history-time">${escapeHtml(Sessions._relTime(e.ts))}</span>
+          <button class="search-history-remove" data-query="${escapeHtml(e.q)}" onmousedown="event.stopPropagation(); ${removeHandler}(this.dataset.query)" title="Remove">&#10005;</button>
+        </div>`;
+      }
+    }
+    html += `<div class="search-history-clear"><button onmousedown="event.stopPropagation(); ${clearHandler}()">Clear history</button></div>`;
+
+    dropdown.innerHTML = html;
+    dropdown.style.display = 'block';
+  },
+
+  _renderHistoryDropdown(slug) {
+    Sessions._renderHistoryInto(
+      'search-history-dropdown',
+      Sessions.SEARCH_HISTORY_KEY,
+      `Sessions._applyHistory(event, '${slug}', this)`,
+      'Sessions._removeFromHistory',
+      'Sessions._clearHistory'
+    );
+  },
+
+  _renderDetailHistoryDropdown() {
+    Sessions._renderHistoryInto(
+      'detail-search-history-dropdown',
+      Sessions.DETAIL_SEARCH_HISTORY_KEY,
+      'Sessions._applyDetailHistory(event, this)',
+      'Sessions._removeFromDetailHistory',
+      'Sessions._clearDetailHistory'
+    );
+  },
+
+  _applyHistory(event, slug, el) {
+    event.preventDefault();
+    const q = el.dataset.query;
+    const input = document.getElementById('session-search-input');
+    if (input) { input.value = q; input.focus(); }
+    Sessions._hideHistoryDropdown();
+    Sessions.onSearch(slug, q);
+  },
+
+  _applyDetailHistory(event, el) {
+    event.preventDefault();
+    const q = el.dataset.query;
+    const input = document.getElementById('session-detail-search-input');
+    if (input) { input.value = q; input.focus(); }
+    Sessions._hideDetailHistoryDropdown();
+    Sessions.onDetailSearch(q);
+  },
+
+  _hideHistoryDropdown() {
+    const dropdown = document.getElementById('search-history-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+  },
+
+  _hideDetailHistoryDropdown() {
+    const dropdown = document.getElementById('detail-search-history-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
   },
 
   renderList(slug, sessions) {
@@ -292,6 +439,7 @@ const Sessions = {
   onSearch: debounce(async function(slug, value) {
     const q = value.trim();
     Sessions._lastQuery = q;
+    if (q.length >= 2) Sessions._saveToHistory(q);
 
     if (q.length < 2) {
       if (Sessions.cache[slug]) {
@@ -361,6 +509,7 @@ const Sessions = {
     if (!Number.isFinite(ms) || ms < Sessions.REFRESH_INTERVAL_MIN_MS) return false;
     localStorage.setItem(Sessions.REFRESH_INTERVAL_KEY, String(ms));
     if (Sessions._refreshTimer && !Sessions.isConversationHidden()) Sessions.startAutoRefresh();
+    if (Sessions._ctxTimer) Sessions.startCtxPolling();
     return true;
   },
 
@@ -488,6 +637,9 @@ const Sessions = {
 
     Sessions.detailState = { slug, sessionId, offset: 0, loading: false, hasMore: false, total: 0 };
     Sessions._pendingFlash = undefined;
+    Sessions._activityLoaded = false;
+    Sessions._activityItems = [];
+    Sessions._activityFilter = null;
     container.innerHTML = '';
 
     // Reset search
@@ -500,7 +652,10 @@ const Sessions = {
     if (!sessionId) {
       Sessions.switchTab('conversation');
       container.innerHTML = '<div class="empty-state"><p>Waiting for session to start...</p></div>';
-      if (typeof TerminalPanel !== 'undefined' && !TerminalPanel.isOpen()) {
+      const ctxEl = document.getElementById('session-context');
+      if (ctxEl) ctxEl.innerHTML = '';
+      if (typeof TerminalPanel !== 'undefined') {
+        if (TerminalPanel.isOpen()) TerminalPanel.close();
         TerminalPanel.open(slug, null);
       }
       Sessions.applyConversationHiddenState();
@@ -607,6 +762,10 @@ const Sessions = {
         Sessions.annotateDetailPlan(data.stats);
       }
 
+      if (typeof data.total === 'number' && data.total > state.total) {
+        Sessions.refreshActivity();
+        if (typeof GitActions !== 'undefined') GitActions.refresh();
+      }
       if (typeof data.total !== 'number' || data.total <= state.total) return;
 
       const added = data.total - state.total;
@@ -735,6 +894,7 @@ const Sessions = {
       await Sessions.checkPricing();
       await api(`/api/projects/${slug}/sessions/new`, { method: 'POST' });
       toast('New session opened');
+      if (typeof ActiveSessionsBar !== 'undefined') ActiveSessionsBar.poll();
     } catch (e) {
       toast('Failed to open terminal: ' + e.message, 'error');
     }
@@ -767,6 +927,7 @@ const Sessions = {
         TerminalPanel.close();
       }
       toast('Terminal opened with session');
+      if (typeof ActiveSessionsBar !== 'undefined') ActiveSessionsBar.poll();
     } catch (e) {
       toast('Failed to open terminal: ' + e.message, 'error');
     }
@@ -871,19 +1032,25 @@ const Sessions = {
   switchTab(tab) {
     const ctx = document.getElementById('session-context');
     const msgs = document.getElementById('session-messages-wrap');
+    const act = document.getElementById('session-activity');
     const fcBtn = document.getElementById('tab-btn-file-changes');
     const cvBtn = document.getElementById('tab-btn-conversation');
+    const acBtn = document.getElementById('tab-btn-activity');
     if (!ctx || !msgs || !fcBtn || !cvBtn) return;
     const isFC = tab === 'file-changes';
+    const isAct = tab === 'activity';
     ctx.style.display = isFC ? 'block' : 'none';
-    msgs.style.display = isFC ? 'none' : '';
+    msgs.style.display = isAct || isFC ? 'none' : '';
+    if (act) act.style.display = isAct ? 'flex' : 'none';
     fcBtn.classList.toggle('active', isFC);
-    cvBtn.classList.toggle('active', !isFC);
+    cvBtn.classList.toggle('active', !isFC && !isAct);
+    if (acBtn) acBtn.classList.toggle('active', isAct);
     if (isFC && Sessions._pendingFlash !== undefined) {
       const pending = Sessions._pendingFlash;
       Sessions._pendingFlash = undefined;
       Sessions._flashItems(ctx, pending);
     }
+    if (isAct && !Sessions._activityLoaded) Sessions.loadActivity();
   },
 
   _rerenderPlans() {

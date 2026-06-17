@@ -10,6 +10,7 @@ const SESSION_A = '11111111-1111-1111-1111-111111111111';
 const SESSION_B = '22222222-2222-2222-2222-222222222222';
 const SESSION_C = '33333333-3333-3333-3333-333333333333';
 const SESSION_D = '44444444-4444-4444-4444-444444444444';
+const SESSION_E = '55555555-5555-5555-5555-555555555555';
 const PROJECT_DIR = path.join(paths.PROJECTS_DIR, SLUG);
 
 function writeJsonl(filePath, entries) {
@@ -108,6 +109,31 @@ before(() => {
     }
   ]);
 
+  writeJsonl(path.join(PROJECT_DIR, SESSION_E + '.jsonl'), [
+    {
+      type: 'user', uuid: 'e1', parentUuid: null,
+      timestamp: '2026-05-01T10:00:00.000Z', gitBranch: 'main',
+      message: { content: 'Session E with a sub-agent' }
+    },
+    {
+      type: 'assistant', uuid: 'e2', parentUuid: 'e1',
+      timestamp: '2026-05-01T10:00:05.000Z',
+      message: { model: 'claude-sonnet', content: [{ type: 'tool_use', name: 'Agent', id: 'tu1', input: { description: 'explore widgets', subagent_type: 'Explore', prompt: 'look at widgets' } }] }
+    }
+  ]);
+  writeJsonl(path.join(PROJECT_DIR, SESSION_E, 'subagents', 'agent-abc123.jsonl'), [
+    {
+      type: 'user', uuid: 's1', parentUuid: null, isSidechain: true, agentId: 'abc123',
+      timestamp: '2026-05-01T10:00:06.000Z',
+      message: { content: 'look at widgets' }
+    },
+    {
+      type: 'assistant', uuid: 's2', parentUuid: 's1', isSidechain: true, agentId: 'abc123',
+      timestamp: '2026-05-01T10:00:08.000Z',
+      message: { content: [{ type: 'text', text: 'Found the unique-subagent-needle result here.' }] }
+    }
+  ]);
+
   writeJsonl(path.join(PROJECT_DIR, SESSION_D + '.jsonl'), [
     {
       type: 'user',
@@ -134,9 +160,9 @@ test('GET /api/projects/:slug/sessions returns array with expected fields', asyn
   const res = await request(app).get(`/api/projects/${SLUG}/sessions`);
   assert.strictEqual(res.status, 200);
   assert.ok(Array.isArray(res.body));
-  assert.ok(res.body.length >= 4);
+  assert.ok(res.body.length >= 5);
   const ids = res.body.map(s => s.sessionId).sort();
-  assert.deepStrictEqual(ids, [SESSION_A, SESSION_B, SESSION_C, SESSION_D].sort());
+  assert.deepStrictEqual(ids, [SESSION_A, SESSION_B, SESSION_C, SESSION_D, SESSION_E].sort());
   const a = res.body.find(s => s.sessionId === SESSION_A);
   assert.strictEqual(a.messageCount, 3);
   assert.strictEqual(a.gitBranch, 'main');
@@ -148,10 +174,11 @@ test('GET /api/projects/:slug/sessions returns array with expected fields', asyn
 test('GET /api/projects/:slug/sessions sorts by modified descending', async () => {
   const res = await request(app).get(`/api/projects/${SLUG}/sessions`);
   assert.strictEqual(res.status, 200);
-  assert.strictEqual(res.body[0].sessionId, SESSION_D);
-  assert.strictEqual(res.body[1].sessionId, SESSION_C);
-  assert.strictEqual(res.body[2].sessionId, SESSION_B);
-  assert.strictEqual(res.body[3].sessionId, SESSION_A);
+  assert.strictEqual(res.body[0].sessionId, SESSION_E);
+  assert.strictEqual(res.body[1].sessionId, SESSION_D);
+  assert.strictEqual(res.body[2].sessionId, SESSION_C);
+  assert.strictEqual(res.body[3].sessionId, SESSION_B);
+  assert.strictEqual(res.body[4].sessionId, SESSION_A);
 });
 
 test('GET /api/projects/:slug/sessions includes ordered distinct gitBranches', async () => {
@@ -197,6 +224,15 @@ test('GET /api/projects/:slug/sessions/search returns empty for short query', as
   const res = await request(app).get(`/api/projects/${SLUG}/sessions/search`).query({ q: 'a' });
   assert.strictEqual(res.status, 200);
   assert.deepStrictEqual(res.body, []);
+});
+
+test('search: query matching sub-agent content returns parent session', async () => {
+  const res = await request(app).get(`/api/projects/${SLUG}/sessions/search`).query({ q: 'unique-subagent-needle' });
+  assert.strictEqual(res.status, 200);
+  assert.ok(Array.isArray(res.body));
+  assert.strictEqual(res.body.length, 1);
+  assert.strictEqual(res.body[0].sessionId, SESSION_E);
+  assert.ok(res.body[0].snippets.some(s => s.text.toLowerCase().includes('unique-subagent-needle')));
 });
 
 test('GET /api/projects/:slug/sessions stamps active=false when nothing is registered', async () => {
@@ -356,7 +392,26 @@ test('POST /api/projects/:slug/sessions/:sessionId/rename returns 404 for unknow
   assert.strictEqual(res.body.error, 'Session not found');
 });
 
-test('POST /api/projects/:slug/sessions/new is skipped (spawns terminal)', { skip: 'Endpoint launches an OS terminal via child_process; testing would open a real window on the runner.' }, () => {});
+test('POST /api/projects/:slug/sessions/new returns ok and registers pending new session', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  activeSessions._reset();
+
+  const res = await request(app).post(`/api/projects/${SLUG}/sessions/new`);
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.body.ok, true);
+
+  // registerPendingNew was called — a fresh session should resolve as active
+  const newId = 'new-session-resolve-test';
+  const created = new Date().toISOString();
+  activeSessions.resolvePendingNew(SLUG, [{ sessionId: newId, created }]);
+  assert.strictEqual(activeSessions.isActive(SLUG, newId, created), true);
+});
+
+test('POST /api/projects/:slug/sessions/new returns 400 for invalid slug', async () => {
+  const res = await request(app).post('/api/projects/bad..slug/sessions/new');
+  assert.strictEqual(res.status, 400);
+  assert.strictEqual(res.body.error, 'Invalid slug');
+});
 
 test('POST /api/projects/:slug/sessions/:sessionId/resume is skipped (spawns terminal)', { skip: 'Endpoint launches an OS terminal via child_process; testing would open a real window on the runner.' }, () => {});
 
@@ -478,4 +533,168 @@ test('GET /api/projects/:slug/sessions/with-plans with invalid slug returns 400'
   const res = await request(app).get('/api/projects/bad..slug/sessions/with-plans');
   assert.strictEqual(res.status, 400);
   assert.strictEqual(res.body.error, 'Invalid slug');
+});
+
+test('GET /api/projects/:slug/sessions/:sessionId/activity returns categorized tool calls', async () => {
+  const tmpSlug = 'activity-test-proj';
+  const sid = 'activ111-1111-1111-1111-111111111111';
+  const dir = path.join(paths.PROJECTS_DIR, tmpSlug);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+
+  writeJsonl(path.join(dir, sid + '.jsonl'), [
+    { type: 'user', uuid: 'u1', timestamp: '2026-01-01T10:00:00Z', message: { content: 'go' } },
+    {
+      type: 'assistant', uuid: 'a1', timestamp: '2026-01-01T10:00:05Z',
+      message: { content: [
+        { type: 'tool_use', name: 'Bash', input: { command: 'npm test' } },
+        { type: 'tool_use', name: 'Read', input: { file_path: '/src/index.js' } },
+        { type: 'tool_use', name: 'WebSearch', input: { query: 'node docs' } },
+        { type: 'tool_use', name: 'Agent', input: { description: 'run sub-task' } }
+      ]}
+    },
+    {
+      type: 'assistant', uuid: 'a2', timestamp: '2026-01-01T10:00:10Z',
+      message: { content: [
+        { type: 'tool_use', name: 'Edit', input: { file_path: '/src/foo.js', old_string: 'a', new_string: 'b' } }
+      ]}
+    }
+  ]);
+
+  const res = await request(app).get(`/api/projects/${tmpSlug}/sessions/${sid}/activity`);
+  assert.strictEqual(res.status, 200);
+  const { items, stats } = res.body;
+
+  assert.strictEqual(stats.total, 5);
+  assert.strictEqual(stats.byCategory.shell, 1);
+  assert.strictEqual(stats.byCategory.file, 2);
+  assert.strictEqual(stats.byCategory.web, 1);
+  assert.strictEqual(stats.byCategory.agent, 1);
+
+  const bash = items.find(i => i.tool === 'Bash');
+  assert.ok(bash, 'Bash item present');
+  assert.strictEqual(bash.category, 'shell');
+  assert.strictEqual(bash.label, 'npm test');
+
+  const webSearch = items.find(i => i.tool === 'WebSearch');
+  assert.ok(webSearch);
+  assert.strictEqual(webSearch.category, 'web');
+  assert.strictEqual(webSearch.label, 'node docs');
+
+  const agent = items.find(i => i.tool === 'Agent');
+  assert.ok(agent);
+  assert.strictEqual(agent.category, 'agent');
+  assert.strictEqual(agent.label, 'run sub-task');
+});
+
+test('GET /api/projects/:slug/sessions/:sessionId/activity returns empty items for session with no tool calls', async () => {
+  const tmpSlug = 'activity-empty-proj';
+  const sid = 'empty111-1111-1111-1111-111111111111';
+  const dir = path.join(paths.PROJECTS_DIR, tmpSlug);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+
+  writeJsonl(path.join(dir, sid + '.jsonl'), [
+    { type: 'user', uuid: 'u1', timestamp: '2026-01-01T10:00:00Z', message: { content: 'hello' } },
+    { type: 'assistant', uuid: 'a1', timestamp: '2026-01-01T10:00:05Z', message: { content: 'hi' } }
+  ]);
+
+  const res = await request(app).get(`/api/projects/${tmpSlug}/sessions/${sid}/activity`);
+  assert.strictEqual(res.status, 200);
+  assert.deepStrictEqual(res.body.items, []);
+  assert.strictEqual(res.body.stats.total, 0);
+});
+
+test('GET /api/projects/:slug/sessions/:sessionId/activity returns 404 for unknown session', async () => {
+  const res = await request(app).get(`/api/projects/${SLUG}/sessions/no-such-session/activity`);
+  assert.strictEqual(res.status, 404);
+});
+
+test('GET /api/projects/:slug/sessions/:sessionId/activity returns 400 for invalid slug', async () => {
+  const res = await request(app).get('/api/projects/bad..slug/sessions/any/activity');
+  assert.strictEqual(res.status, 400);
+});
+
+test('GET /api/projects/active returns active sessions with titles', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  activeSessions._reset();
+  activeSessions.register(SLUG, SESSION_A, 'os-terminal');
+
+  const res = await request(app).get('/api/projects/active');
+  assert.strictEqual(res.status, 200);
+  assert.ok(Array.isArray(res.body));
+  const entry = res.body.find(s => s.slug === SLUG && s.sessionId === SESSION_A);
+  assert.ok(entry, 'active session should be present');
+  assert.strictEqual(entry.kind, 'os');
+  assert.ok(typeof entry.title === 'string');
+
+  activeSessions._reset();
+});
+
+test('GET /api/projects/active returns empty when no active sessions', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  activeSessions._reset();
+
+  const res = await request(app).get('/api/projects/active');
+  assert.strictEqual(res.status, 200);
+  assert.deepStrictEqual(res.body, []);
+});
+
+// ── POST deactivate ───────────────────────────────────────────────────────────
+
+test('POST /api/projects/:slug/sessions/:sessionId/deactivate returns 200 for valid session', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  activeSessions._reset();
+  activeSessions.register(SLUG, SESSION_A, 'os-terminal');
+
+  const res = await request(app)
+    .post(`/api/projects/${SLUG}/sessions/${SESSION_A}/deactivate`);
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.body.ok, true);
+
+  activeSessions._reset();
+});
+
+test('POST /api/projects/:slug/sessions/:sessionId/deactivate returns 400 for invalid slug', async () => {
+  const res = await request(app)
+    .post('/api/projects/bad..slug/sessions/any-session/deactivate');
+  assert.strictEqual(res.status, 400);
+  assert.strictEqual(res.body.error, 'Invalid slug');
+});
+
+test('POST /api/projects/:slug/sessions/:sessionId/deactivate returns 400 for traversal in sessionId', async () => {
+  const res = await request(app)
+    .post(`/api/projects/${SLUG}/sessions/..evil/deactivate`);
+  assert.strictEqual(res.status, 400);
+  assert.strictEqual(res.body.error, 'Invalid session ID');
+});
+
+test('POST /api/projects/:slug/sessions/:sessionId/deactivate removes session from active list', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  activeSessions._reset();
+  activeSessions.register(SLUG, SESSION_A, 'os-terminal');
+
+  await request(app).post(`/api/projects/${SLUG}/sessions/${SESSION_A}/deactivate`);
+
+  const list = await request(app).get('/api/projects/active');
+  const entry = list.body.find(s => s.slug === SLUG && s.sessionId === SESSION_A);
+  assert.ok(!entry, 'deactivated session must not appear in active list');
+
+  activeSessions._reset();
+});
+
+// ── GET /active: sessionId traversal filter ───────────────────────────────────
+
+test('GET /api/projects/active filters out sessions with traversal characters in sessionId', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  activeSessions._reset();
+  // Register a session with a traversal sessionId (register() does not validate)
+  activeSessions.register(SLUG, '../etc/passwd', 'os-terminal');
+
+  const res = await request(app).get('/api/projects/active');
+  assert.strictEqual(res.status, 200);
+  const entry = res.body.find(s => s.sessionId === '../etc/passwd');
+  assert.ok(!entry, 'sessionId with .. must be excluded from active list');
+
+  activeSessions._reset();
 });

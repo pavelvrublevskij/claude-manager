@@ -23,38 +23,46 @@ router.get('/:sessionId/context', wrapRoute((req, res) => {
 
   let projSlug = null;
   const planPathsFromSession = new Set();
-  if (fs.existsSync(histDir)) {
-    // Find the session JSONL to get file path mappings
-    let sessionContent = null;
-    for (const proj of fs.readdirSync(PROJECTS_DIR, { withFileTypes: true }).filter(d => d.isDirectory())) {
-      const candidate = path.join(PROJECTS_DIR, proj.name, sessionId + '.jsonl');
-      if (fs.existsSync(candidate)) {
-        try { sessionContent = fs.readFileSync(candidate, 'utf-8'); projSlug = proj.name; } catch (_) {}
-        break;
-      }
-    }
 
-    if (sessionContent) {
-      const fileMap = {};
-      for (const line of sessionContent.split('\n')) {
-        if (!line.trim()) continue;
-        try {
-          const obj = JSON.parse(line);
-          if (obj.type === 'user' && obj.timestamp) {
-            const t = new Date(obj.timestamp).getTime();
-            if (!sessionFrom) sessionFrom = t;
-            sessionTo = t;
-          }
-          if (planPathsFromSession.size === 0 && planCache.get(sessionId) !== false && obj.type === 'assistant') {
-            const content = obj.message && obj.message.content;
-            if (Array.isArray(content)) {
-              for (const block of content) {
-                if (block.type === 'tool_use' && block.name === 'ExitPlanMode' && block.input && block.input.planFilePath) {
-                  planPathsFromSession.add(block.input.planFilePath);
+  // Always find the session JSONL regardless of whether file-history exists
+  let sessionContent = null;
+  for (const proj of fs.readdirSync(PROJECTS_DIR, { withFileTypes: true }).filter(d => d.isDirectory())) {
+    const candidate = path.join(PROJECTS_DIR, proj.name, sessionId + '.jsonl');
+    if (fs.existsSync(candidate)) {
+      try { sessionContent = fs.readFileSync(candidate, 'utf-8'); projSlug = proj.name; } catch (_) {}
+      break;
+    }
+  }
+
+  if (sessionContent) {
+    const fileMap = {};
+
+    for (const line of sessionContent.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const obj = JSON.parse(line);
+        if (obj.type === 'user' && obj.timestamp) {
+          const t = new Date(obj.timestamp).getTime();
+          if (!sessionFrom) sessionFrom = t;
+          sessionTo = t;
+        }
+        if (planPathsFromSession.size === 0 && planCache.get(sessionId) !== false && obj.type === 'assistant') {
+          const content = obj.message && obj.message.content;
+          if (Array.isArray(content)) {
+            for (const block of content) {
+              if (block.type !== 'tool_use' || !block.input) continue;
+              if (block.name === 'ExitPlanMode' && block.input.planFilePath) {
+                planPathsFromSession.add(block.input.planFilePath);
+              } else if (block.name === 'Write' && block.input.file_path) {
+                const planRel = path.relative(PLANS_DIR, path.resolve(block.input.file_path));
+                if (!planRel.startsWith('..') && !path.isAbsolute(planRel)) {
+                  planPathsFromSession.add(block.input.file_path);
                 }
               }
             }
           }
+        }
+        if (fs.existsSync(histDir)) {
           if (obj.type !== 'file-history-snapshot' || !obj.isSnapshotUpdate) continue;
           const backups = obj.snapshot && obj.snapshot.trackedFileBackups;
           if (!backups) continue;
@@ -67,55 +75,63 @@ router.get('/:sessionId/context', wrapRoute((req, res) => {
             if (!fileMap[filePath].hash) fileMap[filePath].hash = info.backupFileName.split('@')[0];
             fileMap[filePath].maxVersion = Math.max(fileMap[filePath].maxVersion, info.version);
           }
+        }
+      } catch (_) {}
+    }
+
+    const projectDir = projSlug ? decodeSlug(projSlug) : null;
+
+    // Fallback: collect files touched via Write/Edit/MultiEdit tool calls.
+    // Runs unconditionally so sessions without a file-history dir still show their files.
+    if (projectDir) {
+      const resolvedProjectDir = path.resolve(projectDir);
+      const existingKeys = new Set(Object.keys(fileMap).map(k => k.replace(/\\/g, '/')));
+      for (const line of sessionContent.split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const obj = JSON.parse(line);
+          if (obj.type !== 'assistant') continue;
+          const content = obj.message && obj.message.content;
+          if (!Array.isArray(content)) continue;
+          for (const block of content) {
+            if (block.type !== 'tool_use' || !block.input) continue;
+            let filePath = null;
+            let isNew = false;
+            if (block.name === 'Write') { filePath = block.input.file_path; isNew = true; }
+            else if (block.name === 'Edit' || block.name === 'MultiEdit') { filePath = block.input.file_path; }
+            else if (block.name === 'NotebookEdit') { filePath = block.input.notebook_path; }
+            if (!filePath) continue;
+            const rel = path.relative(resolvedProjectDir, path.resolve(filePath));
+            if (rel.startsWith('..') || path.isAbsolute(rel)) continue;
+            const relNorm = rel.replace(/\\/g, '/');
+            if (!existingKeys.has(relNorm)) {
+              existingKeys.add(relNorm);
+              fileMap[relNorm] = { hash: null, maxVersion: 0, isNew };
+            }
+          }
         } catch (_) {}
       }
+    }
 
-      const projectDir = projSlug ? decodeSlug(projSlug) : null;
-
+    const histFiles = fs.existsSync(histDir) ? fs.readdirSync(histDir) : [];
+    files = Object.entries(fileMap).map(([filePath, info]) => {
+      const versions = info.hash ? histFiles
+        .filter(f => f.startsWith(info.hash + '@v'))
+        .map(f => parseInt(f.split('@v')[1], 10))
+        .filter(v => !isNaN(v))
+        .sort((a, b) => a - b) : [];
+      let isDeleted = false;
+      let mtime = null;
       if (projectDir) {
-        const resolvedProjectDir = path.resolve(projectDir);
-        const existingKeys = new Set(Object.keys(fileMap).map(k => k.replace(/\\/g, '/')));
-        for (const line of sessionContent.split('\n')) {
-          if (!line.trim()) continue;
-          try {
-            const obj = JSON.parse(line);
-            if (obj.type !== 'assistant') continue;
-            const content = obj.message && obj.message.content;
-            if (!Array.isArray(content)) continue;
-            for (const block of content) {
-              if (block.type !== 'tool_use' || block.name !== 'Write' || !block.input || !block.input.file_path) continue;
-              const rel = path.relative(resolvedProjectDir, path.resolve(block.input.file_path));
-              if (rel.startsWith('..') || path.isAbsolute(rel)) continue;
-              const relNorm = rel.replace(/\\/g, '/');
-              if (!existingKeys.has(relNorm)) {
-                existingKeys.add(relNorm);
-                fileMap[relNorm] = { hash: null, maxVersion: 0, isNew: true };
-              }
-            }
-          } catch (_) {}
+        const currentFile = path.resolve(projectDir, filePath);
+        try {
+          mtime = fs.statSync(currentFile).mtimeMs;
+        } catch (_) {
+          isDeleted = true;
         }
       }
-
-      const histFiles = fs.readdirSync(histDir);
-      files = Object.entries(fileMap).map(([filePath, info]) => {
-        const versions = info.hash ? histFiles
-          .filter(f => f.startsWith(info.hash + '@v'))
-          .map(f => parseInt(f.split('@v')[1], 10))
-          .filter(v => !isNaN(v))
-          .sort((a, b) => a - b) : [];
-        let isDeleted = false;
-        let mtime = null;
-        if (projectDir) {
-          const currentFile = path.resolve(projectDir, filePath);
-          try {
-            mtime = fs.statSync(currentFile).mtimeMs;
-          } catch (_) {
-            isDeleted = true;
-          }
-        }
-        return { path: filePath, hash: info.hash, versions, isNew: info.isNew, isDeleted, mtime };
-      }).filter(f => f.versions.length > 0 || f.isNew);
-    }
+      return { path: filePath, hash: info.hash, versions, isNew: info.isNew, isDeleted, mtime };
+    }).filter(f => f.versions.length > 0 || f.isNew || f.hash !== null);
   }
 
   // Plans linked to this session via ExitPlanMode planFilePath

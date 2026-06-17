@@ -12,10 +12,23 @@ const { collectBranches } = require('../lib/session-branches');
 const { hasBridgeSession } = require('../lib/session-flags');
 const terminalServer = require('../lib/terminal-server');
 const activeSessions = require('../lib/active-sessions');
-const { stampActive } = require('../lib/session-status');
+const { stampActive, listAllActiveSessions } = require('../lib/session-status');
 const { MAX_SNIPPETS, extractEntrySnippets, extractMetaSnippet } = require('../lib/session-search');
+const { collectFromJsonl, collectFromDir } = require('../lib/session-activity');
 
 const router = express.Router({ mergeParams: true });
+
+const _titleCache = new Map();
+const TITLE_CACHE_TTL = 60000;
+
+function getCachedTitle(filePath) {
+  const nowMs = Date.now();
+  const cached = _titleCache.get(filePath);
+  if (cached && nowMs - cached.cachedAt < TITLE_CACHE_TTL) return cached.title;
+  const title = getCustomTitle(filePath) || findFirstMeaningfulPrompt(filePath);
+  _titleCache.set(filePath, { title, cachedAt: nowMs });
+  return title;
+}
 
 function normalizePrompt(text) {
   const m = (text || '').match(/<command-name>(\/[\w-]+)<\/command-name>/);
@@ -54,6 +67,7 @@ function safeSpawn(cmd, args, opts) {
 }
 
 function launchTerminal(projectPath, cmd) {
+  if (process.env.__CLAUDE_MANAGER_TEST_HOME) return;
   const platform = process.platform;
   if (platform === 'win32') {
     const wtArgs = ['-d', projectPath, 'cmd.exe', '/k', cmd];
@@ -81,6 +95,22 @@ function launchTerminal(projectPath, cmd) {
     throw new Error('No supported terminal found');
   }
 }
+
+router.get('/active', wrapRoute((req, res) => {
+  const all = listAllActiveSessions();
+  const result = all
+    .filter(({ sessionId }) => !sessionId.includes('..') && !sessionId.includes('/') && !sessionId.includes('\\'))
+    .map(({ slug, sessionId, kind }) => {
+      const dir = safeSlug(slug);
+      let title = '';
+      if (dir) {
+        const filePath = path.join(dir, sessionId + '.jsonl');
+        title = getCachedTitle(filePath);
+      }
+      return { slug, sessionId, title: title || '', kind };
+    });
+  res.json(result);
+}));
 
 router.get('/:slug/sessions', wrapRoute((req, res) => {
   const dir = safeSlug(req.params.slug);
@@ -275,6 +305,28 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
       }
     } catch (_) { continue; }
 
+    // Also search sub-agent conversations
+    if (snippets.length < MAX_SNIPPETS) {
+      const subagentDir = path.join(dir, sessionId, 'subagents');
+      if (fs.existsSync(subagentDir)) {
+        try {
+          for (const sf of fs.readdirSync(subagentDir).filter(sf => sf.endsWith('.jsonl'))) {
+            if (snippets.length >= MAX_SNIPPETS) break;
+            try {
+              const subLines = fs.readFileSync(path.join(subagentDir, sf), 'utf-8').split('\n').filter(Boolean);
+              for (const line of subLines) {
+                if (snippets.length >= MAX_SNIPPETS) break;
+                try {
+                  const entry = JSON.parse(line);
+                  snippets.push(...extractEntrySnippets(entry, q, qLower, snippets.length));
+                } catch (_) {}
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+    }
+
     // Also check title/metadata fields (custom title, index summary, first prompt)
     const meta = indexMeta[sessionId];
     if (snippets.length === 0) {
@@ -427,7 +479,12 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
                   .join('\n')
                   .slice(0, 2000);
               }
-              msg.content.push({ type: 'tool_result', text: resultText });
+              const tr = { type: 'tool_result', text: resultText };
+              if (entry.toolUseResult?.agentId) {
+                tr.agentId = entry.toolUseResult.agentId;
+                tr.agentType = entry.toolUseResult.agentType || '';
+              }
+              msg.content.push(tr);
             } else if (block.type === 'thinking') {
               // skip thinking blocks
             }
@@ -477,6 +534,101 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
   res.json({ messages: page, total: messages.length, hasMore: offset + limit < messages.length, stats });
 }));
 
+router.get('/:slug/sessions/:sessionId/activity', wrapRoute((req, res) => {
+  const dir = safeSlug(req.params.slug);
+  if (!dir) return res.status(400).json({ error: 'Invalid slug' });
+
+  const sessionId = req.params.sessionId;
+  if (sessionId.includes('..') || sessionId.includes('/') || sessionId.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid session ID' });
+  }
+
+  const filePath = path.join(dir, sessionId + '.jsonl');
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Session not found' });
+
+  const items = collectFromJsonl(filePath, null);
+
+  const sessionSubDir = path.join(dir, sessionId);
+  if (fs.existsSync(sessionSubDir)) {
+    items.push(...collectFromDir(sessionSubDir, 500));
+  }
+
+  items.sort((a, b) => {
+    if (!a.timestamp && !b.timestamp) return 0;
+    if (!a.timestamp) return 1;
+    if (!b.timestamp) return -1;
+    return new Date(a.timestamp) - new Date(b.timestamp);
+  });
+
+  const byCategory = { agent: 0, web: 0, shell: 0, file: 0, other: 0 };
+  for (const item of items) byCategory[item.category]++;
+
+  res.json({ items, stats: { total: items.length, byCategory } });
+}));
+
+router.get('/:slug/sessions/:sessionId/subagents/:agentId', wrapRoute((req, res) => {
+  const dir = safeSlug(req.params.slug);
+  if (!dir) return res.status(400).json({ error: 'Invalid slug' });
+
+  const sessionId = req.params.sessionId;
+  if (sessionId.includes('..') || sessionId.includes('/') || sessionId.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid session ID' });
+  }
+
+  const agentId = req.params.agentId;
+  if (!/^[a-zA-Z0-9_-]+$/.test(agentId)) {
+    return res.status(400).json({ error: 'Invalid agent ID' });
+  }
+
+  const filePath = path.join(dir, sessionId, 'subagents', 'agent-' + agentId + '.jsonl');
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Sub-agent session not found' });
+
+  const lines = fs.readFileSync(filePath, 'utf-8').split('\n').filter(Boolean);
+  const messages = [];
+
+  for (const line of lines) {
+    try {
+      const entry = JSON.parse(line);
+      if (entry.type !== 'user' && entry.type !== 'assistant') continue;
+      const msg = {
+        role: entry.type,
+        timestamp: entry.timestamp,
+        model: entry.message?.model || '',
+        content: []
+      };
+      const content = entry.message?.content;
+      if (typeof content === 'string') {
+        msg.content.push({ type: 'text', text: content });
+      } else if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block.type === 'text') {
+            msg.content.push({ type: 'text', text: block.text });
+          } else if (block.type === 'tool_use') {
+            msg.content.push({ type: 'tool_use', name: block.name, input: block.input });
+          } else if (block.type === 'tool_result') {
+            let resultText = '';
+            if (typeof block.content === 'string') {
+              resultText = block.content.slice(0, 2000);
+            } else if (Array.isArray(block.content)) {
+              resultText = block.content.filter(c => c.type === 'text').map(c => c.text).join('\n').slice(0, 2000);
+            }
+            const tr = { type: 'tool_result', text: resultText };
+            if (entry.toolUseResult?.agentId) {
+              tr.agentId = entry.toolUseResult.agentId;
+              tr.agentType = entry.toolUseResult.agentType || '';
+            }
+            msg.content.push(tr);
+          }
+        }
+      }
+      if (msg.content.length > 0) messages.push(msg);
+    } catch (_) {}
+  }
+
+  messages.reverse();
+  res.json({ messages });
+}));
+
 router.post('/:slug/sessions/new', wrapRoute((req, res) => {
   const dir = safeSlug(req.params.slug);
   if (!dir) return res.status(400).json({ error: 'Invalid slug' });
@@ -513,6 +665,18 @@ router.post('/:slug/sessions/:sessionId/resume', wrapRoute((req, res) => {
   } catch (e) {
     res.status(500).json({ error: 'Failed to open terminal: ' + e.message });
   }
+}));
+
+router.post('/:slug/sessions/:sessionId/deactivate', wrapRoute((req, res) => {
+  const slug = req.params.slug;
+  if (!safeSlug(slug)) return res.status(400).json({ error: 'Invalid slug' });
+  const sessionId = req.params.sessionId;
+  if (sessionId.includes('..') || sessionId.includes('/') || sessionId.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid session ID' });
+  }
+  activeSessions.deactivate(slug, sessionId);
+  terminalServer.disconnectFor(slug, sessionId, 'Closed by user.');
+  res.json({ ok: true });
 }));
 
 router.post('/:slug/sessions/:sessionId/rename', wrapRoute((req, res) => {
