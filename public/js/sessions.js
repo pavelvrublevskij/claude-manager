@@ -652,7 +652,10 @@ const Sessions = {
     if (!sessionId) {
       Sessions.switchTab('conversation');
       container.innerHTML = '<div class="empty-state"><p>Waiting for session to start...</p></div>';
-      if (typeof TerminalPanel !== 'undefined' && !TerminalPanel.isOpen()) {
+      const ctxEl = document.getElementById('session-context');
+      if (ctxEl) ctxEl.innerHTML = '';
+      if (typeof TerminalPanel !== 'undefined') {
+        if (TerminalPanel.isOpen()) TerminalPanel.close();
         TerminalPanel.open(slug, null);
       }
       Sessions.applyConversationHiddenState();

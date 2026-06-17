@@ -20,6 +20,12 @@ const MTIME_SESSION_ID = 'mtimetest-2222-2222-2222-222222222222';
 const MTIME_HASH = 'mtimehash00012ab';
 const REAL_FILE = path.join(HOME, 'mtime-tracked-file.txt');
 
+function slugForPath(p) {
+  const win = p.match(/^([A-Za-z]):[\\\/](.*)/);
+  if (win) return `${win[1].toUpperCase()}--${win[2].replace(/[\\\/\.]/g, '-')}`;
+  return p.replace(/^\//, '').replace(/[\/\.]/g, '-');
+}
+
 before(() => {
   // Project dir + session JSONL
   const projDir = path.join(paths.PROJECTS_DIR, PROJ_SLUG);
@@ -413,4 +419,40 @@ test('context: session with no file-history dir and no tool writes returns empty
   const res = await request(app).get(`/api/file-history/${emptySessionId}/context`);
   assert.strictEqual(res.status, 200);
   assert.deepStrictEqual(res.body.files, []);
+});
+
+// ── /diff-current additional cases ───────────────────────────────────────────
+
+test('diff-current: stored version vs on-disk current file returns 200 with non-empty hunks and stats', async () => {
+  const homeSlug = slugForPath(HOME);
+  const res = await request(app)
+    .get(`/api/file-history/${MTIME_SESSION_ID}/${MTIME_HASH}/diff-current`)
+    .query({ version: 1, projSlug: homeSlug, filePath: 'mtime-tracked-file.txt' });
+  assert.strictEqual(res.status, 200);
+  assert.ok(Array.isArray(res.body.hunks));
+  assert.ok(res.body.hunks.length > 0, 'stored and current content differ so hunks must be non-empty');
+  assert.strictEqual(typeof res.body.stats.added, 'number');
+  assert.strictEqual(typeof res.body.stats.removed, 'number');
+});
+
+test('diff-current: deleted file (current absent) returns 200 with currentText empty string', async () => {
+  const res = await request(app)
+    .get(`/api/file-history/${SESSION_ID}/${HASH}/diff-current`)
+    .query({ version: 1, projSlug: PROJ_SLUG, filePath: 'deleted-file.txt' });
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.body.currentText, '');
+});
+
+test('diff-current: missing projSlug returns 400', async () => {
+  const res = await request(app)
+    .get(`/api/file-history/${SESSION_ID}/${HASH}/diff-current`)
+    .query({ version: 1, filePath: 'something.js' });
+  assert.strictEqual(res.status, 400);
+});
+
+test('diff-current: path traversal in filePath returns 400', async () => {
+  const res = await request(app)
+    .get(`/api/file-history/${SESSION_ID}/${HASH}/diff-current`)
+    .query({ version: 1, projSlug: PROJ_SLUG, filePath: '../../../etc/passwd' });
+  assert.strictEqual(res.status, 400);
 });

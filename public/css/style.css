@@ -2139,6 +2139,122 @@ mark.search-highlight {
   display: none;
 }
 
+.chat-agent-launch {
+  margin: 8px 0;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--accent);
+  overflow: hidden;
+}
+
+.agent-launch-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+}
+.agent-launch-header[onclick] { cursor: pointer; }
+.agent-launch-header[onclick]:hover { background: var(--bg-secondary); }
+
+.agent-launch-type {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.agent-launch-desc {
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-launch-expand {
+  color: var(--text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.agent-launch-prompt {
+  border-top: 1px solid var(--border);
+}
+.agent-launch-prompt pre {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 11px;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.chat-agent-result {
+  margin: 4px 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  overflow: hidden;
+}
+
+.chat-agent-result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+.chat-agent-result-header:hover { background: var(--bg-tertiary); }
+
+.agent-result-arrow { font-size: 9px; }
+
+.agent-result-type {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.agent-result-label { color: var(--text-secondary); }
+
+.agent-result-link {
+  margin-left: auto;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.chat-agent-conv {
+  border-top: 1px solid var(--border);
+  padding: 8px;
+  background: var(--bg-primary);
+  max-height: 600px;
+  overflow-y: auto;
+}
+.chat-agent-conv .chat-msg { margin-bottom: 8px; }
+.chat-agent-conv .chat-msg:last-child { margin-bottom: 0; }
+
+.activity-agents-heading {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
 .tool-name { font-weight: 600; }
 
 .tool-param {
@@ -2460,6 +2576,99 @@ mark.search-highlight {
   max-height: 90vh;
   display: flex;
   flex-direction: column;
+}
+
+.modal--diff {
+  position: relative;
+  width: 90vw;
+  max-width: 98vw;
+  height: 85vh;
+  max-height: 98vh;
+  min-width: 400px;
+  min-height: 300px;
+  overflow: hidden;
+}
+
+.modal-resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 18px;
+  height: 18px;
+  cursor: se-resize;
+  z-index: 10;
+}
+
+.modal-resize-handle::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  opacity: 0.5;
+}
+
+.modal-resize-handle:hover::after {
+  opacity: 1;
+}
+
+.modal--diff .diff-view {
+  max-height: none;
+}
+
+.diff-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  margin-bottom: 8px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.diff-nav-btns {
+  display: flex;
+}
+
+.diff-nav-btns .diff-nav-btn:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+  border-right: none;
+}
+
+.diff-nav-btns .diff-nav-btn:last-child {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.diff-nav-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.diff-nav-btn:hover:not(:disabled) {
+  background: var(--bg-hover, var(--bg-secondary));
+  border-color: var(--text-muted);
+}
+
+.diff-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.diff-nav-label {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .modal h3 {
@@ -3674,6 +3883,27 @@ mark.search-highlight {
   border-top: 1px solid var(--border);
   overflow-x: auto;
   min-height: 46px;
+  position: relative;
+}
+
+
+.asb-placeholder {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#asb-groups {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+  position: relative;
+  z-index: 1;
 }
 
 .asb-group {
@@ -3681,7 +3911,6 @@ mark.search-highlight {
   flex-direction: column;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  overflow: hidden;
   flex-shrink: 0;
   transition: border-color 0.15s;
 }
@@ -3696,20 +3925,70 @@ mark.search-highlight {
 }
 
 .asb-group-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 10px;
   color: var(--text-muted);
   padding: 3px 8px;
   border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   background: var(--bg-secondary);
   line-height: 1.4;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.asb-group-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asb-new-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.asb-group:hover .asb-new-btn {
+  opacity: 1;
+}
+
+.asb-new-btn:hover {
+  color: var(--success, #3fb950);
+}
+
+.project-active-sub--new {
+  position: relative;
+  opacity: 0.55;
+}
+
+.project-active-sub--new:hover {
+  opacity: 1;
+}
+
+.asb-new-sidebar-icon {
+  font-size: 14px;
+  width: 14px;
+  text-align: center;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .asb-group-sessions {
   display: flex;
+  gap: 4px;
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
 }
+
 
 .asb-pill {
   display: flex;

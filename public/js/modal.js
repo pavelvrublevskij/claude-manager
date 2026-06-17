@@ -9,12 +9,12 @@
  * @param {Array} opts.buttons - Array of { label, primary?, danger?, onClick }
  * @returns {HTMLElement} The overlay element (for external removal if needed)
  */
-function openModal({ title, width, body, buttons = [] }) {
+function openModal({ title, width, body, buttons = [], cls }) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
 
   const modal = document.createElement('div');
-  modal.className = 'modal';
+  modal.className = 'modal' + (cls ? ' ' + cls : '');
   if (width) modal.style.width = width + 'px';
 
   const h3 = document.createElement('h3');

@@ -5,23 +5,33 @@ Object.assign(Sessions, {
     const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
     let bodyHtml = '';
     const hasText = msg.content.some(b => b.type === 'text' && b.text && b.text.trim());
+    const hasAgentBlock = msg.content.some(b =>
+      (b.type === 'tool_use' && b.name === 'Agent') ||
+      (b.type === 'tool_result' && b.agentId)
+    );
 
     for (const block of msg.content) {
       if (block.type === 'text') {
         bodyHtml += `<div class="chat-text">${renderMarkdown(block.text)}</div>`;
       } else if (block.type === 'tool_use') {
-        const toolId = 'tool-' + Math.random().toString(36).slice(2, 8);
-        const { headerSuffix, bodyContent } = Sessions.formatToolUse(block.name, block.input);
-        bodyHtml += `
-          <div class="chat-tool">
-            <div class="chat-tool-header" onclick="document.getElementById('${toolId}').classList.toggle('open')">
-              &#9654; <span class="tool-name">${escapeHtml(block.name)}</span>${headerSuffix}
+        if (block.name === 'Agent') {
+          bodyHtml += Sessions._renderAgentLaunchBlock(block);
+        } else {
+          const toolId = 'tool-' + Math.random().toString(36).slice(2, 8);
+          const { headerSuffix, bodyContent } = Sessions.formatToolUse(block.name, block.input);
+          bodyHtml += `
+            <div class="chat-tool">
+              <div class="chat-tool-header" onclick="document.getElementById('${toolId}').classList.toggle('open')">
+                &#9654; <span class="tool-name">${escapeHtml(block.name)}</span>${headerSuffix}
+              </div>
+              <div class="chat-tool-body" id="${toolId}">${bodyContent}</div>
             </div>
-            <div class="chat-tool-body" id="${toolId}">${bodyContent}</div>
-          </div>
-        `;
+          `;
+        }
       } else if (block.type === 'tool_result') {
-        if (block.text) {
+        if (block.agentId) {
+          bodyHtml += Sessions._renderAgentResultBlock(block);
+        } else if (block.text) {
           const resId = 'res-' + Math.random().toString(36).slice(2, 8);
           bodyHtml += `
             <div class="chat-tool-result">
@@ -36,7 +46,7 @@ Object.assign(Sessions, {
     }
 
     return `
-      <div class="chat-msg ${msg.role}${hasText ? '' : ' chat-msg-tools-only'}">
+      <div class="chat-msg ${msg.role}${(hasText || hasAgentBlock) ? '' : ' chat-msg-tools-only'}">
         <div class="chat-role ${msg.role}">
           <span class="chat-role-label">${msg.role === 'user' ? 'You' : 'Claude'}</span>
           ${msg.model && msg.role === 'assistant' ? `<span class="chat-model">${escapeHtml(shortModel(msg.model))}</span>` : ''}
@@ -45,6 +55,75 @@ Object.assign(Sessions, {
         ${bodyHtml}
       </div>
     `;
+  },
+
+  _renderAgentLaunchBlock(block) {
+    const input = block.input || {};
+    const type = escapeHtml(input.subagent_type || 'Agent');
+    const desc = escapeHtml((input.description || '').trim());
+    const prompt = (input.prompt || '').trim();
+    const promptPreview = escapeHtml(prompt.slice(0, 400));
+    const id = 'alp-' + Math.random().toString(36).slice(2, 8);
+    const hasPrompt = prompt.length > 0;
+
+    return `<div class="chat-agent-launch">
+      <div class="agent-launch-header"${hasPrompt ? ` onclick="Sessions._toggleAgentLaunchPrompt('${id}')"` : ''}>
+        <span class="agent-launch-type">${type}</span>
+        ${desc ? `<span class="agent-launch-desc">${desc}</span>` : ''}
+        ${hasPrompt ? `<span class="agent-launch-expand" id="${id}-btn">&#9654; prompt</span>` : ''}
+      </div>
+      ${hasPrompt ? `<div class="agent-launch-prompt" id="${id}" style="display:none"><pre>${promptPreview}${prompt.length > 400 ? '\n…' : ''}</pre></div>` : ''}
+    </div>`;
+  },
+
+  _renderAgentResultBlock(block) {
+    const agentId = escapeHtml(block.agentId);
+    const type = escapeHtml(block.agentType || 'Agent');
+    const convId = 'agconv-' + block.agentId.slice(0, 16);
+    return `<div class="chat-agent-result">
+      <div class="chat-agent-result-header" onclick="Sessions._expandAgentConv('${agentId}', '${escapeHtml(convId)}')">
+        <span class="agent-result-arrow" id="${escapeHtml(convId)}-arrow">&#9654;</span>
+        <span class="agent-result-type">${type}</span>
+        <span class="agent-result-label">completed</span>
+        <span class="agent-result-link">view conversation</span>
+      </div>
+      <div class="chat-agent-conv" id="${escapeHtml(convId)}" style="display:none"></div>
+    </div>`;
+  },
+
+  _toggleAgentLaunchPrompt(id) {
+    const el = document.getElementById(id);
+    const btn = document.getElementById(id + '-btn');
+    if (!el) return;
+    const open = el.style.display !== 'none';
+    el.style.display = open ? 'none' : 'block';
+    if (btn) btn.innerHTML = open ? '&#9654; prompt' : '&#9660; prompt';
+  },
+
+  async _expandAgentConv(agentId, convId) {
+    const convEl = document.getElementById(convId);
+    const arrowEl = document.getElementById(convId + '-arrow');
+    if (!convEl) return;
+
+    const isOpen = convEl.style.display !== 'none';
+    convEl.style.display = isOpen ? 'none' : 'block';
+    if (arrowEl) arrowEl.innerHTML = isOpen ? '&#9654;' : '&#9660;';
+    if (isOpen || convEl.dataset.loaded) return;
+
+    const { slug, sessionId } = Sessions.detailState;
+    convEl.innerHTML = '<div class="loading"><div class="spinner"></div> Loading sub-agent conversation…</div>';
+
+    try {
+      const data = await api(`/api/projects/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(sessionId)}/subagents/${encodeURIComponent(agentId)}`);
+      convEl.dataset.loaded = '1';
+      if (!data.messages || !data.messages.length) {
+        convEl.innerHTML = '<div class="empty-state"><p>No messages recorded</p></div>';
+        return;
+      }
+      convEl.innerHTML = data.messages.map(m => Sessions.renderMessage(m)).join('');
+    } catch (e) {
+      convEl.innerHTML = `<div class="empty-state"><p>${escapeHtml(e.message)}</p></div>`;
+    }
   },
 
   onDetailSearch: debounce(async function(value) {

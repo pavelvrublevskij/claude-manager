@@ -7,6 +7,39 @@ const ActiveSessionsBar = {
   start() {
     ActiveSessionsBar.poll();
     ActiveSessionsBar._timer = setInterval(ActiveSessionsBar.poll, ActiveSessionsBar.POLL_MS);
+    document.addEventListener('click', () => {
+      const p = document.getElementById('asb-new-panel');
+      if (p) p.remove();
+    });
+  },
+
+  _showNewPanel(btn, slug) {
+    const existing = document.getElementById('asb-new-panel');
+    if (existing) {
+      existing.remove();
+      if (existing.dataset.slug === slug) return;
+    }
+    const rect = btn.getBoundingClientRect();
+    const panel = document.createElement('div');
+    panel.id = 'asb-new-panel';
+    panel.className = 'action-menu-panel open';
+    panel.dataset.slug = slug;
+    const panelWidth = 150;
+    const hPos = rect.right >= panelWidth
+      ? `right:${window.innerWidth - rect.right}px`
+      : `left:${Math.max(0, rect.left)}px`;
+    panel.style.cssText = `position:fixed;top:auto;${hPos};bottom:${window.innerHeight - rect.top + 4}px;z-index:1000;width:max-content;`;
+    panel.innerHTML = `<button class="action-menu-item" data-action="os">In OS terminal</button><button class="action-menu-item" data-action="browser">In browser terminal</button>`;
+    panel.querySelectorAll('.action-menu-item').forEach(item => {
+      item.addEventListener('click', e => {
+        e.stopPropagation();
+        panel.remove();
+        if (typeof Sessions === 'undefined') return;
+        if (item.dataset.action === 'os') Sessions.newSessionOS(slug);
+        else Sessions.newSessionBrowser(slug);
+      });
+    });
+    document.body.appendChild(panel);
   },
 
   async poll() {
@@ -22,10 +55,18 @@ const ActiveSessionsBar = {
     const bar = document.getElementById('active-sessions-bar');
     if (!bar) return;
     const sessions = ActiveSessionsBar._sessions;
+
+    const container = document.getElementById('asb-groups');
+    if (!container) return;
+
     if (!sessions.length) {
       bar.style.display = 'none';
+      container.innerHTML = '';
       return;
     }
+
+    bar.style.display = 'flex';
+
     const inSession = typeof App !== 'undefined' && App.currentView === 'session-detail';
     const currentSessionId = inSession && typeof Sessions !== 'undefined' ? Sessions.detailState.sessionId : null;
 
@@ -36,8 +77,7 @@ const ActiveSessionsBar = {
       bySlug[s.slug].push(s);
     }
 
-    bar.style.display = 'flex';
-    bar.innerHTML = slugOrder.map(slug => {
+    const groupsHtml = slugOrder.map(slug => {
       const group = bySlug[slug];
       const pills = group.map(s => {
         const label = s.title || s.sessionId.slice(0, 12);
@@ -49,15 +89,20 @@ const ActiveSessionsBar = {
         </div>`;
       }).join('');
       return `<div class="asb-group">
-        <div class="asb-group-header">${escapeHtml(decodeName(slug))}</div>
+        <div class="asb-group-header">
+          <span class="asb-group-name">${escapeHtml(decodeName(slug))}</span>
+          <button class="asb-new-btn" onclick="event.stopPropagation(); ActiveSessionsBar._showNewPanel(this, '${slug}')" title="New session">+</button>
+        </div>
         <div class="asb-group-sessions">${pills}</div>
       </div>`;
     }).join('');
 
-    bar.querySelectorAll('.asb-pill').forEach(el => {
+    container.innerHTML = groupsHtml;
+
+    container.querySelectorAll('.asb-pill').forEach(el => {
       el.addEventListener('click', () => ActiveSessionsBar.open(el.dataset.asbSlug, el.dataset.asbSession));
     });
-    bar.querySelectorAll('[data-asb-close-session]').forEach(btn => {
+    container.querySelectorAll('[data-asb-close-session]').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
         ActiveSessionsBar.close(btn.dataset.asbCloseSlug, btn.dataset.asbCloseSession);
@@ -106,6 +151,22 @@ const ActiveSessionsBar = {
         anchor.insertAdjacentElement('afterend', div);
         anchor = div;
       }
+
+      const newDiv = document.createElement('div');
+      newDiv.className = 'nav-item project-active-sub project-active-sub--new';
+      newDiv.title = 'New session';
+
+      const newBtn = document.createElement('button');
+      newBtn.className = 'asb-sidebar-new-btn';
+      newBtn.innerHTML = `<span class="asb-new-sidebar-icon">+</span><span class="nav-label">New session</span>`;
+
+      newBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        ActiveSessionsBar._showNewPanel(newBtn, slug);
+      });
+
+      newDiv.appendChild(newBtn);
+      anchor.insertAdjacentElement('afterend', newDiv);
     }
   },
 

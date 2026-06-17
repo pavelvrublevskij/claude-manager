@@ -120,7 +120,11 @@ Object.assign(Sessions, {
       html += Sessions._renderActivityItem(item, idx++);
     }
 
-    // Sub-agent groups, newest first by their first item's timestamp
+    // Sub-agent groups
+    if (agentOrder.length > 0) {
+      html += `<div class="activity-agents-heading">Sub-agents (${agentOrder.length})</div>`;
+    }
+    const autoExpand = agentOrder.length === 1;
     for (const agentId of agentOrder) {
       const group = agentGroups[agentId];
       const groupId = 'ag-' + agentId.slice(0, 12);
@@ -129,11 +133,11 @@ Object.assign(Sessions, {
       html += `
         <div class="activity-agent-group">
           <div class="activity-agent-header" data-group-id="${escapeHtml(groupId)}" onclick="Sessions._toggleAgentGroup(this.dataset.groupId)">
-            <span class="activity-agent-arrow" id="${escapeHtml(groupId)}-arrow">&#9654;</span>
+            <span class="activity-agent-arrow" id="${escapeHtml(groupId)}-arrow">${autoExpand ? '&#9660;' : '&#9654;'}</span>
             <span class="activity-agent-label" title="${escapeHtml(group.label)}">${escapeHtml(shortLabel)}</span>
             <span class="activity-filter-count">${count}</span>
           </div>
-          <div class="activity-agent-body collapsed" id="${escapeHtml(groupId)}">
+          <div class="activity-agent-body${autoExpand ? '' : ' collapsed'}" id="${escapeHtml(groupId)}">
             ${group.items.map(item => Sessions._renderActivityItem(item, idx++)).join('')}
           </div>
         </div>`;

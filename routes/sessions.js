@@ -67,6 +67,7 @@ function safeSpawn(cmd, args, opts) {
 }
 
 function launchTerminal(projectPath, cmd) {
+  if (process.env.__CLAUDE_MANAGER_TEST_HOME) return;
   const platform = process.platform;
   if (platform === 'win32') {
     const wtArgs = ['-d', projectPath, 'cmd.exe', '/k', cmd];
@@ -304,6 +305,28 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
       }
     } catch (_) { continue; }
 
+    // Also search sub-agent conversations
+    if (snippets.length < MAX_SNIPPETS) {
+      const subagentDir = path.join(dir, sessionId, 'subagents');
+      if (fs.existsSync(subagentDir)) {
+        try {
+          for (const sf of fs.readdirSync(subagentDir).filter(sf => sf.endsWith('.jsonl'))) {
+            if (snippets.length >= MAX_SNIPPETS) break;
+            try {
+              const subLines = fs.readFileSync(path.join(subagentDir, sf), 'utf-8').split('\n').filter(Boolean);
+              for (const line of subLines) {
+                if (snippets.length >= MAX_SNIPPETS) break;
+                try {
+                  const entry = JSON.parse(line);
+                  snippets.push(...extractEntrySnippets(entry, q, qLower, snippets.length));
+                } catch (_) {}
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+    }
+
     // Also check title/metadata fields (custom title, index summary, first prompt)
     const meta = indexMeta[sessionId];
     if (snippets.length === 0) {
@@ -456,7 +479,12 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
                   .join('\n')
                   .slice(0, 2000);
               }
-              msg.content.push({ type: 'tool_result', text: resultText });
+              const tr = { type: 'tool_result', text: resultText };
+              if (entry.toolUseResult?.agentId) {
+                tr.agentId = entry.toolUseResult.agentId;
+                tr.agentType = entry.toolUseResult.agentType || '';
+              }
+              msg.content.push(tr);
             } else if (block.type === 'thinking') {
               // skip thinking blocks
             }
@@ -536,6 +564,69 @@ router.get('/:slug/sessions/:sessionId/activity', wrapRoute((req, res) => {
   for (const item of items) byCategory[item.category]++;
 
   res.json({ items, stats: { total: items.length, byCategory } });
+}));
+
+router.get('/:slug/sessions/:sessionId/subagents/:agentId', wrapRoute((req, res) => {
+  const dir = safeSlug(req.params.slug);
+  if (!dir) return res.status(400).json({ error: 'Invalid slug' });
+
+  const sessionId = req.params.sessionId;
+  if (sessionId.includes('..') || sessionId.includes('/') || sessionId.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid session ID' });
+  }
+
+  const agentId = req.params.agentId;
+  if (!/^[a-zA-Z0-9_-]+$/.test(agentId)) {
+    return res.status(400).json({ error: 'Invalid agent ID' });
+  }
+
+  const filePath = path.join(dir, sessionId, 'subagents', 'agent-' + agentId + '.jsonl');
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Sub-agent session not found' });
+
+  const lines = fs.readFileSync(filePath, 'utf-8').split('\n').filter(Boolean);
+  const messages = [];
+
+  for (const line of lines) {
+    try {
+      const entry = JSON.parse(line);
+      if (entry.type !== 'user' && entry.type !== 'assistant') continue;
+      const msg = {
+        role: entry.type,
+        timestamp: entry.timestamp,
+        model: entry.message?.model || '',
+        content: []
+      };
+      const content = entry.message?.content;
+      if (typeof content === 'string') {
+        msg.content.push({ type: 'text', text: content });
+      } else if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block.type === 'text') {
+            msg.content.push({ type: 'text', text: block.text });
+          } else if (block.type === 'tool_use') {
+            msg.content.push({ type: 'tool_use', name: block.name, input: block.input });
+          } else if (block.type === 'tool_result') {
+            let resultText = '';
+            if (typeof block.content === 'string') {
+              resultText = block.content.slice(0, 2000);
+            } else if (Array.isArray(block.content)) {
+              resultText = block.content.filter(c => c.type === 'text').map(c => c.text).join('\n').slice(0, 2000);
+            }
+            const tr = { type: 'tool_result', text: resultText };
+            if (entry.toolUseResult?.agentId) {
+              tr.agentId = entry.toolUseResult.agentId;
+              tr.agentType = entry.toolUseResult.agentType || '';
+            }
+            msg.content.push(tr);
+          }
+        }
+      }
+      if (msg.content.length > 0) messages.push(msg);
+    } catch (_) {}
+  }
+
+  messages.reverse();
+  res.json({ messages });
 }));
 
 router.post('/:slug/sessions/new', wrapRoute((req, res) => {
