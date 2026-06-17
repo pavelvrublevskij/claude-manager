@@ -67,7 +67,12 @@ Object.assign(Sessions, {
     ).join('');
 
     panel.innerHTML = `
-      <div class="activity-filter-bar">${filterBar}</div>
+      <div class="activity-filter-bar">
+        ${filterBar}
+        <div class="activity-filter-spacer"></div>
+        <button class="activity-toggle-btn" onclick="Sessions._setAllAgentGroups(false)" title="Collapse all agent groups">&#9654;&#9654;</button>
+        <button class="activity-toggle-btn" onclick="Sessions._setAllAgentGroups(true)" title="Expand all agent groups">&#9660;&#9660;</button>
+      </div>
       <div class="activity-list" id="activity-list"></div>
     `;
     Sessions._renderActivityList(Sessions._activityItems);
@@ -124,11 +129,11 @@ Object.assign(Sessions, {
       html += `
         <div class="activity-agent-group">
           <div class="activity-agent-header" onclick="Sessions._toggleAgentGroup('${groupId}')">
-            <span class="activity-agent-arrow" id="${groupId}-arrow">&#9660;</span>
+            <span class="activity-agent-arrow" id="${groupId}-arrow">&#9654;</span>
             <span class="activity-agent-label" title="${escapeHtml(group.label)}">${escapeHtml(shortLabel)}</span>
             <span class="activity-filter-count">${count}</span>
           </div>
-          <div class="activity-agent-body" id="${groupId}">
+          <div class="activity-agent-body collapsed" id="${groupId}">
             ${group.items.map(item => Sessions._renderActivityItem(item, idx++)).join('')}
           </div>
         </div>`;
@@ -143,6 +148,14 @@ Object.assign(Sessions, {
     if (!body) return;
     const collapsed = body.classList.toggle('collapsed');
     if (arrow) arrow.innerHTML = collapsed ? '&#9654;' : '&#9660;';
+  },
+
+  _setAllAgentGroups(expanded) {
+    document.querySelectorAll('.activity-agent-body').forEach(body => {
+      body.classList.toggle('collapsed', !expanded);
+      const arrow = document.getElementById(body.id + '-arrow');
+      if (arrow) arrow.innerHTML = expanded ? '&#9660;' : '&#9654;';
+    });
   },
 
   _renderActivityItem(item, i) {

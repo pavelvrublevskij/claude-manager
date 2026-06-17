@@ -3270,6 +3270,19 @@ mark.search-highlight {
 .activity-agent-body.collapsed { display: none; }
 .activity-agent-body .activity-item { padding-left: 28px; }
 
+.activity-filter-spacer { flex: 1; }
+.activity-toggle-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 9px;
+  padding: 2px 6px;
+  line-height: 1;
+}
+.activity-toggle-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+
 .activity-item-detail {
   display: none;
   margin-top: 6px;
