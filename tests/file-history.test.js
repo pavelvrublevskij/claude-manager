@@ -254,6 +254,46 @@ test('context: mtime is null and isDeleted=true for files missing from disk', as
   assert.strictEqual(file.isDeleted, true);
 });
 
+// ── Plan detection via Write tool to PLANS_DIR ───────────────────────────────
+
+const WRITE_PLAN_SESSION_ID = 'writeplan-4444-4444-4444-444444444444';
+const WRITE_PLAN_PATH = path.join(PLANS_DIR, 'write-detected-plan.md');
+
+before(() => {
+  const projDir = path.join(paths.PROJECTS_DIR, PROJ_SLUG);
+  const entries = [
+    { type: 'user', timestamp: '2026-06-01T10:00:00.000Z', message: { content: 'plan request' } },
+    {
+      type: 'assistant',
+      message: {
+        content: [
+          { type: 'tool_use', id: 'toolu_plan_write', name: 'Write', input: { file_path: WRITE_PLAN_PATH, content: '# Plan\n\nContent.' } }
+        ]
+      }
+    }
+  ];
+  fs.writeFileSync(
+    path.join(projDir, WRITE_PLAN_SESSION_ID + '.jsonl'),
+    entries.map(e => JSON.stringify(e)).join('\n')
+  );
+  fs.mkdirSync(PLANS_DIR, { recursive: true });
+  fs.writeFileSync(WRITE_PLAN_PATH, '# Plan\n\nContent.');
+});
+
+test('context: plan written to PLANS_DIR via Write tool appears in plans array', async () => {
+  const res = await request(app).get(`/api/file-history/${WRITE_PLAN_SESSION_ID}/context`);
+  assert.strictEqual(res.status, 200);
+  const names = res.body.plans.map(p => p.name);
+  assert.ok(names.includes('write-detected-plan'), 'plan created via Write tool must appear even without ExitPlanMode call');
+});
+
+test('context: plan written to PLANS_DIR via Write tool does not appear in files array', async () => {
+  const res = await request(app).get(`/api/file-history/${WRITE_PLAN_SESSION_ID}/context`);
+  assert.strictEqual(res.status, 200);
+  const found = res.body.files.some(f => f.path.includes('write-detected-plan'));
+  assert.ok(!found, 'plan file must not appear in the files section');
+});
+
 // ── Write tool scan ───────────────────────────────────────────────────────────
 
 const WRITE_SESSION_ID = 'writetest1-3333-3333-3333-333333333333';
@@ -305,4 +345,72 @@ test('context: Write file already in snapshot is not overridden with isNew', asy
   const res = await request(app).get(`/api/file-history/${SESSION_ID}/context`);
   const matches = res.body.files.filter(f => f.path === '/projects/myapp/src/new-file.js');
   assert.strictEqual(matches.length, 1, 'snapshot-tracked new file must appear exactly once');
+});
+
+// ── Write/Edit tool fallback with NO file-history directory ──────────────────
+
+const NO_HISTDIR_SESSION_ID = 'nohistdir-5555-5555-5555-555555555555';
+const NO_HISTDIR_PROJ_DIR = path.resolve(decodeSlug(PROJ_SLUG));
+const NO_HISTDIR_WRITE_PATH = path.join(NO_HISTDIR_PROJ_DIR, 'specs', 'plan.md');
+const NO_HISTDIR_EDIT_PATH = path.join(NO_HISTDIR_PROJ_DIR, 'specs', 'existing.md');
+
+before(() => {
+  const projDir = path.join(paths.PROJECTS_DIR, PROJ_SLUG);
+  const entries = [
+    { type: 'user', timestamp: '2026-04-01T10:00:00.000Z', message: { content: 'start' } },
+    {
+      type: 'assistant',
+      message: {
+        content: [
+          { type: 'tool_use', id: 't1', name: 'Write', input: { file_path: NO_HISTDIR_WRITE_PATH, content: '# Plan\n' } },
+          { type: 'tool_use', id: 't2', name: 'Edit', input: { file_path: NO_HISTDIR_EDIT_PATH, old_string: 'a', new_string: 'b' } }
+        ]
+      }
+    }
+  ];
+  fs.writeFileSync(
+    path.join(projDir, NO_HISTDIR_SESSION_ID + '.jsonl'),
+    entries.map(e => JSON.stringify(e)).join('\n')
+  );
+  // Intentionally do NOT create FILE_HISTORY_DIR/NO_HISTDIR_SESSION_ID
+});
+
+test('context: Write-tool files appear with isNew=true when no file-history dir exists', async () => {
+  const res = await request(app).get(`/api/file-history/${NO_HISTDIR_SESSION_ID}/context`);
+  assert.strictEqual(res.status, 200);
+  const f = res.body.files.find(f => f.path === 'specs/plan.md');
+  assert.ok(f, 'Write-detected file must appear even when file-history directory does not exist');
+  assert.strictEqual(f.isNew, true);
+  assert.strictEqual(f.hash, null);
+  assert.deepStrictEqual(f.versions, []);
+});
+
+test('context: session without file-history dir returns projSlug correctly', async () => {
+  const res = await request(app).get(`/api/file-history/${NO_HISTDIR_SESSION_ID}/context`);
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.body.projSlug, PROJ_SLUG);
+});
+
+test('context: Edit-tool files without snapshot are excluded (no diff available)', async () => {
+  const res = await request(app).get(`/api/file-history/${NO_HISTDIR_SESSION_ID}/context`);
+  assert.strictEqual(res.status, 200);
+  // Edit-only files have isNew=false, hash=null, versions=[] → filtered out since no diff can be shown
+  const editFile = res.body.files.find(f => f.path === 'specs/existing.md');
+  assert.ok(!editFile, 'Edit-only file without snapshot should not appear (no diff data available)');
+});
+
+test('context: session with no file-history dir and no tool writes returns empty files', async () => {
+  const emptySessionId = 'notools55-6666-6666-6666-666666666666';
+  const projDir = path.join(paths.PROJECTS_DIR, PROJ_SLUG);
+  const entries = [
+    { type: 'user', timestamp: '2026-05-01T10:00:00.000Z', message: { content: 'just chatting' } },
+    { type: 'assistant', message: { content: 'sure' } }
+  ];
+  fs.writeFileSync(
+    path.join(projDir, emptySessionId + '.jsonl'),
+    entries.map(e => JSON.stringify(e)).join('\n')
+  );
+  const res = await request(app).get(`/api/file-history/${emptySessionId}/context`);
+  assert.strictEqual(res.status, 200);
+  assert.deepStrictEqual(res.body.files, []);
 });

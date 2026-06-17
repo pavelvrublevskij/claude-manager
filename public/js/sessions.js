@@ -279,7 +279,8 @@ const Sessions = {
     const h = Math.floor(diff / 3600000);
     if (h < 24) return `${h}h ago`;
     const d = Math.floor(diff / 86400000);
-    return `${d}d ago`;
+    if (d < 30) return `${d}d ago`;
+    return new Date(ts).toLocaleDateString();
   },
 
   _renderHistoryInto(dropdownId, storageKey, applyHandler, removeHandler, clearHandler) {
@@ -508,6 +509,7 @@ const Sessions = {
     if (!Number.isFinite(ms) || ms < Sessions.REFRESH_INTERVAL_MIN_MS) return false;
     localStorage.setItem(Sessions.REFRESH_INTERVAL_KEY, String(ms));
     if (Sessions._refreshTimer && !Sessions.isConversationHidden()) Sessions.startAutoRefresh();
+    if (Sessions._ctxTimer) Sessions.startCtxPolling();
     return true;
   },
 
@@ -757,7 +759,10 @@ const Sessions = {
         Sessions.annotateDetailPlan(data.stats);
       }
 
-      if (typeof data.total === 'number' && data.total > state.total) Sessions.refreshActivity();
+      if (typeof data.total === 'number' && data.total > state.total) {
+        Sessions.refreshActivity();
+        if (typeof GitActions !== 'undefined') GitActions.refresh();
+      }
       if (typeof data.total !== 'number' || data.total <= state.total) return;
 
       const added = data.total - state.total;

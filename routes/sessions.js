@@ -14,8 +14,21 @@ const terminalServer = require('../lib/terminal-server');
 const activeSessions = require('../lib/active-sessions');
 const { stampActive, listAllActiveSessions } = require('../lib/session-status');
 const { MAX_SNIPPETS, extractEntrySnippets, extractMetaSnippet } = require('../lib/session-search');
+const { collectFromJsonl, collectFromDir } = require('../lib/session-activity');
 
 const router = express.Router({ mergeParams: true });
+
+const _titleCache = new Map();
+const TITLE_CACHE_TTL = 60000;
+
+function getCachedTitle(filePath) {
+  const nowMs = Date.now();
+  const cached = _titleCache.get(filePath);
+  if (cached && nowMs - cached.cachedAt < TITLE_CACHE_TTL) return cached.title;
+  const title = getCustomTitle(filePath) || findFirstMeaningfulPrompt(filePath);
+  _titleCache.set(filePath, { title, cachedAt: nowMs });
+  return title;
+}
 
 function normalizePrompt(text) {
   const m = (text || '').match(/<command-name>(\/[\w-]+)<\/command-name>/);
@@ -84,15 +97,17 @@ function launchTerminal(projectPath, cmd) {
 
 router.get('/active', wrapRoute((req, res) => {
   const all = listAllActiveSessions();
-  const result = all.map(({ slug, sessionId, kind }) => {
-    const dir = safeSlug(slug);
-    let title = '';
-    if (dir) {
-      const filePath = path.join(dir, sessionId + '.jsonl');
-      title = getCustomTitle(filePath) || findFirstMeaningfulPrompt(filePath);
-    }
-    return { slug, sessionId, title: title || '', kind };
-  });
+  const result = all
+    .filter(({ sessionId }) => !sessionId.includes('..') && !sessionId.includes('/') && !sessionId.includes('\\'))
+    .map(({ slug, sessionId, kind }) => {
+      const dir = safeSlug(slug);
+      let title = '';
+      if (dir) {
+        const filePath = path.join(dir, sessionId + '.jsonl');
+        title = getCachedTitle(filePath);
+      }
+      return { slug, sessionId, title: title || '', kind };
+    });
   res.json(result);
 }));
 
@@ -503,102 +518,6 @@ router.get('/:slug/sessions/:sessionId/activity', wrapRoute((req, res) => {
   const filePath = path.join(dir, sessionId + '.jsonl');
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Session not found' });
 
-  const AGENT_TOOLS = new Set(['Agent', 'Task', 'TaskCreate', 'TaskUpdate', 'TaskGet', 'TaskList', 'TaskStop', 'TaskOutput']);
-  const WEB_TOOLS = new Set(['WebFetch', 'WebSearch']);
-  const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
-  const FILE_TOOLS = new Set(['Read', 'Write', 'Edit', 'MultiEdit', 'Glob', 'Grep', 'NotebookEdit']);
-
-  function getCategory(name) {
-    if (AGENT_TOOLS.has(name)) return 'agent';
-    if (WEB_TOOLS.has(name)) return 'web';
-    if (SHELL_TOOLS.has(name)) return 'shell';
-    if (FILE_TOOLS.has(name)) return 'file';
-    return 'other';
-  }
-
-  function getLabel(name, input) {
-    switch (name) {
-      case 'Bash':
-      case 'PowerShell': return (input.command || '');
-      case 'Read':
-      case 'Write':
-      case 'Edit':
-      case 'MultiEdit': return input.file_path || '';
-      case 'NotebookEdit': return input.notebook_path || '';
-      case 'Glob': return input.pattern || '';
-      case 'Grep': return input.pattern || '';
-      case 'WebFetch': return input.url || '';
-      case 'WebSearch': return input.query || '';
-      case 'Agent': return input.description || (input.prompt || '').slice(0, 200);
-      default: return JSON.stringify(input).slice(0, 200);
-    }
-  }
-
-  function extractAgentLabel(lines) {
-    for (const line of lines) {
-      try {
-        const entry = JSON.parse(line);
-        if (entry.type !== 'user') continue;
-        const c = entry.message?.content;
-        if (typeof c === 'string' && c.trim()) return c.trim().slice(0, 200);
-        if (Array.isArray(c)) {
-          for (const b of c) {
-            if (b.type === 'text' && b.text?.trim()) return b.text.trim().slice(0, 200);
-          }
-        }
-      } catch (_) {}
-    }
-    return null;
-  }
-
-  function collectFromJsonl(jsonlPath, agentId) {
-    const result = [];
-    try {
-      const lines = fs.readFileSync(jsonlPath, 'utf-8').split('\n').filter(Boolean);
-      const agentLabel = agentId ? extractAgentLabel(lines) : null;
-      for (const line of lines) {
-        try {
-          const entry = JSON.parse(line);
-          if (entry.type !== 'assistant') continue;
-          const content = entry.message?.content;
-          if (!Array.isArray(content)) continue;
-          for (const block of content) {
-            if (block.type !== 'tool_use') continue;
-            result.push({
-              tool: block.name,
-              category: getCategory(block.name),
-              timestamp: entry.timestamp || null,
-              label: getLabel(block.name, block.input || {}),
-              agentId: agentId || null,
-              agentLabel: agentLabel || null
-            });
-          }
-        } catch (_) {}
-      }
-    } catch (_) {}
-    return result;
-  }
-
-  function collectFromDir(dirPath, maxFiles) {
-    const result = [];
-    let count = 0;
-    function walk(d) {
-      let entries;
-      try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch (_) { return; }
-      for (const e of entries) {
-        if (count >= maxFiles) return;
-        const full = path.join(d, e.name);
-        if (e.isDirectory()) { walk(full); }
-        else if (e.isFile() && e.name.endsWith('.jsonl') && e.name !== 'journal.jsonl') {
-          result.push(...collectFromJsonl(full, e.name.replace('.jsonl', '')));
-          count++;
-        }
-      }
-    }
-    walk(dirPath);
-    return result;
-  }
-
   const items = collectFromJsonl(filePath, null);
 
   const sessionSubDir = path.join(dir, sessionId);
@@ -659,12 +578,13 @@ router.post('/:slug/sessions/:sessionId/resume', wrapRoute((req, res) => {
 
 router.post('/:slug/sessions/:sessionId/deactivate', wrapRoute((req, res) => {
   const slug = req.params.slug;
+  if (!safeSlug(slug)) return res.status(400).json({ error: 'Invalid slug' });
   const sessionId = req.params.sessionId;
   if (sessionId.includes('..') || sessionId.includes('/') || sessionId.includes('\\')) {
     return res.status(400).json({ error: 'Invalid session ID' });
   }
-  terminalServer.disconnectFor(slug, sessionId, 'Closed by user.');
   activeSessions.deactivate(slug, sessionId);
+  terminalServer.disconnectFor(slug, sessionId, 'Closed by user.');
   res.json({ ok: true });
 }));
 

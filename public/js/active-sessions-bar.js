@@ -2,6 +2,7 @@ const ActiveSessionsBar = {
   POLL_MS: 15000,
   _timer: null,
   _sessions: [],
+  _lastSidebarKey: null,
 
   start() {
     ActiveSessionsBar.poll();
@@ -27,37 +28,50 @@ const ActiveSessionsBar = {
     }
     const inSession = typeof App !== 'undefined' && App.currentView === 'session-detail';
     const currentSessionId = inSession && typeof Sessions !== 'undefined' ? Sessions.detailState.sessionId : null;
+
+    const slugOrder = [];
+    const bySlug = {};
+    for (const s of sessions) {
+      if (!bySlug[s.slug]) { bySlug[s.slug] = []; slugOrder.push(s.slug); }
+      bySlug[s.slug].push(s);
+    }
+
     bar.style.display = 'flex';
-    bar.innerHTML = sessions.map((s, i) => {
-      const label = s.title || s.sessionId.slice(0, 12);
-      const isCurrent = s.sessionId === currentSessionId;
-      return `<div class="asb-pill${isCurrent ? ' asb-pill--current' : ''}" data-asb-idx="${i}" title="${escapeHtml(s.title || s.sessionId)}">
-        <span class="session-active-dot session-active-dot--${s.kind}"></span>
-        <div class="asb-text">
-          <span class="asb-project">${escapeHtml(decodeName(s.slug))}</span>
+    bar.innerHTML = slugOrder.map(slug => {
+      const group = bySlug[slug];
+      const pills = group.map(s => {
+        const label = s.title || s.sessionId.slice(0, 12);
+        const isCurrent = s.sessionId === currentSessionId;
+        return `<div class="asb-pill${isCurrent ? ' asb-pill--current' : ''}" data-asb-session="${escapeHtml(s.sessionId)}" data-asb-slug="${escapeHtml(s.slug)}" title="${escapeHtml(s.title || s.sessionId)}">
+          <span class="session-active-dot session-active-dot--${s.kind}"></span>
           <span class="asb-session">${escapeHtml(label)}</span>
-        </div>
-        <button class="asb-close" data-asb-close="${i}" title="Close session" aria-label="Close">&#215;</button>
+          <button class="asb-close" data-asb-close-session="${escapeHtml(s.sessionId)}" data-asb-close-slug="${escapeHtml(s.slug)}" title="Close session" aria-label="Close">&#215;</button>
+        </div>`;
+      }).join('');
+      return `<div class="asb-group">
+        <div class="asb-group-header">${escapeHtml(decodeName(slug))}</div>
+        <div class="asb-group-sessions">${pills}</div>
       </div>`;
     }).join('');
+
     bar.querySelectorAll('.asb-pill').forEach(el => {
-      const idx = parseInt(el.dataset.asbIdx, 10);
-      el.addEventListener('click', () => {
-        const s = ActiveSessionsBar._sessions[idx];
-        if (s) ActiveSessionsBar.open(s.slug, s.sessionId);
-      });
+      el.addEventListener('click', () => ActiveSessionsBar.open(el.dataset.asbSlug, el.dataset.asbSession));
     });
-    bar.querySelectorAll('.asb-close').forEach(btn => {
-      const idx = parseInt(btn.dataset.asbClose, 10);
+    bar.querySelectorAll('[data-asb-close-session]').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
-        const s = ActiveSessionsBar._sessions[idx];
-        if (s) ActiveSessionsBar.close(s.slug, s.sessionId);
+        ActiveSessionsBar.close(btn.dataset.asbCloseSlug, btn.dataset.asbCloseSession);
       });
     });
   },
 
   _renderSidebar() {
+    const inSession = typeof App !== 'undefined' && App.currentView === 'session-detail';
+    const currentSessionId = inSession && typeof Sessions !== 'undefined' ? Sessions.detailState.sessionId : null;
+    const key = ActiveSessionsBar._sessions.map(s => s.slug + '|' + s.sessionId).join(',') + '|' + currentSessionId;
+    if (key === ActiveSessionsBar._lastSidebarKey) return;
+    ActiveSessionsBar._lastSidebarKey = key;
+
     document.querySelectorAll('.project-active-sub').forEach(el => el.remove());
 
     const bySlug = {};
@@ -66,8 +80,6 @@ const ActiveSessionsBar = {
       bySlug[s.slug].push(s);
     }
 
-    const inSession = typeof App !== 'undefined' && App.currentView === 'session-detail';
-    const currentSessionId = inSession && typeof Sessions !== 'undefined' ? Sessions.detailState.sessionId : null;
     for (const [slug, sessions] of Object.entries(bySlug)) {
       const navItem = document.querySelector(`.project-list .nav-item[data-slug="${slug}"]`);
       if (!navItem) continue;

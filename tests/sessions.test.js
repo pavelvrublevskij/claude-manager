@@ -584,3 +584,62 @@ test('GET /api/projects/active returns empty when no active sessions', async () 
   assert.strictEqual(res.status, 200);
   assert.deepStrictEqual(res.body, []);
 });
+
+// ── POST deactivate ───────────────────────────────────────────────────────────
+
+test('POST /api/projects/:slug/sessions/:sessionId/deactivate returns 200 for valid session', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  activeSessions._reset();
+  activeSessions.register(SLUG, SESSION_A, 'os-terminal');
+
+  const res = await request(app)
+    .post(`/api/projects/${SLUG}/sessions/${SESSION_A}/deactivate`);
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.body.ok, true);
+
+  activeSessions._reset();
+});
+
+test('POST /api/projects/:slug/sessions/:sessionId/deactivate returns 400 for invalid slug', async () => {
+  const res = await request(app)
+    .post('/api/projects/bad..slug/sessions/any-session/deactivate');
+  assert.strictEqual(res.status, 400);
+  assert.strictEqual(res.body.error, 'Invalid slug');
+});
+
+test('POST /api/projects/:slug/sessions/:sessionId/deactivate returns 400 for traversal in sessionId', async () => {
+  const res = await request(app)
+    .post(`/api/projects/${SLUG}/sessions/..evil/deactivate`);
+  assert.strictEqual(res.status, 400);
+  assert.strictEqual(res.body.error, 'Invalid session ID');
+});
+
+test('POST /api/projects/:slug/sessions/:sessionId/deactivate removes session from active list', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  activeSessions._reset();
+  activeSessions.register(SLUG, SESSION_A, 'os-terminal');
+
+  await request(app).post(`/api/projects/${SLUG}/sessions/${SESSION_A}/deactivate`);
+
+  const list = await request(app).get('/api/projects/active');
+  const entry = list.body.find(s => s.slug === SLUG && s.sessionId === SESSION_A);
+  assert.ok(!entry, 'deactivated session must not appear in active list');
+
+  activeSessions._reset();
+});
+
+// ── GET /active: sessionId traversal filter ───────────────────────────────────
+
+test('GET /api/projects/active filters out sessions with traversal characters in sessionId', async () => {
+  const activeSessions = require('../lib/active-sessions');
+  activeSessions._reset();
+  // Register a session with a traversal sessionId (register() does not validate)
+  activeSessions.register(SLUG, '../etc/passwd', 'os-terminal');
+
+  const res = await request(app).get('/api/projects/active');
+  assert.strictEqual(res.status, 200);
+  const entry = res.body.find(s => s.sessionId === '../etc/passwd');
+  assert.ok(!entry, 'sessionId with .. must be excluded from active list');
+
+  activeSessions._reset();
+});

@@ -3676,41 +3676,77 @@ mark.search-highlight {
   min-height: 46px;
 }
 
+.asb-group {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+
+.asb-group:has(.asb-pill--current) {
+  border-color: var(--accent);
+}
+
+.asb-group:has(.asb-pill--current) .asb-group-header {
+  color: var(--accent);
+  border-bottom-color: rgba(56, 139, 253, 0.3);
+}
+
+.asb-group-header {
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--bg-secondary);
+  line-height: 1.4;
+}
+
+.asb-group-sessions {
+  display: flex;
+}
+
 .asb-pill {
   display: flex;
   align-items: center;
   gap: 7px;
   padding: 5px 10px;
   background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border: none;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
   cursor: pointer;
-  min-width: 110px;
-  max-width: 170px;
+  min-width: 90px;
+  max-width: 160px;
   flex-shrink: 0;
   user-select: none;
-  transition: border-color 0.15s;
+  transition: background 0.15s;
+}
+
+.asb-pill:last-child {
+  border-right: none;
 }
 
 .asb-pill:hover {
-  border-color: var(--accent);
+  background: var(--bg-hover, var(--border));
 }
 
 .asb-pill:active {
   background: var(--accent-bg);
-  border-color: var(--accent);
 }
 
 .asb-pill--current {
-  border-color: var(--accent);
-  background: var(--accent-bg);
+  background: rgba(56, 139, 253, 0.12);
+  border-left: 3px solid var(--accent);
 }
 
-.asb-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
+.asb-pill--current .asb-session {
+  color: var(--accent);
 }
 
 .asb-close {
@@ -3763,6 +3799,8 @@ mark.search-highlight {
   text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 1.4;
+  flex: 1;
+  min-width: 0;
 }
 
 /* Sidebar active session sub-items */

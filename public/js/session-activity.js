@@ -128,12 +128,12 @@ Object.assign(Sessions, {
       const count = group.items.length;
       html += `
         <div class="activity-agent-group">
-          <div class="activity-agent-header" onclick="Sessions._toggleAgentGroup('${groupId}')">
-            <span class="activity-agent-arrow" id="${groupId}-arrow">&#9654;</span>
+          <div class="activity-agent-header" data-group-id="${escapeHtml(groupId)}" onclick="Sessions._toggleAgentGroup(this.dataset.groupId)">
+            <span class="activity-agent-arrow" id="${escapeHtml(groupId)}-arrow">&#9654;</span>
             <span class="activity-agent-label" title="${escapeHtml(group.label)}">${escapeHtml(shortLabel)}</span>
             <span class="activity-filter-count">${count}</span>
           </div>
-          <div class="activity-agent-body collapsed" id="${groupId}">
+          <div class="activity-agent-body collapsed" id="${escapeHtml(groupId)}">
             ${group.items.map(item => Sessions._renderActivityItem(item, idx++)).join('')}
           </div>
         </div>`;
