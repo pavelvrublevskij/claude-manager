@@ -6,6 +6,7 @@
 - **Search suggestion not dismissing on mouse-away** — the dropdown only closed on input blur, not when the mouse left the search area; now the container uses `onmouseleave` with a 150 ms delayed hide (cancelled by `onmouseenter`) to bridge any gap between the input and the dropdown panel
 - **Search history shared across all projects** — history suggestions were stored under a single global localStorage key, so searches in one project appeared as suggestions in every other project; keys are now scoped per project (`claude-manager-search-history-<slug>`)
 - **Intermediate keystrokes saved to history** — typing "te", "tes", "test" in quick succession saved all three as separate history entries; history is now written with a 1.5 s debounce so only the query the user settles on is recorded
+- **Message timestamps missing date** — conversation messages in session detail only showed time (`09:34 AM`), making multi-day sessions hard to follow; messages from a previous day now include a short date prefix (`Jun 17 09:34 AM`)
 
 ## v1.2.0
 

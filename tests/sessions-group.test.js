@@ -24,7 +24,7 @@ const context = vm.createContext({
   TerminalPanel: { isOpen: () => false, shouldAutoOpen: () => false },
 });
 vm.runInContext(src + '\nglobalThis._Sessions = Sessions;', context);
-const { groupSessions, filterByDateRange } = context._Sessions;
+const { groupSessions, filterByDateRange, _searchKey, _detailSearchKey } = context._Sessions;
 
 function makeSession(id, opts = {}) {
   return {
@@ -121,4 +121,26 @@ test('groupSessions: main/master/HEAD/develop/dev branches are not used for bran
     const { groups } = groupSessions([s1, s2]);
     assert.strictEqual(groups.length, 0, `branch "${branch}" should not trigger branch grouping`);
   }
+});
+
+// ── Search history key scoping ────────────────────────────────────────────────
+
+test('_searchKey returns a key containing the slug', () => {
+  assert.ok(_searchKey('my-project').includes('my-project'));
+});
+
+test('_detailSearchKey returns a key containing the slug', () => {
+  assert.ok(_detailSearchKey('my-project').includes('my-project'));
+});
+
+test('_searchKey differs between slugs', () => {
+  assert.notStrictEqual(_searchKey('proj-a'), _searchKey('proj-b'));
+});
+
+test('_detailSearchKey differs between slugs', () => {
+  assert.notStrictEqual(_detailSearchKey('proj-a'), _detailSearchKey('proj-b'));
+});
+
+test('_searchKey and _detailSearchKey are distinct for the same slug', () => {
+  assert.notStrictEqual(_searchKey('proj-a'), _detailSearchKey('proj-a'));
 });

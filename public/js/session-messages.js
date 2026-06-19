@@ -2,7 +2,14 @@ Object.assign(Sessions, {
   _detailSearchQuery: '',
 
   renderMessage(msg) {
-    const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
+    const time = msg.timestamp ? (() => {
+      const d = new Date(msg.timestamp);
+      const today = new Date();
+      const sameDay = d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+      return sameDay
+        ? d.toLocaleTimeString()
+        : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString();
+    })() : '';
     let bodyHtml = '';
     const hasText = msg.content.some(b => b.type === 'text' && b.text && b.text.trim());
     const hasAgentBlock = msg.content.some(b =>
