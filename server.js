@@ -64,25 +64,46 @@ const { exec, spawn } = require('child_process');
 const os = require('os');
 const AdmZip = require('adm-zip');
 
+const OWNER = 'pavelvrublevskij';
+const REPO = 'claude-manager';
+
+function downloadZip(url, redirectsLeft = 5) {
+  return new Promise((resolve, reject) => {
+    https.get(url, { headers: { 'User-Agent': 'claude-manager' } }, res => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        if (!redirectsLeft) return reject(new Error('Too many redirects'));
+        return resolve(downloadZip(res.headers.location, redirectsLeft - 1));
+      }
+      if (res.statusCode !== 200) {
+        res.resume();
+        return reject(new Error(`Download failed: HTTP ${res.statusCode}`));
+      }
+      const chunks = [];
+      res.on('data', chunk => chunks.push(chunk));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+}
+
 async function fetchReleaseInfo() {
-  const owner = 'pavelvrublevskij';
-  const repo = 'claude-manager';
   try {
-    const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`, {
+    const r = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`, {
       headers: { 'User-Agent': 'claude-manager' }
     });
     if (r.ok) {
       const data = await r.json();
       if (data.tag_name) {
         return {
-          zipUrl: `https://codeload.github.com/${owner}/${repo}/zip/refs/tags/${data.tag_name}`,
+          zipUrl: `https://github.com/${OWNER}/${REPO}/archive/refs/tags/${data.tag_name}.zip`,
           latestVersion: data.tag_name.replace(/^v/, '')
         };
       }
     }
   } catch (_) {}
   return {
-    zipUrl: `https://codeload.github.com/${owner}/${repo}/zip/refs/heads/main`,
+    zipUrl: `https://github.com/${OWNER}/${REPO}/archive/refs/heads/main.zip`,
     latestVersion: null
   };
 }
@@ -106,9 +127,7 @@ app.post('/api/update/zip', async (req, res) => {
     if (latestVersion && !isNewer(latestVersion, version)) {
       return res.status(400).json({ error: 'Already on the latest version' });
     }
-    const r = await fetch(zipUrl, { headers: { 'User-Agent': 'claude-manager' }, redirect: 'follow' });
-    if (!r.ok) throw new Error(`Download failed: HTTP ${r.status}`);
-    const zipBuffer = Buffer.from(await r.arrayBuffer());
+    const zipBuffer = await downloadZip(zipUrl);
 
     const zip = new AdmZip(zipBuffer);
     const tmpDir = path.join(os.tmpdir(), 'claude-manager-update-' + Date.now());

@@ -7,7 +7,7 @@
 - **Search history shared across all projects** — history suggestions were stored under a single global localStorage key, so searches in one project appeared as suggestions in every other project; keys are now scoped per project (`claude-manager-search-history-<slug>`)
 - **Intermediate keystrokes saved to history** — typing "te", "tes", "test" in quick succession saved all three as separate history entries; history is now written with a 1.5 s debounce so only the query the user settles on is recorded
 - **Message timestamps missing date** — conversation messages in session detail only showed time (`09:34 AM`), making multi-day sessions hard to follow; messages from a previous day now include a short date prefix (`Jun 17 09:34 AM`)
-- **Auto-update failing with HTTP 3xx** — the download URLs (`zipball_url` from GitHub API and the main-branch archive fallback) both redirect to `codeload.github.com`; Node.js built-in fetch did not reliably follow those redirects, causing the update to fail; now uses `codeload.github.com` URLs directly, which return 200 with the zip without any redirect
+- **Auto-update failing with HTTP 300** — GitHub's API `zipball/{tag}` endpoint returns HTTP 300 "Multiple Choices" with no `Location` header for tag-based refs, which cannot be followed as a redirect; switched to `github.com/archive/refs/tags/{tag}.zip` which returns a standard 302 redirect to the download CDN; download now uses Node's `https` module with explicit redirect following instead of built-in `fetch`
 
 ## v1.2.0
 
