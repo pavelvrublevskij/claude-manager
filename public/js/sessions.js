@@ -7,8 +7,8 @@ const Sessions = {
   _planSessionIds: null,
   _renderedGroups: [],
   GROUP_COLLAPSED_KEY: 'claude-manager-collapsed-groups',
-  SEARCH_HISTORY_KEY: 'claude-manager-search-history',
-  DETAIL_SEARCH_HISTORY_KEY: 'claude-manager-detail-search-history',
+  _searchKey(slug) { return `claude-manager-search-history-${slug}`; },
+  _detailSearchKey(slug) { return `claude-manager-detail-search-history-${slug}`; },
 
   _getCollapsed() {
     try { return new Set(JSON.parse(localStorage.getItem(Sessions.GROUP_COLLAPSED_KEY) || '[]')); }
@@ -207,12 +207,12 @@ const Sessions = {
 
   renderSearchBar(slug) {
     return `<div class="session-search-wrap">
-      <div class="session-search-container">
+      <div class="session-search-container" onmouseenter="Sessions._cancelHideHistoryDropdown()" onmouseleave="Sessions._hideHistoryDropdownDelayed()">
         <input type="text" class="session-search" id="session-search-input"
           placeholder="Search sessions..."
           oninput="Sessions._hideHistoryDropdown(); Sessions.onSearch('${slug}', this.value)"
           onfocus="Sessions.showHistory('${slug}')"
-          onblur="Sessions._hideHistoryDropdown()">
+          onblur="Sessions._hideHistoryDropdownDelayed()">
         <div class="search-history-dropdown" id="search-history-dropdown" style="display:none"></div>
       </div>
       <div class="action-menu">
@@ -226,37 +226,42 @@ const Sessions = {
   },
 
   _getHistory(key) {
-    try { return JSON.parse(localStorage.getItem(key || Sessions.SEARCH_HISTORY_KEY) || '[]'); }
+    try { return JSON.parse(localStorage.getItem(key) || '[]'); }
     catch (_) { return []; }
   },
 
   _saveToHistory(q, key) {
-    const k = key || Sessions.SEARCH_HISTORY_KEY;
-    let h = Sessions._getHistory(k).filter(e => e.q !== q);
+    let h = Sessions._getHistory(key).filter(e => e.q !== q);
     h.unshift({ q, ts: Date.now() });
     if (h.length > 50) h = h.slice(0, 50);
-    localStorage.setItem(k, JSON.stringify(h));
+    localStorage.setItem(key, JSON.stringify(h));
   },
 
+  _saveToHistoryDebounced: debounce(function(q, key) {
+    Sessions._saveToHistory(q, key);
+  }, 1500),
+
   _removeFromHistory(q) {
-    const h = Sessions._getHistory(Sessions.SEARCH_HISTORY_KEY).filter(e => e.q !== q);
-    localStorage.setItem(Sessions.SEARCH_HISTORY_KEY, JSON.stringify(h));
+    const key = Sessions._searchKey(Sessions._historySlug);
+    const h = Sessions._getHistory(key).filter(e => e.q !== q);
+    localStorage.setItem(key, JSON.stringify(h));
     Sessions._renderHistoryDropdown(Sessions._historySlug);
   },
 
   _clearHistory() {
-    localStorage.removeItem(Sessions.SEARCH_HISTORY_KEY);
+    localStorage.removeItem(Sessions._searchKey(Sessions._historySlug));
     Sessions._hideHistoryDropdown();
   },
 
   _removeFromDetailHistory(q) {
-    const h = Sessions._getHistory(Sessions.DETAIL_SEARCH_HISTORY_KEY).filter(e => e.q !== q);
-    localStorage.setItem(Sessions.DETAIL_SEARCH_HISTORY_KEY, JSON.stringify(h));
+    const key = Sessions._detailSearchKey(Sessions.detailState.slug);
+    const h = Sessions._getHistory(key).filter(e => e.q !== q);
+    localStorage.setItem(key, JSON.stringify(h));
     Sessions._renderDetailHistoryDropdown();
   },
 
   _clearDetailHistory() {
-    localStorage.removeItem(Sessions.DETAIL_SEARCH_HISTORY_KEY);
+    localStorage.removeItem(Sessions._detailSearchKey(Sessions.detailState.slug));
     Sessions._hideDetailHistoryDropdown();
   },
 
@@ -319,7 +324,7 @@ const Sessions = {
   _renderHistoryDropdown(slug) {
     Sessions._renderHistoryInto(
       'search-history-dropdown',
-      Sessions.SEARCH_HISTORY_KEY,
+      Sessions._searchKey(slug),
       `Sessions._applyHistory(event, '${slug}', this)`,
       'Sessions._removeFromHistory',
       'Sessions._clearHistory'
@@ -329,7 +334,7 @@ const Sessions = {
   _renderDetailHistoryDropdown() {
     Sessions._renderHistoryInto(
       'detail-search-history-dropdown',
-      Sessions.DETAIL_SEARCH_HISTORY_KEY,
+      Sessions._detailSearchKey(Sessions.detailState.slug),
       'Sessions._applyDetailHistory(event, this)',
       'Sessions._removeFromDetailHistory',
       'Sessions._clearDetailHistory'
@@ -340,7 +345,7 @@ const Sessions = {
     event.preventDefault();
     const q = el.dataset.query;
     const input = document.getElementById('session-search-input');
-    if (input) { input.value = q; input.focus(); }
+    if (input) { input.value = q; input.blur(); }
     Sessions._hideHistoryDropdown();
     Sessions.onSearch(slug, q);
   },
@@ -349,7 +354,7 @@ const Sessions = {
     event.preventDefault();
     const q = el.dataset.query;
     const input = document.getElementById('session-detail-search-input');
-    if (input) { input.value = q; input.focus(); }
+    if (input) { input.value = q; input.blur(); }
     Sessions._hideDetailHistoryDropdown();
     Sessions.onDetailSearch(q);
   },
@@ -362,6 +367,24 @@ const Sessions = {
   _hideDetailHistoryDropdown() {
     const dropdown = document.getElementById('detail-search-history-dropdown');
     if (dropdown) dropdown.style.display = 'none';
+  },
+
+  _hideHistoryDropdownDelayed() {
+    clearTimeout(Sessions._hideHistoryTimer);
+    Sessions._hideHistoryTimer = setTimeout(() => Sessions._hideHistoryDropdown(), 150);
+  },
+
+  _cancelHideHistoryDropdown() {
+    clearTimeout(Sessions._hideHistoryTimer);
+  },
+
+  _hideDetailHistoryDropdownDelayed() {
+    clearTimeout(Sessions._hideDetailHistoryTimer);
+    Sessions._hideDetailHistoryTimer = setTimeout(() => Sessions._hideDetailHistoryDropdown(), 150);
+  },
+
+  _cancelHideDetailHistoryDropdown() {
+    clearTimeout(Sessions._hideDetailHistoryTimer);
   },
 
   renderList(slug, sessions) {
@@ -439,7 +462,7 @@ const Sessions = {
   onSearch: debounce(async function(slug, value) {
     const q = value.trim();
     Sessions._lastQuery = q;
-    if (q.length >= 2) Sessions._saveToHistory(q);
+    if (q.length >= 2) Sessions._saveToHistoryDebounced(q, Sessions._searchKey(slug));
 
     if (q.length < 2) {
       if (Sessions.cache[slug]) {

@@ -1,3 +1,12 @@
+## v1.2.1
+
+### Bug fixes
+
+- **Search suggestion re-appearing after selection** — clicking a history suggestion caused the dropdown to hide then immediately reappear; fixed by removing the `input.focus()` call that was re-triggering `onfocus` → `showHistory()`, and instead calling `input.blur()` so the next click correctly re-opens the dropdown
+- **Search suggestion not dismissing on mouse-away** — the dropdown only closed on input blur, not when the mouse left the search area; now the container uses `onmouseleave` with a 150 ms delayed hide (cancelled by `onmouseenter`) to bridge any gap between the input and the dropdown panel
+- **Search history shared across all projects** — history suggestions were stored under a single global localStorage key, so searches in one project appeared as suggestions in every other project; keys are now scoped per project (`claude-manager-search-history-<slug>`)
+- **Intermediate keystrokes saved to history** — typing "te", "tes", "test" in quick succession saved all three as separate history entries; history is now written with a 1.5 s debounce so only the query the user settles on is recorded
+
 ## v1.2.0
 
 ### Features
