@@ -2,7 +2,14 @@ Object.assign(Sessions, {
   _detailSearchQuery: '',
 
   renderMessage(msg) {
-    const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
+    const time = msg.timestamp ? (() => {
+      const d = new Date(msg.timestamp);
+      const today = new Date();
+      const sameDay = d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+      return sameDay
+        ? d.toLocaleTimeString()
+        : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString();
+    })() : '';
     let bodyHtml = '';
     const hasText = msg.content.some(b => b.type === 'text' && b.text && b.text.trim());
     const hasAgentBlock = msg.content.some(b =>
@@ -129,7 +136,7 @@ Object.assign(Sessions, {
   onDetailSearch: debounce(async function(value) {
     const q = value.trim();
     Sessions._detailSearchQuery = q;
-    if (q.length >= 2) Sessions._saveToHistory(q, Sessions.DETAIL_SEARCH_HISTORY_KEY);
+    if (q.length >= 2) Sessions._saveToHistoryDebounced(q, Sessions._detailSearchKey(Sessions.detailState.slug));
     if (q && Sessions.detailState.hasMore) {
       await Sessions.loadAllMessages();
       if (Sessions._detailSearchQuery !== q) return;

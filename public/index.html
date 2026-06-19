@@ -570,12 +570,12 @@
             <div class="session-messages-header">
               <div class="subtitle" id="session-count" style="color:var(--text-muted)"></div>
               <div class="session-search-wrap" style="margin-top:8px;margin-bottom:0">
-                <div class="session-search-container">
+                <div class="session-search-container" onmouseenter="Sessions._cancelHideDetailHistoryDropdown()" onmouseleave="Sessions._hideDetailHistoryDropdownDelayed()">
                   <input type="text" class="session-search" id="session-detail-search-input"
                     placeholder="Search in this session..."
                     oninput="Sessions._hideDetailHistoryDropdown(); Sessions.onDetailSearch(this.value)"
                     onfocus="Sessions.showDetailHistory()"
-                    onblur="Sessions._hideDetailHistoryDropdown()">
+                    onblur="Sessions._hideDetailHistoryDropdownDelayed()">
                   <div class="search-history-dropdown" id="detail-search-history-dropdown" style="display:none"></div>
                 </div>
                 <span id="session-detail-search-count" style="font-size:12px;color:var(--text-muted);white-space:nowrap"></span>
