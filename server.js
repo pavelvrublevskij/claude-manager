@@ -65,18 +65,26 @@ const os = require('os');
 const AdmZip = require('adm-zip');
 
 async function fetchReleaseInfo() {
+  const owner = 'pavelvrublevskij';
+  const repo = 'claude-manager';
   try {
-    const r = await fetch('https://api.github.com/repos/pavelvrublevskij/claude-manager/releases/latest', {
+    const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`, {
       headers: { 'User-Agent': 'claude-manager' }
     });
     if (r.ok) {
       const data = await r.json();
-      if (data.zipball_url) {
-        return { zipUrl: data.zipball_url, latestVersion: data.tag_name?.replace(/^v/, '') };
+      if (data.tag_name) {
+        return {
+          zipUrl: `https://codeload.github.com/${owner}/${repo}/zip/refs/tags/${data.tag_name}`,
+          latestVersion: data.tag_name.replace(/^v/, '')
+        };
       }
     }
   } catch (_) {}
-  return { zipUrl: 'https://github.com/pavelvrublevskij/claude-manager/archive/refs/heads/main.zip', latestVersion: null };
+  return {
+    zipUrl: `https://codeload.github.com/${owner}/${repo}/zip/refs/heads/main`,
+    latestVersion: null
+  };
 }
 
 function copyDirSync(src, dest) {
