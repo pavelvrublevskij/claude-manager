@@ -216,14 +216,26 @@ const Sessions = {
     Sessions.load(slug);
   },
 
-  async archiveAction(slug, sessionId) {
-    try {
-      await api(`/api/projects/${slug}/sessions/${sessionId}/archive`, { method: 'POST' });
-      Sessions.cache[slug] = (Sessions.cache[slug] || []).filter(s => s.sessionId !== sessionId);
-      Sessions.renderList(slug, Sessions.applyFilters(Sessions.cache[slug]));
-    } catch (e) {
-      toast('Failed to archive session', 'error');
-    }
+  archiveAction(slug, sessionId) {
+    document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
+    openModal({
+      title: 'Archive session',
+      body: '<p>This session will be hidden from the session list and excluded from search. Token usage will still be counted in statistics.</p><p>Are you sure you want to archive this session?</p>',
+      buttons: [{
+        label: 'Archive',
+        primary: true,
+        onClick: async () => {
+          try {
+            await api(`/api/projects/${slug}/sessions/${sessionId}/archive`, { method: 'POST' });
+            Sessions.cache[slug] = (Sessions.cache[slug] || []).filter(s => s.sessionId !== sessionId);
+            Sessions.renderList(slug, Sessions.applyFilters(Sessions.cache[slug]));
+          } catch (e) {
+            toast('Failed to archive session', 'error');
+            return false;
+          }
+        }
+      }]
+    });
   },
 
   async unarchiveAction(slug, sessionId) {
@@ -236,29 +248,41 @@ const Sessions = {
     }
   },
 
-  async archiveDetail() {
+  archiveDetail() {
     const { slug, sessionId } = Sessions.detailState;
     if (!slug || !sessionId) return;
-    try {
-      await api(`/api/projects/${slug}/sessions/${sessionId}/archive`, { method: 'POST' });
-      if (Sessions.cache[slug]) {
-        Sessions.cache[slug] = Sessions.cache[slug].filter(s => s.sessionId !== sessionId);
-      }
-      const archiveBtn = document.getElementById('session-detail-archive-btn');
-      const unarchiveBtn = document.getElementById('session-detail-unarchive-btn');
-      const archivedWarning = document.getElementById('session-archived-warning');
-      const isActive = !!(Sessions._detailInfo && Sessions._detailInfo.active);
-      if (archiveBtn) archiveBtn.style.display = 'none';
-      if (unarchiveBtn) unarchiveBtn.style.display = isActive ? '' : 'none';
-      if (archivedWarning) {
-        archivedWarning.innerHTML = isActive
-          ? '&#9888; Session is archived and will not be visible after it closes. You can unarchive it while it remains active.'
-          : '&#9888; Session is archived and will not be visible in the sessions list.';
-        archivedWarning.style.display = 'block';
-      }
-    } catch (e) {
-      toast('Failed to archive session', 'error');
-    }
+    document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
+    openModal({
+      title: 'Archive session',
+      body: '<p>This session will be hidden from the session list and excluded from search. Token usage will still be counted in statistics.</p><p>Are you sure you want to archive this session?</p>',
+      buttons: [{
+        label: 'Archive',
+        primary: true,
+        onClick: async () => {
+          try {
+            await api(`/api/projects/${slug}/sessions/${sessionId}/archive`, { method: 'POST' });
+            if (Sessions.cache[slug]) {
+              Sessions.cache[slug] = Sessions.cache[slug].filter(s => s.sessionId !== sessionId);
+            }
+            const archiveBtn = document.getElementById('session-detail-archive-btn');
+            const unarchiveBtn = document.getElementById('session-detail-unarchive-btn');
+            const archivedWarning = document.getElementById('session-archived-warning');
+            const isActive = !!(Sessions._detailInfo && Sessions._detailInfo.active);
+            if (archiveBtn) archiveBtn.style.display = 'none';
+            if (unarchiveBtn) unarchiveBtn.style.display = isActive ? '' : 'none';
+            if (archivedWarning) {
+              archivedWarning.innerHTML = isActive
+                ? '&#9888; Session is archived and will not be visible after it closes. You can unarchive it while it remains active.'
+                : '&#9888; Session is archived and will not be visible in the sessions list.';
+              archivedWarning.style.display = 'block';
+            }
+          } catch (e) {
+            toast('Failed to archive session', 'error');
+            return false;
+          }
+        }
+      }]
+    });
   },
 
   async unarchiveDetail() {
