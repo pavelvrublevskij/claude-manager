@@ -59,6 +59,10 @@ const App = {
     const collapsed = app.classList.toggle('sidebar-collapsed');
     btn.textContent = collapsed ? '›' : '‹';
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+    if (!collapsed && typeof ActiveSessionsBar !== 'undefined') {
+      ActiveSessionsBar._lastSidebarKey = null;
+      ActiveSessionsBar._renderSidebar();
+    }
   },
 
   // Build hash from current state
