@@ -10,7 +10,7 @@ const SESSION_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const SESSION_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const SESSION_C = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 const PROJECT_DIR = path.join(paths.PROJECTS_DIR, SLUG);
-const ARCHIVE_FILE = path.join(PROJECT_DIR, 'archived-sessions.json');
+const ARCHIVE_FILE = path.join(paths.DATA_DIR, 'archived-sessions.json');
 
 function writeJsonl(filePath, entries) {
   const content = entries.map(e => JSON.stringify(e)).join('\n') + '\n';
@@ -57,7 +57,7 @@ test('POST /archive marks session as archived', async () => {
   assert.strictEqual(res.status, 200);
   assert.strictEqual(res.body.ok, true);
   const archived = JSON.parse(fs.readFileSync(ARCHIVE_FILE, 'utf-8'));
-  assert.ok(archived.includes(SESSION_A));
+  assert.ok((archived[SLUG] || []).includes(SESSION_A));
 });
 
 test('GET /sessions excludes archived session', async () => {
@@ -97,7 +97,7 @@ test('POST /unarchive restores session', async () => {
   assert.strictEqual(res.status, 200);
   assert.strictEqual(res.body.ok, true);
   const archived = JSON.parse(fs.readFileSync(ARCHIVE_FILE, 'utf-8'));
-  assert.ok(!archived.includes(SESSION_A));
+  assert.ok(!(archived[SLUG] || []).includes(SESSION_A));
 });
 
 test('GET /sessions includes unarchived session again', async () => {

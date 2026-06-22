@@ -230,7 +230,7 @@ const Sessions = {
             Sessions.cache[slug] = (Sessions.cache[slug] || []).filter(s => s.sessionId !== sessionId);
             Sessions.renderList(slug, Sessions.applyFilters(Sessions.cache[slug]));
           } catch (e) {
-            toast('Failed to archive session', 'error');
+            toast(`Archive failed: ${e.message}`, 'error');
             return false;
           }
         }
@@ -248,6 +248,31 @@ const Sessions = {
     }
   },
 
+  _archiveIconSvg: '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:5px"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v1.5C0 5.216.784 6 1.75 6v6.25c0 .966.784 1.75 1.75 1.75h9c.966 0 1.75-.784 1.75-1.75V6A1.75 1.75 0 0 0 16 4.25v-1.5A1.75 1.75 0 0 0 14.25 1ZM6.5 9.5h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1 0-1.5Z"/></svg>',
+
+  _setDetailArchivedUI(isActive) {
+    const archiveBtn = document.getElementById('session-detail-archive-btn');
+    const unarchiveBtn = document.getElementById('session-detail-unarchive-btn');
+    const warning = document.getElementById('session-archived-warning');
+    if (archiveBtn) archiveBtn.style.display = 'none';
+    if (unarchiveBtn) unarchiveBtn.style.display = isActive ? '' : 'none';
+    if (warning) {
+      warning.innerHTML = Sessions._archiveIconSvg + (isActive
+        ? 'Session marked as archive and will not be visible later after session close. Is possible to unmark during this session.'
+        : 'Session is archived and will not be visible in the sessions list.');
+      warning.style.display = 'block';
+    }
+  },
+
+  _clearDetailArchivedUI() {
+    const archiveBtn = document.getElementById('session-detail-archive-btn');
+    const unarchiveBtn = document.getElementById('session-detail-unarchive-btn');
+    const warning = document.getElementById('session-archived-warning');
+    if (archiveBtn) archiveBtn.style.display = '';
+    if (unarchiveBtn) unarchiveBtn.style.display = 'none';
+    if (warning) warning.style.display = 'none';
+  },
+
   archiveDetail() {
     const { slug, sessionId } = Sessions.detailState;
     if (!slug || !sessionId) return;
@@ -260,24 +285,15 @@ const Sessions = {
         primary: true,
         onClick: async () => {
           try {
+            const cachedSession = (Sessions.cache[slug] || []).find(s => s.sessionId === sessionId);
+            const isActive = !!(Sessions._detailInfo && Sessions._detailInfo.active) || !!(cachedSession && cachedSession.active);
             await api(`/api/projects/${slug}/sessions/${sessionId}/archive`, { method: 'POST' });
             if (Sessions.cache[slug]) {
               Sessions.cache[slug] = Sessions.cache[slug].filter(s => s.sessionId !== sessionId);
             }
-            const archiveBtn = document.getElementById('session-detail-archive-btn');
-            const unarchiveBtn = document.getElementById('session-detail-unarchive-btn');
-            const archivedWarning = document.getElementById('session-archived-warning');
-            const isActive = !!(Sessions._detailInfo && Sessions._detailInfo.active);
-            if (archiveBtn) archiveBtn.style.display = 'none';
-            if (unarchiveBtn) unarchiveBtn.style.display = isActive ? '' : 'none';
-            if (archivedWarning) {
-              archivedWarning.innerHTML = isActive
-                ? '&#9888; Session is archived and will not be visible after it closes. You can unarchive it while it remains active.'
-                : '&#9888; Session is archived and will not be visible in the sessions list.';
-              archivedWarning.style.display = 'block';
-            }
+            Sessions._setDetailArchivedUI(isActive);
           } catch (e) {
-            toast('Failed to archive session', 'error');
+            toast(`Archive failed: ${e.message}`, 'error');
             return false;
           }
         }
@@ -290,12 +306,7 @@ const Sessions = {
     if (!slug || !sessionId) return;
     try {
       await api(`/api/projects/${slug}/sessions/${sessionId}/unarchive`, { method: 'POST' });
-      const archiveBtn = document.getElementById('session-detail-archive-btn');
-      const unarchiveBtn = document.getElementById('session-detail-unarchive-btn');
-      const archivedWarning = document.getElementById('session-archived-warning');
-      if (archiveBtn) archiveBtn.style.display = '';
-      if (unarchiveBtn) unarchiveBtn.style.display = 'none';
-      if (archivedWarning) archivedWarning.style.display = 'none';
+      Sessions._clearDetailArchivedUI();
     } catch (e) {
       toast('Failed to unarchive session', 'error');
     }
@@ -684,6 +695,7 @@ const Sessions = {
     if (!meta) return;
     const info = Sessions._detailInfo || {};
     const merged = Object.assign({}, info, stats || {});
+    if (stats) Sessions._detailInfo = merged;
 
     // Fill title from stats when navigated without info (e.g. from dashboard)
     const title = document.getElementById('session-detail-title');
@@ -719,6 +731,10 @@ const Sessions = {
     Sessions.renderDetailBranches(merged);
     if (merged.lastGitBranch) Sessions.detailState.lastGitBranch = merged.lastGitBranch;
     Sessions.updateBranchWarning(Sessions.detailState.lastGitBranch || merged.lastGitBranch);
+
+    if (stats && typeof stats.archived !== 'undefined' && stats.archived) {
+      Sessions._setDetailArchivedUI(stats.active);
+    }
   },
 
   updateBranchWarning(lastGitBranch) {
@@ -778,12 +794,7 @@ const Sessions = {
 
     Sessions.detailState = { slug, sessionId, offset: 0, loading: false, hasMore: false, total: 0 };
     Sessions._pendingFlash = undefined;
-    const archiveBtn = document.getElementById('session-detail-archive-btn');
-    const unarchiveBtn = document.getElementById('session-detail-unarchive-btn');
-    const archivedWarning = document.getElementById('session-archived-warning');
-    if (archiveBtn) archiveBtn.style.display = '';
-    if (unarchiveBtn) unarchiveBtn.style.display = 'none';
-    if (archivedWarning) archivedWarning.style.display = 'none';
+    Sessions._clearDetailArchivedUI();
     Sessions._activityLoaded = false;
     Sessions._activityItems = [];
     Sessions._activityFilter = null;
