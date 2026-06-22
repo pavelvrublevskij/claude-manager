@@ -337,6 +337,10 @@ function renderSessionCard(s, opts = {}) {
               <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.resumeBrowser('${slug}', '${s.sessionId}')">Resume in browser terminal</button>
               <button class="action-menu-item" data-slug="${slug}" data-session="${s.sessionId}" data-title="${escapeHtml(s.summary || s.firstPrompt || '')}" onclick="event.stopPropagation(); Sessions.renameAction(this)">Rename</button>
               <button class="action-menu-item" onclick="event.stopPropagation(); Sessions.copyIdAction('${s.sessionId}')">Copy session ID</button>
+              ${opts.archived
+                ? `<button class="action-menu-item" onclick="event.stopPropagation(); Sessions.unarchiveAction('${slug}', '${s.sessionId}')">Unarchive</button>`
+                : `<button class="action-menu-item" onclick="event.stopPropagation(); Sessions.archiveAction('${slug}', '${s.sessionId}')">Archive</button>`
+              }
             </div>
           </div>
         </div>

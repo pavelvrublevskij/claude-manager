@@ -6,6 +6,7 @@ const Sessions = {
   _planFilter: false,
   _planSessionIds: null,
   _renderedGroups: [],
+  _showArchived: false,
   GROUP_COLLAPSED_KEY: 'claude-manager-collapsed-groups',
   _searchKey(slug) { return `claude-manager-search-history-${slug}`; },
   _detailSearchKey(slug) { return `claude-manager-detail-search-history-${slug}`; },
@@ -117,7 +118,7 @@ const Sessions = {
       const hasPlan = !!(hasPlanIds && hasPlanIds.has(s.sessionId));
       bodyHtml += renderSessionCard(s, {
         onclick: `Sessions.open('${slug}', '${s.sessionId}', ${ci >= 0 ? ci : i})`,
-        slug, dates: true, sidechain: true, hasPlan
+        slug, dates: true, sidechain: true, hasPlan, archived: Sessions._showArchived
       });
     });
 
@@ -152,6 +153,7 @@ const Sessions = {
   async load(slug) {
     if (Sessions._searchSlug !== slug) {
       Sessions._planFilter = false;
+      Sessions._showArchived = false;
       const cb = document.getElementById('filter-plan-only');
       if (cb) cb.checked = false;
     }
@@ -161,7 +163,10 @@ const Sessions = {
     showLoading(container, 'Loading sessions...');
 
     try {
-      const sessions = await api(`/api/projects/${slug}/sessions`);
+      const url = Sessions._showArchived
+        ? `/api/projects/${slug}/sessions?archived=true`
+        : `/api/projects/${slug}/sessions`;
+      const sessions = await api(url);
       Sessions.cache[slug] = sessions;
       Sessions.renderList(slug, Sessions.applyFilters(sessions));
     } catch (e) {
@@ -205,7 +210,76 @@ const Sessions = {
     Sessions.rerenderWithFilter();
   },
 
+  toggleArchived(slug) {
+    Sessions._showArchived = !Sessions._showArchived;
+    Sessions._lastQuery = '';
+    Sessions.load(slug);
+  },
+
+  async archiveAction(slug, sessionId) {
+    try {
+      await api(`/api/projects/${slug}/sessions/${sessionId}/archive`, { method: 'POST' });
+      Sessions.cache[slug] = (Sessions.cache[slug] || []).filter(s => s.sessionId !== sessionId);
+      Sessions.renderList(slug, Sessions.applyFilters(Sessions.cache[slug]));
+    } catch (e) {
+      toast('Failed to archive session', 'error');
+    }
+  },
+
+  async unarchiveAction(slug, sessionId) {
+    try {
+      await api(`/api/projects/${slug}/sessions/${sessionId}/unarchive`, { method: 'POST' });
+      Sessions.cache[slug] = (Sessions.cache[slug] || []).filter(s => s.sessionId !== sessionId);
+      Sessions.renderList(slug, Sessions.applyFilters(Sessions.cache[slug]));
+    } catch (e) {
+      toast('Failed to unarchive session', 'error');
+    }
+  },
+
+  async archiveDetail() {
+    const { slug, sessionId } = Sessions.detailState;
+    if (!slug || !sessionId) return;
+    try {
+      await api(`/api/projects/${slug}/sessions/${sessionId}/archive`, { method: 'POST' });
+      if (Sessions.cache[slug]) {
+        Sessions.cache[slug] = Sessions.cache[slug].filter(s => s.sessionId !== sessionId);
+      }
+      const archiveBtn = document.getElementById('session-detail-archive-btn');
+      const unarchiveBtn = document.getElementById('session-detail-unarchive-btn');
+      const archivedWarning = document.getElementById('session-archived-warning');
+      const isActive = !!(Sessions._detailInfo && Sessions._detailInfo.active);
+      if (archiveBtn) archiveBtn.style.display = 'none';
+      if (unarchiveBtn) unarchiveBtn.style.display = isActive ? '' : 'none';
+      if (archivedWarning) {
+        archivedWarning.innerHTML = isActive
+          ? '&#9888; Session is archived and will not be visible after it closes. You can unarchive it while it remains active.'
+          : '&#9888; Session is archived and will not be visible in the sessions list.';
+        archivedWarning.style.display = 'block';
+      }
+    } catch (e) {
+      toast('Failed to archive session', 'error');
+    }
+  },
+
+  async unarchiveDetail() {
+    const { slug, sessionId } = Sessions.detailState;
+    if (!slug || !sessionId) return;
+    try {
+      await api(`/api/projects/${slug}/sessions/${sessionId}/unarchive`, { method: 'POST' });
+      const archiveBtn = document.getElementById('session-detail-archive-btn');
+      const unarchiveBtn = document.getElementById('session-detail-unarchive-btn');
+      const archivedWarning = document.getElementById('session-archived-warning');
+      if (archiveBtn) archiveBtn.style.display = '';
+      if (unarchiveBtn) unarchiveBtn.style.display = 'none';
+      if (archivedWarning) archivedWarning.style.display = 'none';
+    } catch (e) {
+      toast('Failed to unarchive session', 'error');
+    }
+  },
+
   renderSearchBar(slug) {
+    const archivedBtnClass = Sessions._showArchived ? 'btn btn-sm btn-secondary btn-active' : 'btn btn-sm btn-secondary';
+    const archivedBtnTitle = Sessions._showArchived ? 'Showing archived sessions — click to show active' : 'Show archived sessions';
     return `<div class="session-search-wrap">
       <div class="session-search-container" onmouseenter="Sessions._cancelHideHistoryDropdown()" onmouseleave="Sessions._hideHistoryDropdownDelayed()">
         <input type="text" class="session-search" id="session-search-input"
@@ -215,6 +289,7 @@ const Sessions = {
           onblur="Sessions._hideHistoryDropdownDelayed()">
         <div class="search-history-dropdown" id="search-history-dropdown" style="display:none"></div>
       </div>
+      <button class="${archivedBtnClass}" title="${archivedBtnTitle}" onclick="Sessions.toggleArchived('${slug}')">Archive</button>
       <div class="action-menu">
         <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); Sessions.toggleActionMenu(this)">New Session &#9662;</button>
         <div class="action-menu-panel">
@@ -445,7 +520,8 @@ const Sessions = {
       dates: true,
       sidechain: true,
       snippets: snippetsHtml,
-      hasPlan
+      hasPlan,
+      archived: Sessions._showArchived
     });
   },
 
@@ -678,6 +754,12 @@ const Sessions = {
 
     Sessions.detailState = { slug, sessionId, offset: 0, loading: false, hasMore: false, total: 0 };
     Sessions._pendingFlash = undefined;
+    const archiveBtn = document.getElementById('session-detail-archive-btn');
+    const unarchiveBtn = document.getElementById('session-detail-unarchive-btn');
+    const archivedWarning = document.getElementById('session-archived-warning');
+    if (archiveBtn) archiveBtn.style.display = '';
+    if (unarchiveBtn) unarchiveBtn.style.display = 'none';
+    if (archivedWarning) archivedWarning.style.display = 'none';
     Sessions._activityLoaded = false;
     Sessions._activityItems = [];
     Sessions._activityFilter = null;

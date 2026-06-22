@@ -4,6 +4,7 @@
 
 - **Branch mismatch warning** — when a session's last recorded branch differs from the project's current git branch, an amber warning banner appears at the top of the session header with the two branch names and a prompt to switch before continuing. Only shown when git is available in the project.
 - **Branch mismatch indicator on active sessions** — the active sessions bar (bottom pill strip) and the sidebar session sub-items now show a ⚠ icon when a background session's branch no longer matches the current project branch, with a tooltip showing both names. Refreshed on every poll cycle.
+- **Session archiving** — sessions can be archived via the ⋮ action menu in the session list or in the session detail view. Archived sessions are hidden from the session list and excluded from search results but remain fully counted in token usage and cost statistics. An "Archive" toggle button in the session list header switches to the archived view, where sessions can be unarchived. In the session detail view, archiving shows an amber warning banner; if the session is still active, an "Unarchive" button also appears so an accidental archive can be immediately undone.
 
 ## v1.2.1
 
