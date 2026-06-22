@@ -15,6 +15,7 @@ const activeSessions = require('../lib/active-sessions');
 const { stampActive, listAllActiveSessions } = require('../lib/session-status');
 const { MAX_SNIPPETS, extractEntrySnippets, extractMetaSnippet } = require('../lib/session-search');
 const { collectFromJsonl, collectFromDir } = require('../lib/session-activity');
+const { getArchivedIds, archiveSession, unarchiveSession } = require('../lib/session-archive');
 
 const router = express.Router({ mergeParams: true });
 
@@ -98,16 +99,22 @@ function launchTerminal(projectPath, cmd) {
 
 router.get('/active', wrapRoute((req, res) => {
   const all = listAllActiveSessions();
+  const archivedBySlug = {};
   const result = all
     .filter(({ sessionId }) => !sessionId.includes('..') && !sessionId.includes('/') && !sessionId.includes('\\'))
     .map(({ slug, sessionId, kind }) => {
       const dir = safeSlug(slug);
       let title = '';
+      let lastGitBranch = '';
       if (dir) {
         const filePath = path.join(dir, sessionId + '.jsonl');
         title = getCachedTitle(filePath);
+        const branches = collectBranches(filePath);
+        lastGitBranch = branches.length ? branches[branches.length - 1] : '';
       }
-      return { slug, sessionId, title: title || '', kind };
+      if (!archivedBySlug[slug]) archivedBySlug[slug] = getArchivedIds(slug);
+      const archived = archivedBySlug[slug].has(sessionId);
+      return { slug, sessionId, title: title || '', kind, lastGitBranch, archived };
     });
   res.json(result);
 }));
@@ -115,6 +122,9 @@ router.get('/active', wrapRoute((req, res) => {
 router.get('/:slug/sessions', wrapRoute((req, res) => {
   const dir = safeSlug(req.params.slug);
   if (!dir) return res.status(400).json({ error: 'Invalid slug' });
+
+  const showArchived = req.query.archived === 'true';
+  const archivedIds = getArchivedIds(req.params.slug);
 
   const indexFile = path.join(dir, 'sessions-index.json');
   if (fs.existsSync(indexFile)) {
@@ -130,7 +140,7 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
         gitBranch: e.gitBranch || '',
         gitBranches: [],
         isSidechain: e.isSidechain || false
-      }));
+      })).filter(s => showArchived ? archivedIds.has(s.sessionId) : !archivedIds.has(s.sessionId));
       sessions.forEach(s => {
         const filePath = path.join(dir, s.sessionId + '.jsonl');
         const custom = getCustomTitle(filePath);
@@ -218,7 +228,7 @@ router.get('/:slug/sessions', wrapRoute((req, res) => {
   });
 
   const usageMap = getProjectUsageMap(req.params.slug);
-  const filtered = sessions.filter(s => s.messageCount > 0);
+  const filtered = sessions.filter(s => s.messageCount > 0 && (showArchived ? archivedIds.has(s.sessionId) : !archivedIds.has(s.sessionId)));
   filtered.forEach(s => {
     const u = usageMap[s.sessionId];
     if (u) { s.tokens = u.totals; s.cost = u.cost; s.models = Object.keys(u.byModel || {}); }
@@ -236,6 +246,7 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
   if (q.length < 2) return res.json([]);
 
   const qLower = q.toLowerCase();
+  const archivedIds = getArchivedIds(req.params.slug);
 
   // Load index metadata if available
   const indexMeta = {};
@@ -249,7 +260,7 @@ router.get('/:slug/sessions/search', wrapRoute((req, res) => {
     } catch (_) {}
   }
 
-  const files = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl'));
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl') && !archivedIds.has(f.replace('.jsonl', '')));
   const results = [];
 
   for (const f of files) {
@@ -510,6 +521,9 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
   if (cachedHasPlan === undefined) planCache.set(sessionId, hasPlan);
 
   const gitBranch = gitBranches[0] || '';
+  const activeList = listAllActiveSessions();
+  const isActive = activeList.some(s => s.sessionId === sessionId && s.slug === req.params.slug);
+  const archivedIds = getArchivedIds(req.params.slug);
   const stats = {
     messageCount: userMessageCount,
     summary: customTitle || indexSummary || firstPrompt.slice(0, 80) || '',
@@ -520,7 +534,9 @@ router.get('/:slug/sessions/:sessionId', wrapRoute((req, res) => {
     lastGitBranch,
     isSidechain,
     hasPlan,
-    remoteControlled: hasBridgeSession(filePath)
+    remoteControlled: hasBridgeSession(filePath),
+    active: isActive,
+    archived: archivedIds.has(sessionId),
   };
   if (usage) {
     stats.tokens = usage.totals;
@@ -715,6 +731,36 @@ router.post('/:slug/sessions/:sessionId/rename', wrapRoute((req, res) => {
   }
 
   res.json({ ok: true, title });
+}));
+
+router.post('/:slug/sessions/:sessionId/archive', wrapRoute((req, res) => {
+  const dir = safeSlug(req.params.slug);
+  if (!dir) return res.status(400).json({ error: 'Invalid slug' });
+
+  const sessionId = req.params.sessionId;
+  if (sessionId.includes('..') || sessionId.includes('/') || sessionId.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid session ID' });
+  }
+
+  if (!fs.existsSync(path.join(dir, sessionId + '.jsonl'))) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+
+  archiveSession(req.params.slug, sessionId);
+  res.json({ ok: true });
+}));
+
+router.post('/:slug/sessions/:sessionId/unarchive', wrapRoute((req, res) => {
+  const dir = safeSlug(req.params.slug);
+  if (!dir) return res.status(400).json({ error: 'Invalid slug' });
+
+  const sessionId = req.params.sessionId;
+  if (sessionId.includes('..') || sessionId.includes('/') || sessionId.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid session ID' });
+  }
+
+  unarchiveSession(req.params.slug, sessionId);
+  res.json({ ok: true });
 }));
 
 module.exports = router;

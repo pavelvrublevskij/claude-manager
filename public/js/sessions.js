@@ -6,6 +6,7 @@ const Sessions = {
   _planFilter: false,
   _planSessionIds: null,
   _renderedGroups: [],
+  _showArchived: false,
   GROUP_COLLAPSED_KEY: 'claude-manager-collapsed-groups',
   _searchKey(slug) { return `claude-manager-search-history-${slug}`; },
   _detailSearchKey(slug) { return `claude-manager-detail-search-history-${slug}`; },
@@ -117,7 +118,7 @@ const Sessions = {
       const hasPlan = !!(hasPlanIds && hasPlanIds.has(s.sessionId));
       bodyHtml += renderSessionCard(s, {
         onclick: `Sessions.open('${slug}', '${s.sessionId}', ${ci >= 0 ? ci : i})`,
-        slug, dates: true, sidechain: true, hasPlan
+        slug, dates: true, sidechain: true, hasPlan, archived: Sessions._showArchived
       });
     });
 
@@ -152,6 +153,7 @@ const Sessions = {
   async load(slug) {
     if (Sessions._searchSlug !== slug) {
       Sessions._planFilter = false;
+      Sessions._showArchived = false;
       const cb = document.getElementById('filter-plan-only');
       if (cb) cb.checked = false;
     }
@@ -161,7 +163,10 @@ const Sessions = {
     showLoading(container, 'Loading sessions...');
 
     try {
-      const sessions = await api(`/api/projects/${slug}/sessions`);
+      const url = Sessions._showArchived
+        ? `/api/projects/${slug}/sessions?archived=true`
+        : `/api/projects/${slug}/sessions`;
+      const sessions = await api(url);
       Sessions.cache[slug] = sessions;
       Sessions.renderList(slug, Sessions.applyFilters(sessions));
     } catch (e) {
@@ -205,7 +210,111 @@ const Sessions = {
     Sessions.rerenderWithFilter();
   },
 
+  toggleArchived(slug) {
+    Sessions._showArchived = !Sessions._showArchived;
+    Sessions._lastQuery = '';
+    Sessions.load(slug);
+  },
+
+  archiveAction(slug, sessionId) {
+    document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
+    openModal({
+      title: 'Archive session',
+      body: '<p>This session will be hidden from the session list and excluded from search. Token usage will still be counted in statistics.</p><p>Are you sure you want to archive this session?</p>',
+      buttons: [{
+        label: 'Archive',
+        primary: true,
+        onClick: async () => {
+          try {
+            await api(`/api/projects/${slug}/sessions/${sessionId}/archive`, { method: 'POST' });
+            Sessions.cache[slug] = (Sessions.cache[slug] || []).filter(s => s.sessionId !== sessionId);
+            Sessions.renderList(slug, Sessions.applyFilters(Sessions.cache[slug]));
+          } catch (e) {
+            toast(`Archive failed: ${e.message}`, 'error');
+            return false;
+          }
+        }
+      }]
+    });
+  },
+
+  async unarchiveAction(slug, sessionId) {
+    try {
+      await api(`/api/projects/${slug}/sessions/${sessionId}/unarchive`, { method: 'POST' });
+      Sessions.cache[slug] = (Sessions.cache[slug] || []).filter(s => s.sessionId !== sessionId);
+      Sessions.renderList(slug, Sessions.applyFilters(Sessions.cache[slug]));
+    } catch (e) {
+      toast('Failed to unarchive session', 'error');
+    }
+  },
+
+  _archiveIconSvg: '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:5px"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v1.5C0 5.216.784 6 1.75 6v6.25c0 .966.784 1.75 1.75 1.75h9c.966 0 1.75-.784 1.75-1.75V6A1.75 1.75 0 0 0 16 4.25v-1.5A1.75 1.75 0 0 0 14.25 1ZM6.5 9.5h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1 0-1.5Z"/></svg>',
+
+  _setDetailArchivedUI(isActive) {
+    const archiveBtn = document.getElementById('session-detail-archive-btn');
+    const unarchiveBtn = document.getElementById('session-detail-unarchive-btn');
+    const warning = document.getElementById('session-archived-warning');
+    if (archiveBtn) archiveBtn.style.display = 'none';
+    if (unarchiveBtn) unarchiveBtn.style.display = isActive ? '' : 'none';
+    if (warning) {
+      warning.innerHTML = Sessions._archiveIconSvg + (isActive
+        ? 'Session marked as archive and will not be visible later after session close. Is possible to unmark during this session.'
+        : 'Session is archived and will not be visible in the sessions list.');
+      warning.style.display = 'block';
+    }
+  },
+
+  _clearDetailArchivedUI() {
+    const archiveBtn = document.getElementById('session-detail-archive-btn');
+    const unarchiveBtn = document.getElementById('session-detail-unarchive-btn');
+    const warning = document.getElementById('session-archived-warning');
+    if (archiveBtn) archiveBtn.style.display = '';
+    if (unarchiveBtn) unarchiveBtn.style.display = 'none';
+    if (warning) warning.style.display = 'none';
+  },
+
+  archiveDetail() {
+    const { slug, sessionId } = Sessions.detailState;
+    if (!slug || !sessionId) return;
+    document.querySelectorAll('.action-menu-panel.open').forEach(p => p.classList.remove('open'));
+    openModal({
+      title: 'Archive session',
+      body: '<p>This session will be hidden from the session list and excluded from search. Token usage will still be counted in statistics.</p><p>Are you sure you want to archive this session?</p>',
+      buttons: [{
+        label: 'Archive',
+        primary: true,
+        onClick: async () => {
+          try {
+            const cachedSession = (Sessions.cache[slug] || []).find(s => s.sessionId === sessionId);
+            const isActive = !!(Sessions._detailInfo && Sessions._detailInfo.active) || !!(cachedSession && cachedSession.active);
+            await api(`/api/projects/${slug}/sessions/${sessionId}/archive`, { method: 'POST' });
+            if (Sessions.cache[slug]) {
+              Sessions.cache[slug] = Sessions.cache[slug].filter(s => s.sessionId !== sessionId);
+            }
+            Sessions._setDetailArchivedUI(isActive);
+          } catch (e) {
+            toast(`Archive failed: ${e.message}`, 'error');
+            return false;
+          }
+        }
+      }]
+    });
+  },
+
+  async unarchiveDetail() {
+    const { slug, sessionId } = Sessions.detailState;
+    if (!slug || !sessionId) return;
+    try {
+      await api(`/api/projects/${slug}/sessions/${sessionId}/unarchive`, { method: 'POST' });
+      Sessions._clearDetailArchivedUI();
+    } catch (e) {
+      toast('Failed to unarchive session', 'error');
+    }
+  },
+
   renderSearchBar(slug) {
+    const archivedBtnClass = Sessions._showArchived ? 'btn btn-sm btn-secondary btn-active' : 'btn btn-sm btn-secondary';
+    const archivedBtnTitle = Sessions._showArchived ? 'Showing archived sessions — click to show active' : 'Show archived sessions';
     return `<div class="session-search-wrap">
       <div class="session-search-container" onmouseenter="Sessions._cancelHideHistoryDropdown()" onmouseleave="Sessions._hideHistoryDropdownDelayed()">
         <input type="text" class="session-search" id="session-search-input"
@@ -215,6 +324,7 @@ const Sessions = {
           onblur="Sessions._hideHistoryDropdownDelayed()">
         <div class="search-history-dropdown" id="search-history-dropdown" style="display:none"></div>
       </div>
+      <button class="${archivedBtnClass}" title="${archivedBtnTitle}" onclick="Sessions.toggleArchived('${slug}')">Archive</button>
       <div class="action-menu">
         <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); Sessions.toggleActionMenu(this)">New Session &#9662;</button>
         <div class="action-menu-panel">
@@ -445,7 +555,8 @@ const Sessions = {
       dates: true,
       sidechain: true,
       snippets: snippetsHtml,
-      hasPlan
+      hasPlan,
+      archived: Sessions._showArchived
     });
   },
 
@@ -584,6 +695,7 @@ const Sessions = {
     if (!meta) return;
     const info = Sessions._detailInfo || {};
     const merged = Object.assign({}, info, stats || {});
+    if (stats) Sessions._detailInfo = merged;
 
     // Fill title from stats when navigated without info (e.g. from dashboard)
     const title = document.getElementById('session-detail-title');
@@ -617,6 +729,28 @@ const Sessions = {
     meta.innerHTML = projectHtml + planBadge + createdHtml + renderSessionBadges(merged, { sidechain: true, modelPricing: true, skipBranches: true });
 
     Sessions.renderDetailBranches(merged);
+    if (merged.lastGitBranch) Sessions.detailState.lastGitBranch = merged.lastGitBranch;
+    Sessions.updateBranchWarning(Sessions.detailState.lastGitBranch || merged.lastGitBranch);
+
+    if (stats && typeof stats.archived !== 'undefined' && stats.archived) {
+      Sessions._setDetailArchivedUI(stats.active);
+    }
+  },
+
+  updateBranchWarning(lastGitBranch) {
+    const el = document.getElementById('session-branch-warning');
+    if (!el) return;
+    if (typeof GitActions === 'undefined' || !GitActions._info || !GitActions._info.available) {
+      el.style.display = 'none';
+      return;
+    }
+    const projectBranch = GitActions._info.branch;
+    if (lastGitBranch && projectBranch && lastGitBranch !== projectBranch) {
+      el.innerHTML = `<span class="branch-warn-icon">&#9888;</span> <strong>WARNING!!!</strong> This session was on branch <code>${escapeHtml(lastGitBranch)}</code> but the project is currently on <code>${escapeHtml(projectBranch)}</code>. Switch to the correct branch before continuing, or you may be working in the wrong context.`;
+      el.style.display = 'block';
+    } else {
+      el.style.display = 'none';
+    }
   },
 
   renderDetailBranches(s) {
@@ -660,6 +794,7 @@ const Sessions = {
 
     Sessions.detailState = { slug, sessionId, offset: 0, loading: false, hasMore: false, total: 0 };
     Sessions._pendingFlash = undefined;
+    Sessions._clearDetailArchivedUI();
     Sessions._activityLoaded = false;
     Sessions._activityItems = [];
     Sessions._activityFilter = null;
@@ -785,9 +920,15 @@ const Sessions = {
         Sessions.annotateDetailPlan(data.stats);
       }
 
+      if (typeof GitActions !== 'undefined') GitActions.refresh().then(() => {
+        const state2 = Sessions.detailState;
+        if (state2.slug === slugAtStart && state2.sessionId === sessionAtStart) {
+          Sessions.updateBranchWarning((data.stats || {}).lastGitBranch);
+        }
+      }).catch(() => {});
+
       if (typeof data.total === 'number' && data.total > state.total) {
         Sessions.refreshActivity();
-        if (typeof GitActions !== 'undefined') GitActions.refresh();
       }
       if (typeof data.total !== 'number' || data.total <= state.total) return;
 

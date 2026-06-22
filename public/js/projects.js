@@ -59,7 +59,10 @@ const Projects = {
     const countEl = document.getElementById('project-nav-count');
     if (countEl) countEl.textContent = Projects.data.length;
     if (typeof ActiveCount !== 'undefined') ActiveCount.refresh();
-    if (typeof ActiveSessionsBar !== 'undefined') ActiveSessionsBar._renderSidebar();
+    if (typeof ActiveSessionsBar !== 'undefined') {
+      ActiveSessionsBar._lastSidebarKey = null;
+      ActiveSessionsBar._renderSidebar();
+    }
   },
 
   async openFolder(slug) {
