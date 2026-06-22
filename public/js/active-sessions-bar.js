@@ -3,6 +3,7 @@ const ActiveSessionsBar = {
   _timer: null,
   _sessions: [],
   _lastSidebarKey: null,
+  _projectBranches: {},
 
   start() {
     ActiveSessionsBar.poll();
@@ -46,9 +47,27 @@ const ActiveSessionsBar = {
     try {
       const sessions = await api('/api/projects/active');
       ActiveSessionsBar._sessions = sessions || [];
+      await ActiveSessionsBar._fetchProjectBranches();
       ActiveSessionsBar._render();
       ActiveSessionsBar._renderSidebar();
     } catch (_) {}
+  },
+
+  async _fetchProjectBranches() {
+    const slugs = [...new Set(ActiveSessionsBar._sessions.map(s => s.slug))];
+    await Promise.all(slugs.map(async slug => {
+      try {
+        const info = await api(`/api/projects/${encodeURIComponent(slug)}/git/info`);
+        ActiveSessionsBar._projectBranches[slug] = info.available ? (info.branch || '') : '';
+      } catch (_) {
+        ActiveSessionsBar._projectBranches[slug] = '';
+      }
+    }));
+  },
+
+  _hasBranchMismatch(s) {
+    const projectBranch = ActiveSessionsBar._projectBranches[s.slug];
+    return !!(s.lastGitBranch && projectBranch && s.lastGitBranch !== projectBranch);
   },
 
   _render() {
@@ -82,8 +101,11 @@ const ActiveSessionsBar = {
       const pills = group.map(s => {
         const label = s.title || s.sessionId.slice(0, 12);
         const isCurrent = s.sessionId === currentSessionId;
-        return `<div class="asb-pill${isCurrent ? ' asb-pill--current' : ''}" data-asb-session="${escapeHtml(s.sessionId)}" data-asb-slug="${escapeHtml(s.slug)}" title="${escapeHtml(s.title || s.sessionId)}">
+        const warn = ActiveSessionsBar._hasBranchMismatch(s);
+        const warnIcon = warn ? `<span class="asb-branch-warn-icon" title="Branch mismatch: session on &quot;${escapeHtml(s.lastGitBranch)}&quot;, project on &quot;${escapeHtml(ActiveSessionsBar._projectBranches[s.slug])}&quot;">&#9888;</span>` : '';
+        return `<div class="asb-pill${isCurrent ? ' asb-pill--current' : ''}${warn ? ' asb-pill--branch-warn' : ''}" data-asb-session="${escapeHtml(s.sessionId)}" data-asb-slug="${escapeHtml(s.slug)}" title="${escapeHtml(s.title || s.sessionId)}">
           <span class="session-active-dot session-active-dot--${s.kind}"></span>
+          ${warnIcon}
           <span class="asb-session">${escapeHtml(label)}</span>
           <button class="asb-close" data-asb-close-session="${escapeHtml(s.sessionId)}" data-asb-close-slug="${escapeHtml(s.slug)}" title="Close session" aria-label="Close">&#215;</button>
         </div>`;
@@ -113,7 +135,7 @@ const ActiveSessionsBar = {
   _renderSidebar() {
     const inSession = typeof App !== 'undefined' && App.currentView === 'session-detail';
     const currentSessionId = inSession && typeof Sessions !== 'undefined' ? Sessions.detailState.sessionId : null;
-    const key = ActiveSessionsBar._sessions.map(s => s.slug + '|' + s.sessionId).join(',') + '|' + currentSessionId;
+    const key = ActiveSessionsBar._sessions.map(s => s.slug + '|' + s.sessionId + '|' + ActiveSessionsBar._hasBranchMismatch(s)).join(',') + '|' + currentSessionId;
     if (key === ActiveSessionsBar._lastSidebarKey) return;
     ActiveSessionsBar._lastSidebarKey = key;
 
@@ -143,7 +165,9 @@ const ActiveSessionsBar = {
         closeBtn.addEventListener('click', (function(slug, sessionId) {
           return e => { e.stopPropagation(); ActiveSessionsBar.close(slug, sessionId); };
         }(s.slug, s.sessionId)));
-        div.innerHTML = `<span class="session-active-dot session-active-dot--${s.kind}"></span><span class="nav-label">${escapeHtml(label)}</span>`;
+        const warn = ActiveSessionsBar._hasBranchMismatch(s);
+        const warnIcon = warn ? `<span class="asb-branch-warn-icon" title="Branch mismatch: session on &quot;${escapeHtml(s.lastGitBranch)}&quot;, project on &quot;${escapeHtml(ActiveSessionsBar._projectBranches[s.slug])}&quot;">&#9888;</span>` : '';
+        div.innerHTML = `<span class="session-active-dot session-active-dot--${s.kind}"></span>${warnIcon}<span class="nav-label">${escapeHtml(label)}</span>`;
         div.appendChild(closeBtn);
         div.addEventListener('click', (function(slug, sessionId) {
           return () => ActiveSessionsBar.open(slug, sessionId);

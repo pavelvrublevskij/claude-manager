@@ -617,6 +617,24 @@ const Sessions = {
     meta.innerHTML = projectHtml + planBadge + createdHtml + renderSessionBadges(merged, { sidechain: true, modelPricing: true, skipBranches: true });
 
     Sessions.renderDetailBranches(merged);
+    if (merged.lastGitBranch) Sessions.detailState.lastGitBranch = merged.lastGitBranch;
+    Sessions.updateBranchWarning(Sessions.detailState.lastGitBranch || merged.lastGitBranch);
+  },
+
+  updateBranchWarning(lastGitBranch) {
+    const el = document.getElementById('session-branch-warning');
+    if (!el) return;
+    if (typeof GitActions === 'undefined' || !GitActions._info || !GitActions._info.available) {
+      el.style.display = 'none';
+      return;
+    }
+    const projectBranch = GitActions._info.branch;
+    if (lastGitBranch && projectBranch && lastGitBranch !== projectBranch) {
+      el.innerHTML = `<span class="branch-warn-icon">&#9888;</span> <strong>WARNING!!!</strong> This session was on branch <code>${escapeHtml(lastGitBranch)}</code> but the project is currently on <code>${escapeHtml(projectBranch)}</code>. Switch to the correct branch before continuing, or you may be working in the wrong context.`;
+      el.style.display = 'block';
+    } else {
+      el.style.display = 'none';
+    }
   },
 
   renderDetailBranches(s) {
@@ -785,9 +803,15 @@ const Sessions = {
         Sessions.annotateDetailPlan(data.stats);
       }
 
+      if (typeof GitActions !== 'undefined') GitActions.refresh().then(() => {
+        const state2 = Sessions.detailState;
+        if (state2.slug === slugAtStart && state2.sessionId === sessionAtStart) {
+          Sessions.updateBranchWarning((data.stats || {}).lastGitBranch);
+        }
+      }).catch(() => {});
+
       if (typeof data.total === 'number' && data.total > state.total) {
         Sessions.refreshActivity();
-        if (typeof GitActions !== 'undefined') GitActions.refresh();
       }
       if (typeof data.total !== 'number' || data.total <= state.total) return;
 

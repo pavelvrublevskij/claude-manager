@@ -211,7 +211,11 @@ const App = {
       document.getElementById('view-session-detail').classList.add('active');
       App.currentProject = opts.slug;
       Sessions.loadDetail(opts.slug, opts.sessionId, opts.sessionInfo);
-      if (typeof GitActions !== 'undefined') GitActions.init(opts.slug);
+      if (typeof GitActions !== 'undefined') GitActions.init(opts.slug).then(() => {
+        if (typeof Sessions !== 'undefined' && App.currentView === 'session-detail') {
+          Sessions.updateBranchWarning(Sessions.detailState.lastGitBranch || '');
+        }
+      });
       if (typeof ActiveSessionsBar !== 'undefined') { ActiveSessionsBar._render(); ActiveSessionsBar._renderSidebar(); }
     }
 

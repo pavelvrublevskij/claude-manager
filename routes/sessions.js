@@ -103,11 +103,14 @@ router.get('/active', wrapRoute((req, res) => {
     .map(({ slug, sessionId, kind }) => {
       const dir = safeSlug(slug);
       let title = '';
+      let lastGitBranch = '';
       if (dir) {
         const filePath = path.join(dir, sessionId + '.jsonl');
         title = getCachedTitle(filePath);
+        const branches = collectBranches(filePath);
+        lastGitBranch = branches.length ? branches[branches.length - 1] : '';
       }
-      return { slug, sessionId, title: title || '', kind };
+      return { slug, sessionId, title: title || '', kind, lastGitBranch };
     });
   res.json(result);
 }));
