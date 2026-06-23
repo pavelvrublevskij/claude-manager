@@ -1,3 +1,9 @@
+## v1.3.1
+
+### Bug fixes
+
+- **Browser terminal failing on macOS** — clicking "Open browser terminal" raised `posix_spawnp failed` because `node-pty` tried to exec `claude` directly, which requires the binary to already be on the Node process's stripped PATH. Fixed by running claude through `/bin/sh -c 'claude "$@"' -- ...` so the shell resolves it from the user's full login PATH, mirroring the existing Windows fix that uses `cmd.exe /c claude`.
+
 ## v1.3.0
 
 ### Features
